@@ -1,0 +1,164 @@
+# This file is distributed under the same license as the xmltv2vdr package.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: vdr\n"
+"Report-Msgid-Bugs-To: <see README>\n"
+"POT-Creation-Date: 2010-12-28 18:28+0100\n"
+"PO-Revision-Date: 2010-12-23 23:59+0100\n"
+"Last-Translator: Jochen Dolze <vdr@dolze.de>\n"
+"Language-Team: <vdr@linuxtv.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "options"
+msgstr "Optionen"
+
+msgid "automatic wakeup"
+msgstr "automatisch Aufwachen"
+
+msgid "execution time"
+msgstr "Ausführung um"
+
+msgid "text mapping"
+msgstr "Textzuordnungen"
+
+msgid "epg sources"
+msgstr "EPG Quellen"
+
+msgid "no epgsources installed"
+msgstr "Keine EPG Quellen installiert"
+
+msgid "epg source channels"
+msgstr "EPG Quellkanäle"
+
+msgid "mapped"
+msgstr "zugewiesen"
+
+msgid "up"
+msgstr "hoch"
+
+msgid "down"
+msgstr "runter"
+
+msgid "edit"
+msgstr "editieren"
+
+msgid "texts"
+msgstr "Texte"
+
+msgid "country"
+msgstr "Land"
+
+msgid "year"
+msgstr "Jahr"
+
+msgid "originaltitle"
+msgstr "Originaltitel"
+
+msgid "director"
+msgstr "Regie"
+
+msgid "actor"
+msgstr "Darsteller"
+
+msgid "writer"
+msgstr "Drehbuch"
+
+msgid "adapter"
+msgstr "Adapter"
+
+msgid "producer"
+msgstr "Produzent"
+
+msgid "composer"
+msgstr "Musik"
+
+msgid "editor"
+msgstr "Schnitt"
+
+msgid "presenter"
+msgstr "Moderator"
+
+msgid "commentator"
+msgstr "Bericht"
+
+msgid "guest"
+msgstr "Gaststar"
+
+msgid "review"
+msgstr "Kritik"
+
+msgid "country and date"
+msgstr "Ort und Jahr"
+
+msgid "original title"
+msgstr "Originaltitel"
+
+msgid "credits"
+msgstr "Mitwirkende"
+
+msgid "days in advance"
+msgstr "Anzahl Tage"
+
+msgid "channels provided"
+msgstr "Verfügbare Kanäle"
+
+msgid "selected"
+msgstr "ausgewählt"
+
+msgid "epg source channel options"
+msgstr "EPG Quellkanal Optionen"
+
+msgid "type of processing"
+msgstr "Art der Bearbeitung"
+
+msgid "merge"
+msgstr "mischen"
+
+msgid "append"
+msgstr "hinzufügen"
+
+msgid "short text"
+msgstr "Kurztext"
+
+msgid "long text"
+msgstr "Langtext"
+
+msgid "merge long texts"
+msgstr "Langtexte zusammenführen"
+
+msgid "category"
+msgstr "Kategorie"
+
+msgid "rating"
+msgstr "Freigabe"
+
+msgid "video"
+msgstr "Video"
+
+msgid "audio"
+msgstr "Audio"
+
+msgid "vps"
+msgstr "VPS"
+
+msgid "epg source channel mappings"
+msgstr "EPG Quellkanalzuordnungen"
+
+msgid "none"
+msgstr "keine"
+
+msgid "unmap"
+msgstr "entfernen"
+
+msgid "map"
+msgstr "hinzufügen"
+
+msgid "choose"
+msgstr "Auswahl"
+
+msgid "xmltv2vdr plugin still working"
+msgstr "xmltv2vdr plugin ist noch aktiv"
+
