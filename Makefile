@@ -18,7 +18,7 @@ VERSION = $(shell grep 'static const char \*VERSION *=' $(PLUGIN).h | awk '{ pri
 ### The C++ compiler and options:
 
 CXX      ?= g++
-CXXFLAGS ?= -fPIC -g -O0 -Wall -Wextra -pedantic -Woverloaded-virtual -Wno-parentheses
+CXXFLAGS ?= -fPIC -g -O2 -Wall -Wextra -pedantic -Woverloaded-virtual -Wno-parentheses
 PKG-CONFIG ?= pkg-config
 
 ### The directory environment:
@@ -26,6 +26,10 @@ PKG-CONFIG ?= pkg-config
 VDRDIR = ../../..
 LIBDIR = ../../lib
 TMPDIR = /tmp
+
+### Make sure that necessary options are included:
+
+-include $(VDRDIR)/Make.global
 
 ### Allow user defined options to overwrite defaults:
 
@@ -85,7 +89,7 @@ I18Npot   = $(PODIR)/$(PLUGIN).pot
 %.mo: %.po
 	msgfmt -c -o $@ $<
 
-$(I18Npot): $(wildcard *.cpp)
+$(I18Npot): $(wildcard *.cpp *.h)
 	xgettext -C -cTRANSLATORS --no-wrap --no-location -k -ktr -ktrNOOP --msgid-bugs-address='<see README>' -o $@ $^
 
 %.po: $(I18Npot)

@@ -699,6 +699,7 @@ cMenuSetupXmltv2vdrChannelMap::cMenuSetupXmltv2vdrChannelMap(cPluginXmltv2vdr *P
     flags=map->Flags();
     days=map->Days();
     daysmax=getdaysmax();
+    c1=c2=c3=c4=cm=0;
     output();
 }
 
@@ -758,56 +759,77 @@ void cMenuSetupXmltv2vdrChannelMap::output(void)
     int current=Current();
 
     Clear();
+    cOsdItem *first=newtitle(tr("epg source channel options"));
+    Add(first,true);
 
-    Add(newtitle(tr("epg source channel options")));
-
-    Add(new cMenuEditIntItem(tr("days in advance"),&days,1,daysmax));
-    Add(new cMenuEditBitItem(tr("type of processing"),&flags,OPT_APPEND,tr("merge"),tr("append")));
-
+    Add(new cMenuEditIntItem(tr("days in advance"),&days,1,daysmax),true);
+    Add(new cMenuEditBitItem(tr("type of processing"),&flags,OPT_APPEND,tr("merge"),tr("append")),true);
+    c1=Current();
     if ((flags & OPT_APPEND)!=OPT_APPEND)
     {
-        Add(new cMenuEditBitItem(tr("short text"),&flags,USE_SHORTTEXT));
-        Add(new cMenuEditBitItem(tr("long text"),&flags,USE_LONGTEXT));
+        Add(new cMenuEditBitItem(tr("short text"),&flags,USE_SHORTTEXT),true);
+        Add(new cMenuEditBitItem(tr("long text"),&flags,USE_LONGTEXT),true);
+        c2=Current();
         if ((flags & USE_LONGTEXT)==USE_LONGTEXT)
         {
-            Add(new cMenuEditBitItem(tr("merge long texts"),&flags,OPT_MERGELTEXT));
-        }
-        else
-        {
-            Add(option(tr("merge long texts"),false));
+            Add(new cMenuEditBitItem(tr(" merge long texts"),&flags,OPT_MERGELTEXT),true);
         }
     }
     else
     {
-        Add(option(tr("short text"),true));
-        Add(option(tr("long text"),true));
-        Add(option(tr("merge long texts"),false));
+        Add(option(tr("short text"),true),true);
+        Add(option(tr("long text"),true),true);
+        Add(option(tr(" merge long texts"),false),true);
     }
-    Add(new cMenuEditBitItem(tr("country and date"),&flags,USE_COUNTRYDATE));
-    Add(new cMenuEditBitItem(tr("original title"),&flags,USE_ORIGTITLE));
-    Add(new cMenuEditBitItem(tr("category"),&flags,USE_CATEGORY));
-    Add(new cMenuEditBitItem(tr("credits"),&flags,USE_CREDITS));
-    Add(new cMenuEditBitItem(tr("rating"),&flags,USE_RATING));
-    Add(new cMenuEditBitItem(tr("review"),&flags,USE_REVIEW));
-    Add(new cMenuEditBitItem(tr("video"),&flags,USE_VIDEO));
-    Add(new cMenuEditBitItem(tr("audio"),&flags,USE_AUDIO));
-    Add(new cMenuEditBitItem(tr("vps"),&flags,OPT_VPS));
+    Add(new cMenuEditBitItem(tr("country and date"),&flags,USE_COUNTRYDATE),true);
+    Add(new cMenuEditBitItem(tr("original title"),&flags,USE_ORIGTITLE),true);
+    Add(new cMenuEditBitItem(tr("category"),&flags,USE_CATEGORY),true);
+    Add(new cMenuEditBitItem(tr("credits"),&flags,USE_CREDITS),true);
+    c3=Current();
+    if ((flags & USE_CREDITS)==USE_CREDITS)
+    {
+        Add(new cMenuEditBitItem(tr(" actors"),&flags,CREDITS_ACTORS),true);
+        c4=Current();
+        if ((flags & CREDITS_ACTORS)==CREDITS_ACTORS)
+            Add(new cMenuEditBitItem(tr("  add in a list"),&flags,CREDITS_ACTORS_LIST),true);
+        Add(new cMenuEditBitItem(tr(" director"),&flags,CREDITS_DIRECTOR),true);
+        Add(new cMenuEditBitItem(tr(" other crew"),&flags,CREDITS_OTHER),true);
+    }
+
+    Add(new cMenuEditBitItem(tr("rating"),&flags,USE_RATING),true);
+    Add(new cMenuEditBitItem(tr("review"),&flags,USE_REVIEW),true);
+    Add(new cMenuEditBitItem(tr("video"),&flags,USE_VIDEO),true);
+    Add(new cMenuEditBitItem(tr("audio"),&flags,USE_AUDIO),true);
+    Add(new cMenuEditBitItem(tr("vps"),&flags,OPT_VPS),true);
 
     hasmaps=false;
-    Add(newtitle(tr("epg source channel mappings")));
+    Add(newtitle(tr("epg source channel mappings")),true);
     for (int i=0; i<map->NumChannelIDs(); i++)
     {
         cChannel *chan=Channels.GetByChannelID(map->ChannelIDs()[i]);
         if (chan)
         {
             cString buffer = cString::sprintf("%-*i %s", CHNUMWIDTH, chan->Number(),chan->Name());
-            Add(new cOsdItem(buffer));
+            Add(new cOsdItem(buffer),true);
+            if (!hasmaps) cm=Current();
             hasmaps=true;
         }
     }
-    if (!hasmaps) Add(new cOsdItem(tr("none")));
-    if (current!=-1) for (int i=1; i<=current; i++) CursorDown();
+    if (!hasmaps)
+    {
+        Add(new cOsdItem(tr("none")),true);
+        cm=Current();
+    }
 
+    if (current==-1)
+    {
+        SetCurrent(first);
+        CursorDown();
+    }
+    else
+    {
+        SetCurrent(Get(current));
+    }
     Display();
 }
 
@@ -822,14 +844,15 @@ eOSState cMenuSetupXmltv2vdrChannelMap::ProcessKey (eKeys Key)
         {
         case kLeft:
         case kRight:
-            if ((Current()==2) || (Current()==4)) output();
+            if ((Current()==c1) || (Current()==c2) ||
+                    (Current()==c3) || (Current()==c4)) output();
             break;
         case kDown:
-            if (Current()>=16)
+            if (Current()>=cm)
                 SetHelp(tr("unmap"),tr("map"));
             break;
         case kUp:
-            if (Current()<16)
+            if (Current()<cm)
                 SetHelp(NULL,NULL);
         default:
             break;

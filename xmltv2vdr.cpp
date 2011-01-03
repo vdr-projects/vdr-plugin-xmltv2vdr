@@ -406,11 +406,36 @@ void cPluginXmltv2vdr::ReadInEPGSources(bool Reload)
             {
                 if (access(path,R_OK|W_OK)!=-1)
                 {
-                    epgsources.Add(new cEPGSource(dirent->d_name,&epgmappings,&textmappings));
+                    int fd=open(path,O_RDONLY);
+                    if (fd!=-1)
+                    {
+                        char id[5];
+                        if (read(fd,id,4)!=4)
+                        {
+                            esyslog("xmltv2vdr: cannot read config file '%s'",dirent->d_name);
+                        }
+                        else
+                        {
+                            id[4]=0;
+                            if (!strcmp(id,"file") || !strcmp(id,"pipe"))
+                            {
+                                epgsources.Add(new cEPGSource(dirent->d_name,&epgmappings,&textmappings));
+                            }
+                            else
+                            {
+                                dsyslog("xmltv2vdr: ignoring non config file '%s'",dirent->d_name);
+                            }
+                            close(fd);
+                        }
+                    }
+                    else
+                    {
+                        esyslog("xmltv2vdr: cannot open config file '%s'",dirent->d_name);
+                    }
                 }
                 else
                 {
-                    esyslog("xmltv2vdr: cannot access config file for '%s'",dirent->d_name);
+                    esyslog("xmltv2vdr: cannot access config file '%s'",dirent->d_name);
                 }
                 free(path);
             }
@@ -475,6 +500,7 @@ bool cPluginXmltv2vdr::Initialize(void)
 bool cPluginXmltv2vdr::Start(void)
 {
     // Start any background activities the plugin shall perform.
+    cParse::InitLibXML();
     ReadInEPGSources();
     return true;
 }
@@ -485,6 +511,7 @@ void cPluginXmltv2vdr::Stop(void)
     removeepgsources();
     removeepgmappings();
     removetextmappings();
+    cParse::CleanupLibXML();
 }
 
 void cPluginXmltv2vdr::Housekeeping(void)

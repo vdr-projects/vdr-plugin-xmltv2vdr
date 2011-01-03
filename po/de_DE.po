@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: vdr\n"
 "Report-Msgid-Bugs-To: <see README>\n"
-"POT-Creation-Date: 2010-12-28 18:28+0100\n"
+"POT-Creation-Date: 2011-01-03 20:10+0100\n"
 "PO-Revision-Date: 2010-12-23 23:59+0100\n"
 "Last-Translator: Jochen Dolze <vdr@dolze.de>\n"
 "Language-Team: <vdr@linuxtv.org>\n"
@@ -126,11 +126,23 @@ msgstr "Kurztext"
 msgid "long text"
 msgstr "Langtext"
 
-msgid "merge long texts"
-msgstr "Langtexte zusammenführen"
+msgid " merge long texts"
+msgstr " Langtexte zusammenführen"
 
 msgid "category"
 msgstr "Kategorie"
+
+msgid " actors"
+msgstr " Darsteller"
+
+msgid "  add in a list"
+msgstr "  in einer Liste hinzufügen"
+
+msgid " director"
+msgstr " Regisseur"
+
+msgid " other crew"
+msgstr " Sonstige"
 
 msgid "rating"
 msgstr "Freigabe"
@@ -162,3 +174,5 @@ msgstr "Auswahl"
 msgid "xmltv2vdr plugin still working"
 msgstr "xmltv2vdr plugin ist noch aktiv"
 
+msgid "Imports xmltv epg into vdr"
+msgstr "Importiert xmltv epg in den VDR"

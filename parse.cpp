@@ -8,7 +8,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <limits.h>
-
+#include <ctype.h>
 #include <fcntl.h>
 #include <unistd.h>
 
@@ -425,14 +425,8 @@ bool cParse::FetchEvent(xmlNodePtr enode)
                     xmlFree(content);
                 }
             }
-            else if ((!xmlStrcasecmp(node->name, (const xmlChar *) "country")))
+            else if ((!xmlStrcasecmp(node->name, (const xmlChar *) "credits")))
             {
-                xmlChar *content=xmlNodeListGetString(node->doc,node->xmlChildrenNode,1);
-                if (content)
-                {
-                    xevent.SetCountry(conv->Convert((const char *) content));
-                    xmlFree(content);
-                }
             }
             else if ((!xmlStrcasecmp(node->name, (const xmlChar *) "date")))
             {
@@ -445,9 +439,33 @@ bool cParse::FetchEvent(xmlNodePtr enode)
             }
             else if ((!xmlStrcasecmp(node->name, (const xmlChar *) "category")))
             {
-                // attribute lang
+                // what to do with attribute lang?
+                xmlChar *content=xmlNodeListGetString(node->doc,node->xmlChildrenNode,1);
+                if (content)
+                {
+                    if (isdigit(content[0]))
+                    {
+                        xevent.SetEventID(atoi((const char *) content));
+                    }
+                    else
+                    {
+                    }
+                    xmlFree(content);
+                }
             }
-            else if ((!xmlStrcasecmp(node->name, (const xmlChar *) "credits")))
+            else if ((!xmlStrcasecmp(node->name, (const xmlChar *) "country")))
+            {
+                xmlChar *content=xmlNodeListGetString(node->doc,node->xmlChildrenNode,1);
+                if (content)
+                {
+                    xevent.SetCountry(conv->Convert((const char *) content));
+                    xmlFree(content);
+                }
+            }
+            else if ((!xmlStrcasecmp(node->name, (const xmlChar *) "video")))
+            {
+            }
+            else if ((!xmlStrcasecmp(node->name, (const xmlChar *) "audio")))
             {
             }
             else if ((!xmlStrcasecmp(node->name, (const xmlChar *) "rating")))
@@ -455,15 +473,26 @@ bool cParse::FetchEvent(xmlNodePtr enode)
                 xmlChar *system=xmlGetProp(node,(const xmlChar *) "system");
                 if (system)
                 {
-                    xmlChar *content=xmlNodeListGetString(node->doc,node->xmlChildrenNode,1);
-                    if (content)
+                    xmlNodePtr vnode=node->xmlChildrenNode;
+                    while (vnode)
                     {
-                        const char *crating=strdup(conv->Convert((const char *) content));
-                        const char *csystem=strdup(conv->Convert((const char *) system));
-                        xevent.SetRating(csystem,crating);
-                        if (crating) free((void *) crating);
-                        if (csystem) free((void *) csystem);
-                        xmlFree(content);
+                        if (vnode->type==XML_ELEMENT_NODE)
+                        {
+                            if ((!xmlStrcasecmp(vnode->name, (const xmlChar *) "value")))
+                            {
+                                xmlChar *content=xmlNodeListGetString(vnode->doc,vnode->xmlChildrenNode,1);
+                                if (content)
+                                {
+                                    const char *crating=strdup(conv->Convert((const char *) content));
+                                    const char *csystem=strdup(conv->Convert((const char *) system));
+                                    xevent.SetRating(csystem,crating);
+                                    if (crating) free((void *) crating);
+                                    if (csystem) free((void *) csystem);
+                                    xmlFree(content);
+                                }
+                            }
+                        }
+                        vnode=vnode->next;
                     }
                     xmlFree(system);
                 }
@@ -481,12 +510,6 @@ bool cParse::FetchEvent(xmlNodePtr enode)
                     }
                     xmlFree(type);
                 }
-            }
-            else if ((!xmlStrcasecmp(node->name, (const xmlChar *) "video")))
-            {
-            }
-            else if ((!xmlStrcasecmp(node->name, (const xmlChar *) "audio")))
-            {
             }
             else
             {
@@ -542,11 +565,11 @@ bool cParse::Process(char *buffer, int bufsize)
         {
             if ((!xmlStrcasecmp(node->name, (const xmlChar *) "programme")))
             {
-                xmlChar *channelid=xmlGetProp(node,(const xmlChar *) "channelid");
+                xmlChar *channelid=xmlGetProp(node,(const xmlChar *) "channel");
                 cEPGMapping *map=NULL;
                 if (channelid && (map=EPGMapping((const char *) channelid)))
                 {
-                    time_t end=begin+86000*map->Days();
+                    time_t end=begin+(86000*map->Days())+3600; // 1 hour overlap
                     xmlChar *start,*stop;
                     time_t starttime=(time_t) 0;
                     time_t stoptime=(time_t) 0;
@@ -569,14 +592,6 @@ bool cParse::Process(char *buffer, int bufsize)
                     if (starttime && (starttime>begin) && (starttime<end))
                     {
                         xevent.Clear();
-
-                        xmlChar *eventid;
-                        eventid=xmlGetProp(node,(const xmlChar *) "eventid");
-                        if (eventid)
-                        {
-                            xevent.SetEventID(atoi((const char *) eventid));
-                            xmlFree(eventid);
-                        }
 
                         xmlChar *vpsstart=xmlGetProp(node,(const xmlChar *) "vps-start");
                         if (vpsstart)
@@ -625,6 +640,16 @@ bool cParse::Process(char *buffer, int bufsize)
     }
     xmlFreeDoc(xmltv);
     return true;
+}
+
+void cParse::InitLibXML()
+{
+    xmlInitParser();
+}
+
+void cParse::CleanupLibXML()
+{
+    xmlCleanupParser();
 }
 
 cParse::cParse(const char *Name, cEPGMappings *Maps, cTEXTMappings *Texts)
