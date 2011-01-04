@@ -559,6 +559,7 @@ bool cParse::Process(char *buffer, int bufsize)
 
     time_t begin=time(NULL);
     xmlNodePtr node=rootnode->xmlChildrenNode;
+    cEPGMapping *oldmap=NULL;
     while (node)
     {
         if (node->type==XML_ELEMENT_NODE)
@@ -570,6 +571,13 @@ bool cParse::Process(char *buffer, int bufsize)
                 if (channelid && (map=EPGMapping((const char *) channelid)))
                 {
                     time_t end=begin+(86000*map->Days())+3600; // 1 hour overlap
+                    if (oldmap!=map)
+                    {
+                        dsyslog("xmltv2vdr: '%s' processing '%s'",name,channelid);
+                        dsyslog("xmltv2vdr: '%s' from %s",name,ctime(&begin));
+                        dsyslog("xmltv2vdr: '%s' till %s",name,ctime(&end));
+                    }
+                    oldmap=map;
                     xmlChar *start,*stop;
                     time_t starttime=(time_t) 0;
                     time_t stoptime=(time_t) 0;
