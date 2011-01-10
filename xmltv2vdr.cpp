@@ -100,6 +100,8 @@ bool cEPGExecute::ReadConfig()
                     // channels
                     char *semicolon=strchr(line,';');
                     if (semicolon) *semicolon=0;
+                    char *lf=strchr(line,10);
+                    if (lf) *lf=0;
                     bool used=false;
                     char *cname=line;
                     if (line[0]=='*')
