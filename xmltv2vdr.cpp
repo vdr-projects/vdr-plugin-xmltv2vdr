@@ -450,7 +450,7 @@ void cPluginXmltv2vdr::SetExecTime(int ExecTime)
 {
     exectime=ExecTime;
     exectime_t=cTimer::SetTime(time(NULL),cTimer::TimeToInt(exectime));
-    last_exectime_t=0;
+    if (exectime_t<=time(NULL)) exectime_t+=86000;
 }
 
 cPluginXmltv2vdr::cPluginXmltv2vdr(void)
@@ -459,7 +459,9 @@ cPluginXmltv2vdr::cPluginXmltv2vdr(void)
     // DON'T DO ANYTHING ELSE THAT MAY HAVE SIDE EFFECTS, REQUIRE GLOBAL
     // VDR OBJECTS TO EXIST OR PRODUCE ANY OUTPUT!
     wakeup=0;
-    SetExecTime(200);
+    last_exectime_t=0;
+    exectime=200;
+    SetExecTime(exectime);
     TEXTMappingAdd(new cTEXTMapping("country",tr("country")));
     TEXTMappingAdd(new cTEXTMapping("date",tr("year")));
     TEXTMappingAdd(new cTEXTMapping("originaltitle",tr("originaltitle")));
@@ -531,6 +533,7 @@ void cPluginXmltv2vdr::MainThreadHook(void)
     {
         executeepgsources();
         last_exectime_t=exectime_t;
+        SetExecTime(exectime);
     }
 }
 
