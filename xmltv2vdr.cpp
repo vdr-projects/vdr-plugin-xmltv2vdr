@@ -39,7 +39,23 @@ int cEPGChannel::Compare(const cListObject &ListObject) const
 
 // -------------------------------------------------------------
 
-cEPGExecute::cEPGExecute(const char *Name, cEPGMappings *Maps, cTEXTMappings *Texts):cThread(Name)
+cEPGExecutor::cEPGExecutor(cEPGSources *Sources) : cThread("xmltv2vdr importer")
+{
+    sources=Sources;
+}
+
+void cEPGExecutor::Action()
+{
+    if (!sources) return;
+    for (cEPGSource *epgs=sources->First(); epgs; epgs=sources->Next(epgs))
+    {
+        if (epgs->Execute()) break; // TODO: check if we must execute second/third source!
+    }
+}
+
+// -------------------------------------------------------------
+
+cEPGSource::cEPGSource(const char *Name, cEPGMappings *Maps, cTEXTMappings *Texts)
 {
     dsyslog("xmltv2vdr: added epgsource '%s'",Name);
     name=strdup(Name);
@@ -49,14 +65,14 @@ cEPGExecute::cEPGExecute(const char *Name, cEPGMappings *Maps, cTEXTMappings *Te
     parse=new cParse(Name, Maps, Texts);
 }
 
-cEPGExecute::~cEPGExecute()
+cEPGSource::~cEPGSource()
 {
-    Stop();
-    free((void*) name);
+    dsyslog("xmltv2vdr: removed epgsource '%s'",name);
+    free((void *) name);
     if (parse) delete parse;
 }
 
-bool cEPGExecute::ReadConfig()
+bool cEPGSource::ReadConfig()
 {
     dsyslog("xmltv2vdr: reading config of epgsource '%s'",name);
     char *fname=NULL;
@@ -129,21 +145,14 @@ bool cEPGExecute::ReadConfig()
     return false;
 }
 
-void cEPGExecute::SetChannelSelection(int *Selection)
+bool cEPGSource::Execute()
 {
-    for (int i=0; i<channels.Count(); i++)
-    {
-        channels.Get(i)->SetUsage(Selection[i]);
-    }
-}
-
-void cEPGExecute::Action()
-{
-    if (!ready2parse) return;
-    if (!parse) return;
+    if (!ready2parse) return false;
+    if (!parse) return false;
     char *result=NULL;
     int l=0;
 
+    bool ret=true;
     if (pipe)
     {
         cExtPipe p;
@@ -167,11 +176,13 @@ void cEPGExecute::Action()
                     if (!parse->Process(result,l))
                     {
                         esyslog("xmltv2vdr: failed to parse output of '%s'",name);
+                        ret=false;
                     }
                 }
                 else
                 {
                     esyslog("xmltv2vdr: epgsource '%s' returned with %i",name,returncode);
+                    ret=false;
                 }
             }
             if (result) free(result);
@@ -179,6 +190,7 @@ void cEPGExecute::Action()
         else
         {
             esyslog("xmltv2vdr: failed to open pipe for '%s'",name);
+            ret=false;
         }
     }
     else
@@ -198,7 +210,11 @@ void cEPGExecute::Action()
                     {
                         if (read(fd,result,statbuf.st_size)==statbuf.st_size)
                         {
-                            parse->Process(result,l);
+                            if (!parse->Process(result,l))
+                            {
+                                esyslog("xmltv2vdr: failed to parse output of '%s'",name);
+                                ret=false;
+                            }
                         }
                         free(result);
                     }
@@ -208,30 +224,20 @@ void cEPGExecute::Action()
             else
             {
                 esyslog("xmltv2vdr: failed to open file '%s' for '%s'",fname,name);
+                ret=false;
             }
             free(fname);
         }
     }
+    return ret;
 }
 
-// -------------------------------------------------------------
-
-cEPGSource::cEPGSource(const char *Name, cEPGMappings *Maps, cTEXTMappings *Texts):exec(Name,Maps,Texts)
+void cEPGSource::ChangeChannelSelection(int *Selection)
 {
-    name=strdup(Name);
-}
-
-cEPGSource::~cEPGSource()
-{
-    dsyslog("xmltv2vdr: removed epgsource '%s'",name);
-    free((void *) name);
-}
-
-bool cEPGSource::Execute()
-{
-    if (exec.Active()) return false;
-    exec.Start();
-    return true;
+    for (int i=0; i<channels.Count(); i++)
+    {
+        channels.Get(i)->SetUsage(Selection[i]);
+    }
 }
 
 void cEPGSource::Store(void)
@@ -352,26 +358,6 @@ void cPluginXmltv2vdr::removeepgsources()
     }
 }
 
-bool cPluginXmltv2vdr::epgsourcesactive()
-{
-    bool ret=false;
-    for (cEPGSource *epgs=epgsources.First(); epgs; epgs=epgsources.Next(epgs))
-    {
-        ret|=epgs->Active();
-    }
-    return ret;
-}
-
-bool cPluginXmltv2vdr::executeepgsources()
-{
-    bool ret=false;
-    for (cEPGSource *epgs=epgsources.First(); epgs; epgs=epgsources.Next(epgs))
-    {
-        ret|=epgs->Execute();
-    }
-    return ret;
-}
-
 cEPGMapping *cPluginXmltv2vdr::EPGMapping(const char *ChannelName)
 {
     if (!epgmappings.Count()) return NULL;
@@ -453,12 +439,13 @@ void cPluginXmltv2vdr::SetExecTime(int ExecTime)
     if (exectime_t<=time(NULL)) exectime_t+=86000;
 }
 
-cPluginXmltv2vdr::cPluginXmltv2vdr(void)
+cPluginXmltv2vdr::cPluginXmltv2vdr(void) : epgexecutor(&epgsources)
 {
     // Initialize any member variables here.
     // DON'T DO ANYTHING ELSE THAT MAY HAVE SIDE EFFECTS, REQUIRE GLOBAL
     // VDR OBJECTS TO EXIST OR PRODUCE ANY OUTPUT!
-    wakeup=0;
+    WakeUp=0;
+    UpStart=0;
     last_exectime_t=0;
     exectime=200;
     SetExecTime(exectime);
@@ -506,6 +493,7 @@ bool cPluginXmltv2vdr::Start(void)
     // Start any background activities the plugin shall perform.
     cParse::InitLibXML();
     ReadInEPGSources();
+    if (UpStart) exectime_t=time(NULL)+30;
     return true;
 }
 
@@ -531,7 +519,7 @@ void cPluginXmltv2vdr::MainThreadHook(void)
     if (((now>=exectime_t) && (now<(exectime_t+10))) &&
             (last_exectime_t!=exectime_t))
     {
-        executeepgsources();
+        epgexecutor.Start();
         last_exectime_t=exectime_t;
         SetExecTime(exectime);
     }
@@ -540,7 +528,7 @@ void cPluginXmltv2vdr::MainThreadHook(void)
 cString cPluginXmltv2vdr::Active(void)
 {
     // Return a message string if shutdown should be postponed
-    if (epgsourcesactive())
+    if (epgexecutor.Active())
     {
         return tr("xmltv2vdr plugin still working");
     }
@@ -550,7 +538,7 @@ cString cPluginXmltv2vdr::Active(void)
 time_t cPluginXmltv2vdr::WakeupTime(void)
 {
     // Return custom wakeup time for shutdown script
-    if (wakeup)
+    if (WakeUp)
     {
         time_t Now=time(NULL);
         time_t Time=cTimer::SetTime(Now,cTimer::TimeToInt(exectime));
@@ -613,7 +601,11 @@ bool cPluginXmltv2vdr::SetupParse(const char *Name, const char *Value)
     }
     else if (!strcasecmp(Name,"options.wakeup"))
     {
-        wakeup=atoi(Value);
+        WakeUp=atoi(Value);
+    }
+    else if (!strcasecmp(Name,"options.upstart"))
+    {
+        UpStart=atoi(Value);
     }
     else return false;
     return true;
@@ -651,7 +643,7 @@ cString cPluginXmltv2vdr::SVDRPCommand(const char *Command, const char *UNUSED(O
         }
         else
         {
-            if (executeepgsources())
+            if (epgexecutor.Start())
             {
                 ReplyCode=250;
                 output="Update started\n";

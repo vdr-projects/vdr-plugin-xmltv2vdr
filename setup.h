@@ -26,6 +26,7 @@ private:
     void generatesumchannellist();
     int exectime;
     int wakeup;
+    int upstart;
 public:
     void Output(void);
     cMenuSetupXmltv2vdr(cPluginXmltv2vdr *Plugin);

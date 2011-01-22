@@ -42,7 +42,7 @@ public:
 
 class cEPGChannels : public cList<cEPGChannel> {};
 
-class cEPGExecute : public cThread
+class cEPGSource : public cListObject
 {
 private:
     const char *name;
@@ -54,53 +54,22 @@ private:
     bool ReadConfig();
     cEPGChannels channels;
 public:
-    cEPGExecute(const char *Name,cEPGMappings *Maps,cTEXTMappings *Texts);
-    ~cEPGExecute();
-    cEPGChannels *GetChannelList()
-    {
-        return &channels;
-    }
-    int GetDaysMax()
-    {
-        return daysmax;
-    }
-    int GetDaysInAdvance()
-    {
-        return daysinadvance;
-    }
-    void SetDaysInAdvance(int NewDaysInAdvance)
-    {
-        daysinadvance=NewDaysInAdvance;
-    }
-    void SetChannelSelection(int *Selection);
-    virtual void Action();
-    void Stop()
-    {
-        Cancel(3);
-    }
-};
-
-class cEPGSource : public cListObject
-{
-private:
-    const char *name;
-    cEPGExecute exec;
-public:
     cEPGSource(const char *Name,cEPGMappings *Maps,cTEXTMappings *Texts);
     ~cEPGSource();
     bool Execute();
     void Store(void);
+    void ChangeChannelSelection(int *Selection);
     cEPGChannels *ChannelList()
     {
-        return exec.GetChannelList();
+        return &channels;
     }
     int DaysMax()
     {
-        return exec.GetDaysMax();
+        return daysmax;
     }
     int DaysInAdvance()
     {
-        return exec.GetDaysInAdvance();
+        return daysinadvance;
     }
     const char *Name()
     {
@@ -108,31 +77,31 @@ public:
     }
     void ChangeDaysInAdvance(int NewDaysInAdvance)
     {
-        exec.SetDaysInAdvance(NewDaysInAdvance);
-    }
-    void ChangeChannelSelection(int *Selection)
-    {
-        exec.SetChannelSelection(Selection);
-    }
-    bool Active()
-    {
-        return exec.Active();
+        daysinadvance=NewDaysInAdvance;
     }
 };
 
 class cEPGSources : public cList<cEPGSource> {};
 
+class cEPGExecutor : public cThread
+{
+private:
+    cEPGSources *sources;
+public:
+    cEPGExecutor(cEPGSources *Sources);
+    virtual void Action();
+};
+
 class cPluginXmltv2vdr : public cPlugin
 {
 private:
+    cEPGExecutor epgexecutor;
     cEPGMappings epgmappings;
     cEPGSources epgsources;
     cTEXTMappings textmappings;
     void removeepgsources();
     void removeepgmappings();
     void removetextmappings();
-    bool executeepgsources();
-    bool epgsourcesactive();
     bool epgsourceexists(const char *name);
     int exectime;
     time_t exectime_t,last_exectime_t;
@@ -142,7 +111,8 @@ public:
         return exectime;
     }
     void SetExecTime(int ExecTime);
-    int wakeup;
+    bool UpStart;
+    bool WakeUp;
     void ReadInEPGSources(bool Reload=false);
     int EPGSourceCount()
     {

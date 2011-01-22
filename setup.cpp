@@ -34,7 +34,8 @@ cMenuSetupXmltv2vdr::cMenuSetupXmltv2vdr(cPluginXmltv2vdr *Plugin)
 {
     baseplugin=Plugin;
     sourcesBegin=sourcesEnd=mappingBegin=mappingEnd=mappingEntry=0;
-    wakeup=baseplugin->wakeup;
+    wakeup=baseplugin->WakeUp;
+    upstart=baseplugin->UpStart;
     exectime=baseplugin->ExecTime();
     Output();
 }
@@ -49,6 +50,7 @@ void cMenuSetupXmltv2vdr::Output(void)
 
     Add(new cMenuEditBoolItem(tr("automatic wakeup"),&wakeup),true);
     Add(new cMenuEditTimeItem(tr("execution time"),&exectime),true);
+    Add(new cMenuEditBoolItem(tr("update on start"),&upstart),true);
     Add(new cOsdItem(tr("text mapping")),true);
     mappingEntry=Current();
     Add(newtitle(tr("epg sources")),true);
@@ -170,8 +172,10 @@ void cMenuSetupXmltv2vdr::Store(void)
 {
     SetupStore("options.exectime",exectime);
     SetupStore("options.wakeup",wakeup);
+    SetupStore("options.upstart",upstart);
 
-    baseplugin->wakeup=wakeup;
+    baseplugin->UpStart=upstart;
+    baseplugin->WakeUp=wakeup;
     baseplugin->SetExecTime(exectime);
 }
 

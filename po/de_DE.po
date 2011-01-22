@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: vdr\n"
 "Report-Msgid-Bugs-To: <see README>\n"
-"POT-Creation-Date: 2011-01-03 20:10+0100\n"
+"POT-Creation-Date: 2011-01-22 20:34+0100\n"
 "PO-Revision-Date: 2010-12-23 23:59+0100\n"
 "Last-Translator: Jochen Dolze <vdr@dolze.de>\n"
 "Language-Team: <vdr@linuxtv.org>\n"
@@ -20,6 +20,9 @@ msgstr "automatisch Aufwachen"
 
 msgid "execution time"
 msgstr "Ausführung um"
+
+msgid "update on start"
+msgstr "ausführen beim Start"
 
 msgid "text mapping"
 msgstr "Textzuordnungen"
