@@ -47,10 +47,12 @@ cEPGExecutor::cEPGExecutor(cEPGSources *Sources) : cThread("xmltv2vdr importer")
 void cEPGExecutor::Action()
 {
     if (!sources) return;
+    bool ret=false;
     for (cEPGSource *epgs=sources->First(); epgs; epgs=sources->Next(epgs))
     {
-        if (epgs->Execute()) break; // TODO: check if we must execute second/third source!
+        if ((ret=epgs->Execute())) break; // TODO: check if we must execute second/third source!
     }
+    if (ret) cSchedules::Cleanup(true);
 }
 
 // -------------------------------------------------------------
