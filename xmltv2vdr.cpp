@@ -265,6 +265,7 @@ void cEPGSource::Store(void)
     umask(oldmask);
     if (!w)
     {
+        fclose(r);
         fclose(w);
         unlink(fname2);
         free(fname1);
@@ -495,7 +496,15 @@ bool cPluginXmltv2vdr::Start(void)
     // Start any background activities the plugin shall perform.
     cParse::InitLibXML();
     ReadInEPGSources();
-    if (UpStart) exectime_t=time(NULL)+30;
+    if (UpStart)
+    {
+        exectime_t=time(NULL)+60;
+    }
+    else
+    {
+        exectime_t=time(NULL)-60;
+        last_exectime_t=exectime_t;
+    }
     return true;
 }
 

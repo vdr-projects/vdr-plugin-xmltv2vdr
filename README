@@ -14,4 +14,46 @@ See the file COPYING for more information.
 
 Description:
 
-Add epg info from epg sources into vdr
+Add epg info from epg sources into vdr. xmltv2vdr just imports data in
+xmltv format which must be provided by an external source (wich is not
+part of this package)
+
+Interface for sources:
+
+All sources must provide a control file with a name similar to the
+name of the source/source.xmltv (e.g. epgdata.xmltv -> epgdata).
+In the first line you can decide if your source provides data by file 
+(file must be placed in /var/lib/epgsources with extension .xmltv) or
+pipe (binary with the same name is called by xmltv2vdr-plugin, and
+must be in the path), the second line shows the days which will be
+read by the plugin, followed by the maximum days which will be provided.
+The next lines are unique channelnames, provided by the source.
+There can be application dependend data after each channelname. Note,
+that the plugin/VDR must be able to change this control file (channels
+will be marked with an asterisk if choosen in the setup).
+
+See this link for an list of unique channelnames (and please report
+if there should be more)
+
+http://vdr-wiki.de/wiki/index.php/Xmltv2vdr-plugin#Kanalliste
+
+Examples of control files (in /var/lib/epgsources):
+
+pipe
+1;16
+rtl.de;004
+sat1.de;005
+prosieben.de;006
+
+pipe
+1;10
+rtl.de
+sat1.de
+prosieben.de
+
+file
+1;7
+rtl.de;004
+sat1.de;005
+nickcomedy;190:417
+

@@ -11,6 +11,17 @@
 #include <vdr/menuitems.h>
 #include "xmltv2vdr.h"
 
+class cMyMenuEditBitItem : public cMenuEditBoolItem
+{
+protected:
+    uint *value;
+    uint mask;
+    int bit;
+    virtual void Set();
+public:
+    cMyMenuEditBitItem(const char *Name, uint *Value, uint Mask, const char *FalseString=NULL, const char *TrueString=NULL);
+};
+
 class cMenuSetupXmltv2vdr : public cMenuSetupPage
 {
 protected:

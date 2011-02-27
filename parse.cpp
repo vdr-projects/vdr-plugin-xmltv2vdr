@@ -45,7 +45,14 @@ void cXMLTVEvent::SetDescription(const char *Description)
     }
 }
 
-bool cXMLTVEvent::AddDescription(const char *Name, const char *Value)
+bool cXMLTVEvent::Add2Description(const char *Value)
+{
+    description = strcatrealloc(description,Value);
+    return (description);
+}
+
+
+bool cXMLTVEvent::Add2Description(const char *Name, const char *Value)
 {
     description = strcatrealloc(description,Name);
     description = strcatrealloc(description,": ");
@@ -54,7 +61,7 @@ bool cXMLTVEvent::AddDescription(const char *Name, const char *Value)
     return (description);
 }
 
-bool cXMLTVEvent::AddDescription(const char *Name, int Value)
+bool cXMLTVEvent::Add2Description(const char *Name, int Value)
 {
     char *value=NULL;
     if (asprintf(&value,"%i",Value)==-1) return false;
@@ -85,6 +92,33 @@ void cXMLTVEvent::SetRating(const char *System, const char *Rating)
 
     rating=strcpyrealloc(rating, Rating);
     rating=compactspace(rating);
+}
+
+void cXMLTVEvent::SetDirector(const char *Director)
+{
+    director=strcpyrealloc(director,Director);
+    director=compactspace(director);
+}
+
+void cXMLTVEvent::AddActor(const char *Actor, const char *ActorRole)
+{
+    if (ActorRole)
+    {
+        char *value=NULL;
+        if (asprintf(&value,"%s (%s)",Actor,ActorRole)==-1) return;
+        actors.Append(value);
+    }
+    else
+    {
+        actors.Append(strdup(Actor));
+    }
+}
+
+void cXMLTVEvent::AddOther(const char *OtherType, const char *Other)
+{
+    char *value=NULL;
+    if (asprintf(&value,"%s|%s",OtherType,Other)==-1) return;
+    others.Append(value);
 }
 
 void cXMLTVEvent::Clear()
@@ -129,6 +163,11 @@ void cXMLTVEvent::Clear()
         free(origtitle);
         origtitle=NULL;
     }
+    if (director)
+    {
+        free(director);
+        director=NULL;
+    }
     year=0;
     vps= (time_t) 0;
     starttime = 0;
@@ -146,6 +185,7 @@ cXMLTVEvent::cXMLTVEvent()
     rating=NULL;
     review=NULL;
     origtitle=NULL;
+    director=NULL;
     Clear();
 }
 
@@ -319,35 +359,102 @@ bool cParse::PutEvent(cSchedule* schedule, cEvent *event, cXMLTVEvent *xevent, c
         xevent->SetDescription(event->Description());
     }
     bool addExt=false;
+    if ((map->Flags() & USE_CREDITS)==USE_CREDITS)
+    {
+        cStringList *actors=xevent->Actors();
+        cStringList *others=xevent->Others();
+
+        if ((map->Flags() & CREDITS_ACTORS)==CREDITS_ACTORS)
+        {
+            if ((map->Flags() & CREDITS_ACTORS_LIST)==CREDITS_ACTORS_LIST)
+            {
+                if (actors->Size())
+                {
+                    addExt=xevent->Add2Description(tr("With"));
+                    addExt=xevent->Add2Description(" ");
+                }
+                for (int i=0; i<actors->Size(); i++)
+                {
+                    addExt=xevent->Add2Description((*actors)[i]);
+                    if (i<actors->Size()-1) addExt=xevent->Add2Description(",");
+                }
+                if (actors->Size()) addExt=xevent->Add2Description("\n");
+            }
+            else
+            {
+                cTEXTMapping *text=TEXTMapping("actor");
+                if (text)
+                {
+                    for (int i=0; i<actors->Size(); i++)
+                    {
+                        addExt=xevent->Add2Description(text->Value(),(*actors)[i]);
+                    }
+                }
+            }
+        }
+
+        if ((map->Flags() & CREDITS_OTHERS)==CREDITS_OTHERS)
+        {
+            for (int i=0; i<others->Size(); i++)
+            {
+                char *val=strdup((*others)[i]);
+                if (val)
+                {
+                    char *oth=strchr(val,'|');
+                    if (oth)
+                    {
+                        *oth=0;
+                        oth++;
+                        cTEXTMapping *text=TEXTMapping(val);
+                        if (text)
+                        {
+                            addExt=xevent->Add2Description(text->Value(),oth);
+                            free(val);
+                        }
+                    }
+                }
+            }
+        }
+
+        if ((map->Flags() & CREDITS_DIRECTOR)==CREDITS_DIRECTOR)
+        {
+            if (xevent->Director())
+            {
+                cTEXTMapping *text=TEXTMapping("director");
+                if (text) addExt=xevent->Add2Description(text->Value(),xevent->Director());
+            }
+        }
+    }
+
     if ((map->Flags() & USE_COUNTRYDATE)==USE_COUNTRYDATE)
     {
         if (xevent->Country())
         {
             cTEXTMapping *text=TEXTMapping("country");
-            if (text) addExt=xevent->AddDescription(text->Value(),xevent->Country());
+            if (text) addExt=xevent->Add2Description(text->Value(),xevent->Country());
         }
 
         if (xevent->Year())
         {
             cTEXTMapping *text=TEXTMapping("date");
-            if (text) addExt=xevent->AddDescription(text->Value(),xevent->Year());
+            if (text) addExt=xevent->Add2Description(text->Value(),xevent->Year());
         }
     }
     if (((map->Flags() & USE_ORIGTITLE)==USE_ORIGTITLE) && (xevent->OrigTitle()))
     {
         cTEXTMapping *text;
         text=TEXTMapping("originaltitle");
-        if (text) addExt=xevent->AddDescription(text->Value(),xevent->OrigTitle());
+        if (text) addExt=xevent->Add2Description(text->Value(),xevent->OrigTitle());
     }
     if (((map->Flags() & USE_RATING)==USE_RATING) && (xevent->Rating()) && (xevent->RatingSystem()))
     {
-        addExt=xevent->AddDescription(xevent->RatingSystem(),xevent->Rating());
+        addExt=xevent->Add2Description(xevent->RatingSystem(),xevent->Rating());
     }
     if (((map->Flags() & USE_REVIEW)==USE_REVIEW) && (xevent->Review()))
     {
         cTEXTMapping *text;
         text=TEXTMapping("review");
-        if (text) addExt=xevent->AddDescription(text->Value(),xevent->Review());
+        if (text) addExt=xevent->Add2Description(text->Value(),xevent->Review());
     }
     if (addExt) event->SetDescription(xevent->Description());
     event->SetTableID(0); // prevent EIT EPG to update this event
@@ -427,6 +534,41 @@ bool cParse::FetchEvent(xmlNodePtr enode)
             }
             else if ((!xmlStrcasecmp(node->name, (const xmlChar *) "credits")))
             {
+                xmlNodePtr vnode=node->xmlChildrenNode;
+                while (vnode)
+                {
+                    if (vnode->type==XML_ELEMENT_NODE)
+                    {
+                        if ((!xmlStrcasecmp(vnode->name, (const xmlChar *) "actor")))
+                        {
+                            xmlChar *content=xmlNodeListGetString(vnode->doc,vnode->xmlChildrenNode,1);
+                            if (content)
+                            {
+                                xevent.AddActor(conv->Convert((const char *) content));
+                                xmlFree(content);
+                            }
+                        }
+                        else if ((!xmlStrcasecmp(vnode->name, (const xmlChar *) "director")))
+                        {
+                            xmlChar *content=xmlNodeListGetString(vnode->doc,vnode->xmlChildrenNode,1);
+                            if (content)
+                            {
+                                xevent.SetDirector(conv->Convert((const char *) content));
+                                xmlFree(content);
+                            }
+                        }
+                        else
+                        {
+                            xmlChar *content=xmlNodeListGetString(vnode->doc,vnode->xmlChildrenNode,1);
+                            if (content)
+                            {
+                                xevent.AddOther((const char *) vnode->name,conv->Convert((const char *) content));
+                                xmlFree(content);
+                            }
+                        }
+                    }
+                    vnode=vnode->next;
+                }
             }
             else if ((!xmlStrcasecmp(node->name, (const xmlChar *) "date")))
             {

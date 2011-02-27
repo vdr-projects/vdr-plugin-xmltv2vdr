@@ -31,6 +31,9 @@ private:
     int duration;
     time_t vps;
     tEventID eventid;
+    cStringList actors;
+    cStringList others;
+    char *director;
 #if VDRVERSNUM >= 10711
     uchar parentalRating;
     uchar contents[MaxEventContents];
@@ -38,13 +41,17 @@ private:
 public:
     cXMLTVEvent();
     ~cXMLTVEvent();
+    bool Add2Description(const char *Name, const char *Value);
+    bool Add2Description(const char *Name, int Value);
+    bool Add2Description(const char *Value);
     void Clear();
     void SetTitle(const char *Title);
     void SetOrigTitle(const char *OrigTitle);
     void SetShortText(const char *ShortText);
     void SetDescription(const char *Description);
-    bool AddDescription(const char *Name, const char *Value);
-    bool AddDescription(const char *Name, int Value);
+    void SetDirector(const char *Director);
+    void AddActor(const char *Actor, const char *ActorRole=NULL);
+    void AddOther(const char *OtherType, const char *Other);
     void SetCountry(const char *Country);
     void SetReview(const char *Review);
     void SetRating(const char *System, const char *Rating);
@@ -119,6 +126,18 @@ public:
     tEventID EventID(void) const
     {
         return eventid;
+    }
+    cStringList *Actors(void)
+    {
+        return &actors;
+    }
+    const char *Director(void) const
+    {
+        return director;
+    }
+    cStringList *Others(void)
+    {
+        return &others;
     }
 };
 

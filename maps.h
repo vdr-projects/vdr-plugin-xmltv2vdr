@@ -32,7 +32,7 @@
 
 #define CREDITS_ACTORS         0x100000
 #define CREDITS_DIRECTOR       0x200000
-#define CREDITS_OTHER          0x400000
+#define CREDITS_OTHERS         0x400000
 #define CREDITS_ACTORS_LIST    0x800000
 
 #define OPT_MERGELTEXT         0x10000000

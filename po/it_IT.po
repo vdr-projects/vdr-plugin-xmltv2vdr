@@ -1,0 +1,187 @@
+# This file is distributed under the same license as the xmltv2vdr package.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: vdr\n"
+"Report-Msgid-Bugs-To: <see README>\n"
+"POT-Creation-Date: 2011-02-27 17:20+0100\n"
+"PO-Revision-Date: 2010-12-30 20:01+0100\n"
+"Last-Translator: Diego Pierotto <vdr-italian@tiscali.it>\n"
+"Language-Team:  <vdr@linuxtv.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Poedit-Language: Italian\n"
+"X-Poedit-Country: ITALY\n"
+"X-Poedit-SourceCharset: utf-8\n"
+
+msgid "With"
+msgstr ""
+
+msgid "options"
+msgstr "Opzioni"
+
+msgid "update on start"
+msgstr ""
+
+msgid "automatic wakeup"
+msgstr "Risveglio automatico"
+
+msgid "execution time"
+msgstr "Ora esecuzione"
+
+msgid "text mapping"
+msgstr "Mappatura testo"
+
+msgid "epg sources"
+msgstr "Fonti EPG"
+
+msgid "no epgsources installed"
+msgstr "Nessuna sorgente EPG installata"
+
+msgid "epg source channels"
+msgstr "Canali sorgente EPG"
+
+msgid "mapped"
+msgstr "Mappato"
+
+msgid "up"
+msgstr "Su"
+
+msgid "down"
+msgstr "Giù"
+
+msgid "edit"
+msgstr "Modifica"
+
+msgid "texts"
+msgstr "Testi"
+
+msgid "country"
+msgstr "Paese"
+
+msgid "year"
+msgstr "Anno"
+
+msgid "originaltitle"
+msgstr "Titolo originale"
+
+msgid "director"
+msgstr "Regista"
+
+msgid "actor"
+msgstr "Attore"
+
+msgid "writer"
+msgstr "Scrittore"
+
+msgid "adapter"
+msgstr "Adattatore"
+
+msgid "producer"
+msgstr "Produttore"
+
+msgid "composer"
+msgstr "Compositore"
+
+msgid "editor"
+msgstr "Editore"
+
+msgid "presenter"
+msgstr "Presentatore"
+
+msgid "commentator"
+msgstr "Commentatore"
+
+msgid "guest"
+msgstr "Ospite"
+
+msgid "review"
+msgstr "Anteprima"
+
+msgid "country and date"
+msgstr "Paese e data"
+
+msgid "original title"
+msgstr "Titolo originale"
+
+msgid "credits"
+msgstr "Crediti"
+
+msgid "days in advance"
+msgstr "Giorni in anticipo"
+
+msgid "channels provided"
+msgstr "Canali forniti"
+
+msgid "selected"
+msgstr "Selezionato"
+
+msgid "epg source channel options"
+msgstr "Opzioni canali sorgente EPG"
+
+msgid "type of processing"
+msgstr "Tipo elaborazione"
+
+msgid "merge"
+msgstr "Unisci"
+
+msgid "append"
+msgstr "Aggiungi"
+
+msgid "short text"
+msgstr "Testo breve"
+
+msgid "long text"
+msgstr "Testo completo"
+
+msgid " merge long texts"
+msgstr " Unisci testi completi"
+
+msgid "category"
+msgstr "Categoria"
+
+msgid " actors"
+msgstr " Attore"
+
+msgid "  add in a list"
+msgstr ""
+
+msgid " director"
+msgstr " Regia"
+
+msgid " other crew"
+msgstr ""
+
+msgid "rating"
+msgstr "Valutazione"
+
+msgid "video"
+msgstr "Video"
+
+msgid "audio"
+msgstr "Audio"
+
+msgid "vps"
+msgstr "VPS"
+
+msgid "epg source channel mappings"
+msgstr "Mappature canali sorgente EPG"
+
+msgid "none"
+msgstr "Nessuno"
+
+msgid "unmap"
+msgstr "Non mappare"
+
+msgid "map"
+msgstr "Mappa"
+
+msgid "choose"
+msgstr "Scegli"
+
+msgid "xmltv2vdr plugin still working"
+msgstr "Plugin XMLTV2VDR ancora in esecuzione"
+
+msgid "Imports xmltv epg into vdr"
+msgstr ""

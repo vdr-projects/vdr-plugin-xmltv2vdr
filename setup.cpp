@@ -30,6 +30,26 @@ char *strcatrealloc(char *dest, const char *src)
     return dest;
 }
 
+
+// --------------------------------------------------------------------------------------------------------
+
+cMyMenuEditBitItem::cMyMenuEditBitItem(const char *Name, uint *Value, uint Mask, const char *FalseString, const char *TrueString)
+        :cMenuEditBoolItem(Name,&(bit=0),FalseString,TrueString)
+{
+    value=Value;
+    bit=(*value & Mask)!=0;
+    mask=Mask;
+    Set();
+}
+
+void cMyMenuEditBitItem::Set(void)
+{
+    *value=bit?*value|mask:*value&~mask;
+    cMenuEditBoolItem::Set();
+}
+
+// --------------------------------------------------------------------------------------------------------
+
 cMenuSetupXmltv2vdr::cMenuSetupXmltv2vdr(cPluginXmltv2vdr *Plugin)
 {
     baseplugin=Plugin;
@@ -47,10 +67,9 @@ void cMenuSetupXmltv2vdr::Output(void)
     Clear();
     cOsdItem *first=newtitle(tr("options"));
     Add(first,true);
-
+    Add(new cMenuEditBoolItem(tr("update on start"),&upstart),true);
     Add(new cMenuEditBoolItem(tr("automatic wakeup"),&wakeup),true);
     Add(new cMenuEditTimeItem(tr("execution time"),&exectime),true);
-    Add(new cMenuEditBoolItem(tr("update on start"),&upstart),true);
     Add(new cOsdItem(tr("text mapping")),true);
     mappingEntry=Current();
     Add(newtitle(tr("epg sources")),true);
@@ -767,16 +786,16 @@ void cMenuSetupXmltv2vdrChannelMap::output(void)
     Add(first,true);
 
     Add(new cMenuEditIntItem(tr("days in advance"),&days,1,daysmax),true);
-    Add(new cMenuEditBitItem(tr("type of processing"),&flags,OPT_APPEND,tr("merge"),tr("append")),true);
+    Add(new cMyMenuEditBitItem(tr("type of processing"),&flags,OPT_APPEND,tr("merge"),tr("append")),true);
     c1=Current();
     if ((flags & OPT_APPEND)!=OPT_APPEND)
     {
-        Add(new cMenuEditBitItem(tr("short text"),&flags,USE_SHORTTEXT),true);
-        Add(new cMenuEditBitItem(tr("long text"),&flags,USE_LONGTEXT),true);
+        Add(new cMyMenuEditBitItem(tr("short text"),&flags,USE_SHORTTEXT),true);
+        Add(new cMyMenuEditBitItem(tr("long text"),&flags,USE_LONGTEXT),true);
         c2=Current();
         if ((flags & USE_LONGTEXT)==USE_LONGTEXT)
         {
-            Add(new cMenuEditBitItem(tr(" merge long texts"),&flags,OPT_MERGELTEXT),true);
+            Add(new cMyMenuEditBitItem(tr(" merge long texts"),&flags,OPT_MERGELTEXT),true);
         }
     }
     else
@@ -785,26 +804,26 @@ void cMenuSetupXmltv2vdrChannelMap::output(void)
         Add(option(tr("long text"),true),true);
         Add(option(tr(" merge long texts"),false),true);
     }
-    Add(new cMenuEditBitItem(tr("country and date"),&flags,USE_COUNTRYDATE),true);
-    Add(new cMenuEditBitItem(tr("original title"),&flags,USE_ORIGTITLE),true);
-    Add(new cMenuEditBitItem(tr("category"),&flags,USE_CATEGORY),true);
-    Add(new cMenuEditBitItem(tr("credits"),&flags,USE_CREDITS),true);
+    Add(new cMyMenuEditBitItem(tr("country and date"),&flags,USE_COUNTRYDATE),true);
+    Add(new cMyMenuEditBitItem(tr("original title"),&flags,USE_ORIGTITLE),true);
+    Add(new cMyMenuEditBitItem(tr("category"),&flags,USE_CATEGORY),true);
+    Add(new cMyMenuEditBitItem(tr("credits"),&flags,USE_CREDITS),true);
     c3=Current();
     if ((flags & USE_CREDITS)==USE_CREDITS)
     {
-        Add(new cMenuEditBitItem(tr(" actors"),&flags,CREDITS_ACTORS),true);
+        Add(new cMyMenuEditBitItem(tr(" actors"),&flags,CREDITS_ACTORS),true);
         c4=Current();
         if ((flags & CREDITS_ACTORS)==CREDITS_ACTORS)
-            Add(new cMenuEditBitItem(tr("  add in a list"),&flags,CREDITS_ACTORS_LIST),true);
-        Add(new cMenuEditBitItem(tr(" director"),&flags,CREDITS_DIRECTOR),true);
-        Add(new cMenuEditBitItem(tr(" other crew"),&flags,CREDITS_OTHER),true);
+            Add(new cMyMenuEditBitItem(tr("  add in a list"),&flags,CREDITS_ACTORS_LIST),true);
+        Add(new cMyMenuEditBitItem(tr(" director"),&flags,CREDITS_DIRECTOR),true);
+        Add(new cMyMenuEditBitItem(tr(" other crew"),&flags,CREDITS_OTHERS),true);
     }
 
-    Add(new cMenuEditBitItem(tr("rating"),&flags,USE_RATING),true);
-    Add(new cMenuEditBitItem(tr("review"),&flags,USE_REVIEW),true);
-    Add(new cMenuEditBitItem(tr("video"),&flags,USE_VIDEO),true);
-    Add(new cMenuEditBitItem(tr("audio"),&flags,USE_AUDIO),true);
-    Add(new cMenuEditBitItem(tr("vps"),&flags,OPT_VPS),true);
+    Add(new cMyMenuEditBitItem(tr("rating"),&flags,USE_RATING),true);
+    Add(new cMyMenuEditBitItem(tr("review"),&flags,USE_REVIEW),true);
+    Add(new cMyMenuEditBitItem(tr("video"),&flags,USE_VIDEO),true);
+    Add(new cMyMenuEditBitItem(tr("audio"),&flags,USE_AUDIO),true);
+    Add(new cMyMenuEditBitItem(tr("vps"),&flags,OPT_VPS),true);
 
     hasmaps=false;
     Add(newtitle(tr("epg source channel mappings")),true);
