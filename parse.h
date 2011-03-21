@@ -22,10 +22,11 @@ private:
     char *shorttext;
     char *description;
     char *country;
-    char *review;
     char *system;
+    char *review;
     char *rating;
     char *origtitle;
+    char *director;
     int year;
     time_t starttime;
     int duration;
@@ -33,7 +34,6 @@ private:
     tEventID eventid;
     cStringList actors;
     cStringList others;
-    char *director;
 #if VDRVERSNUM >= 10711
     uchar parentalRating;
     uchar contents[MaxEventContents];

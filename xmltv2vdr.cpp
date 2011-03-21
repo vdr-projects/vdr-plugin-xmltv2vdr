@@ -50,7 +50,22 @@ void cEPGExecutor::Action()
     bool ret=false;
     for (cEPGSource *epgs=sources->First(); epgs; epgs=sources->Next(epgs))
     {
-        if ((ret=epgs->Execute())) break; // TODO: check if we must execute second/third source!
+        int retries=0;
+        while (retries<2)
+        {
+            ret=epgs->Execute();
+            if (!ret)
+            {
+                dsyslog("xmltv2vdr: waiting 60 seconds (%i)",retries);
+                sleep(60);
+                retries++;
+            }
+            else
+            {
+                break;
+            }
+        }
+        if (ret) break; // TODO: check if we must execute second/third source!
     }
     if (ret) cSchedules::Cleanup(true);
 }

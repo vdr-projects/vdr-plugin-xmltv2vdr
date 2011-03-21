@@ -169,10 +169,12 @@ void cXMLTVEvent::Clear()
         director=NULL;
     }
     year=0;
-    vps= (time_t) 0;
     starttime = 0;
     duration = 0;
+    vps= (time_t) 0;
     eventid=0;
+    actors.Clear();
+    others.Clear();
 }
 
 cXMLTVEvent::cXMLTVEvent()
@@ -182,8 +184,8 @@ cXMLTVEvent::cXMLTVEvent()
     description=NULL;
     country=NULL;
     system=NULL;
-    rating=NULL;
     review=NULL;
+    rating=NULL;
     origtitle=NULL;
     director=NULL;
     Clear();
@@ -765,18 +767,38 @@ bool cParse::Process(char *buffer, int bufsize)
                                 if ((map->Flags() & OPT_APPEND)==OPT_APPEND) addevents=true;
 
                                 cChannel *channel=Channels.GetByChannelID(map->ChannelIDs()[i]);
-                                cSchedule* schedule = (cSchedule *) schedules->GetSchedule(channel,addevents);
-                                if (schedule)
+                                if (channel)
                                 {
-                                    cEvent *event=NULL;
-                                    if ((event=SearchEvent(schedule,&xevent)))
+                                    cSchedule* schedule = (cSchedule *) schedules->GetSchedule(channel,addevents);
+                                    if (schedule)
                                     {
-                                        PutEvent(schedule,event,&xevent,map);
+                                        cEvent *event=NULL;
+                                        if ((event=SearchEvent(schedule,&xevent)))
+                                        {
+                                            PutEvent(schedule,event,&xevent,map);
+                                        }
+                                        else
+                                        {
+                                            if (addevents)
+                                            {
+                                                PutEvent(schedule,event,&xevent,map);
+                                            }
+                                            else
+                                            {
+                                                time_t start=xevent.StartTime();
+                                                esyslog("xmltv2vdr: cannot find existing event in epg.data for xmltv-event %s@%s",
+                                                        xevent.Title(),ctime(&start));
+                                            }
+                                        }
                                     }
                                     else
                                     {
-                                        if (addevents) PutEvent(schedule,event,&xevent,map);
+                                        esyslog("xmltv2vdr: cannot get schedule for channel %s (no import)",channel->Name());
                                     }
+                                }
+                                else
+                                {
+                                    esyslog("xmltv2vdr: channel %s not found in channels.conf",*map->ChannelIDs()[i].ToString());
                                 }
                             }
                         }
