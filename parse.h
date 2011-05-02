@@ -143,12 +143,20 @@ public:
 
 class cParse
 {
+    struct split
+    {
+        char *pointers[256];
+        int count;
+    };
+
 private:
     char *name;
     cEPGMappings *maps;
     cTEXTMappings *texts;
     cXMLTVEvent xevent;
     cCharSetConv *conv;
+    char *RemoveNonASCII(const char *src);
+    struct split split(char *in, char delim);
     u_long DoSum(u_long sum, const char *buf, int nBytes);
     cEvent *SearchEvent(cSchedule* schedule, cXMLTVEvent *xevent);
     time_t ConvertXMLTVTime2UnixTime(char *xmltvtime);

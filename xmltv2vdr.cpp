@@ -80,6 +80,7 @@ cEPGSource::cEPGSource(const char *Name, cEPGMappings *Maps, cTEXTMappings *Text
     daysinadvance=0;
     ready2parse=ReadConfig();
     parse=new cParse(Name, Maps, Texts);
+    dsyslog("xmltv2vdr: '%s' is%sready2parse",Name,(ready2parse && parse) ? " " : " not ");
 }
 
 cEPGSource::~cEPGSource()
@@ -215,6 +216,8 @@ bool cEPGSource::Execute()
         char *fname=NULL;
         if (asprintf(&fname,"%s/%s.xmltv",EPGSOURCES,name)!=-1)
         {
+            dsyslog("xmltv2vdr: reading '%s' from epgsource '%s'",fname,name);
+
             int fd=open(fname,O_RDONLY);
             if (fd!=-1)
             {

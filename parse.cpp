@@ -19,27 +19,26 @@ extern char *strcatrealloc(char *dest, const char *src);
 void cXMLTVEvent::SetTitle(const char *Title)
 {
     title = strcpyrealloc(title, Title);
-    title = compactspace(title);
+    if (title) title = compactspace(title);
 }
 
 void cXMLTVEvent::SetOrigTitle(const char *OrigTitle)
 {
     origtitle = strcpyrealloc(origtitle, OrigTitle);
-    origtitle = compactspace(origtitle);
 }
 
 void cXMLTVEvent::SetShortText(const char *ShortText)
 {
     shorttext=strcpyrealloc(shorttext,ShortText);
-    shorttext=compactspace(shorttext);
+    if (shorttext) shorttext=compactspace(shorttext);
 }
 
 void cXMLTVEvent::SetDescription(const char *Description)
 {
     description = strcpyrealloc(description, Description);
-    description = compactspace(description);
     if (description)
     {
+        description = compactspace(description);
         if (description[strlen(description)-1]!='\n')
             description=strcatrealloc(description,"\n");
     }
@@ -76,28 +75,28 @@ bool cXMLTVEvent::Add2Description(const char *Name, int Value)
 void cXMLTVEvent::SetCountry(const char *Country)
 {
     country=strcpyrealloc(country, Country);
-    country=compactspace(country);
+    if (country) country=compactspace(country);
 }
 
 void cXMLTVEvent::SetReview(const char *Review)
 {
     review=strcpyrealloc(review, Review);
-    review=compactspace(review);
+    if (review) review=compactspace(review);
 }
 
 void cXMLTVEvent::SetRating(const char *System, const char *Rating)
 {
     system=strcpyrealloc(system, System);
-    system=compactspace(system);
+    if (system) system=compactspace(system);
 
     rating=strcpyrealloc(rating, Rating);
-    rating=compactspace(rating);
+    if (rating) rating=compactspace(rating);
 }
 
 void cXMLTVEvent::SetDirector(const char *Director)
 {
     director=strcpyrealloc(director,Director);
-    director=compactspace(director);
+    if (director) director=compactspace(director);
 }
 
 void cXMLTVEvent::AddActor(const char *Actor, const char *ActorRole)
@@ -269,6 +268,43 @@ time_t cParse::ConvertXMLTVTime2UnixTime(char *xmltvtime)
     return ret;
 }
 
+struct cParse::split cParse::split(char *in, char delim)
+{
+    struct split sp;
+    sp.count=1;
+    sp.pointers[0]=in;
+    while (*++in)
+    {
+        if (*in==delim)
+        {
+            *in=0;
+            sp.pointers[sp.count++]=in+1;
+        }
+    }
+    return sp;
+}
+
+char *cParse::RemoveNonASCII(const char *src)
+{
+    if (!src) return NULL;
+    int len=strlen(src);
+    if (!len) return NULL;
+    char *dst=(char *) malloc(len+1);
+    if (!dst) return NULL;
+    char *tmp=dst;
+    while (*src)
+    {
+        // 0x20,0x30-0x39,0x41-0x5A,0x61-0x7A
+        if (*src==0x20) *tmp++=0x20;
+        if ((*src>=0x30) && (*src<=0x39)) *tmp++=*src;
+        if ((*src>=0x41) && (*src<=0x5A)) *tmp++=*src;
+        if ((*src>=0x61) && (*src<=0x7A)) *tmp++=*src;
+        src++;
+    }
+    *tmp=0;
+    return dst;
+}
+
 cEvent *cParse::SearchEvent(cSchedule* schedule, cXMLTVEvent *xevent)
 {
     if (!xevent) return NULL;
@@ -297,17 +333,60 @@ cEvent *cParse::SearchEvent(cSchedule* schedule, cXMLTVEvent *xevent)
 
     for (cEvent *p = schedule->Events()->First(); p; p = schedule->Events()->Next(p))
     {
-        if (!strcmp(p->Title(),xevent->Title()))
+        int diff=abs((int) difftime(p->StartTime(),start));
+        if (diff<=eventTimeDiff)
         {
-            // found event with same title
-            int diff=abs((int) difftime(p->StartTime(),start));
-            if (diff<=eventTimeDiff)
+            // found event with exact the same title
+            if (!strcmp(p->Title(),xevent->Title()))
             {
                 if (diff<=maxdiff)
                 {
                     f=p;
                     maxdiff=diff;
                 }
+            }
+            else
+            {
+                // cut both titles into pieces and check
+                // if we have at least one match with
+                // minimum length of 4 characters
+
+                // first remove all non ascii characters
+                // we just want the following codes
+                // 0x20,0x30-0x39,0x41-0x5A,0x61-0x7A
+                int wfound=0;
+                char *s1=RemoveNonASCII(p->Title());
+                char *s2=RemoveNonASCII(xevent->Title());
+                if (s1 && s2)
+                {
+                    struct split w1 = split(s1,' ');
+                    struct split w2 = split(s2,' ');
+                    if ((w1.count) && (w2.count))
+                    {
+                        for (int i1=0; i1<w1.count; i1++)
+                        {
+                            for (int i2=0; i2<w2.count; i2++)
+                            {
+                                if (!strcmp(w1.pointers[i1],w2.pointers[i2]))
+                                {
+                                    if (strlen(w1.pointers[i1])>3) wfound++;
+                                }
+                            }
+                        }
+                    }
+                    free(s1);
+                    free(s2);
+                }
+                if (wfound)
+                {
+                    if (diff<=maxdiff)
+                    {
+                        dsyslog("xmltv2vdr: '%s' found '%s' for '%s'",name,p->Title(),xevent->Title());
+                        f=p;
+                        maxdiff=diff;
+                    }
+                }
+
             }
         }
     }
@@ -350,11 +429,29 @@ bool cParse::PutEvent(cSchedule* schedule, cEvent *event, cXMLTVEvent *xevent, c
     }
     if ((map->Flags() & USE_SHORTTEXT)==USE_SHORTTEXT)
     {
-        event->SetShortText(xevent->ShortText());
+        if (xevent->ShortText() && (strlen(xevent->ShortText())>0))
+        {
+            if (!strcmp(xevent->ShortText(),event->Title()))
+            {
+                dsyslog("xmltv2vdr: '%s' title and subtitle equal, clearing subtitle",name);
+                event->SetShortText("");
+            }
+            else
+            {
+                event->SetShortText(xevent->ShortText());
+            }
+        }
     }
     if ((map->Flags() & USE_LONGTEXT)==USE_LONGTEXT)
     {
-        event->SetDescription(xevent->Description());
+        if (xevent->Description() && (strlen(xevent->Description())>0))
+        {
+            event->SetDescription(xevent->Description());
+        }
+        else
+        {
+            xevent->SetDescription(event->Description());
+        }
     }
     else
     {
@@ -411,9 +508,9 @@ bool cParse::PutEvent(cSchedule* schedule, cEvent *event, cXMLTVEvent *xevent, c
                         if (text)
                         {
                             addExt=xevent->Add2Description(text->Value(),oth);
-                            free(val);
                         }
                     }
+                    free(val);
                 }
             }
         }
