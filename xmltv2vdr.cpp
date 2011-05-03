@@ -203,6 +203,11 @@ bool cEPGSource::Execute()
                     ret=false;
                 }
             }
+            else
+            {
+                esyslog("xmltv2vdr: failed to execute '%s'",name);
+                ret=false;
+            }
             if (result) free(result);
         }
         else
@@ -236,14 +241,29 @@ bool cEPGSource::Execute()
                                 ret=false;
                             }
                         }
+                        else
+                        {
+                            esyslog("xmltv2vdr: failed to read '%s' for '%s'",fname,name);
+                            ret=false;
+                        }
                         free(result);
                     }
+                    else
+                    {
+                        esyslog("xmltv2vdr: out of memory @'%s'",name);
+                        ret=false;
+                    }
+                }
+                else
+                {
+                    esyslog("xmltv2vdr: failed to stat '%s' for '%s'",fname,name);
+                    ret=false;
                 }
                 close(fd);
             }
             else
             {
-                esyslog("xmltv2vdr: failed to open file '%s' for '%s'",fname,name);
+                esyslog("xmltv2vdr: failed to open '%s' for '%s'",fname,name);
                 ret=false;
             }
             free(fname);

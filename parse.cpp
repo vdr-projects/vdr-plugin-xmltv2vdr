@@ -292,13 +292,35 @@ char *cParse::RemoveNonASCII(const char *src)
     char *dst=(char *) malloc(len+1);
     if (!dst) return NULL;
     char *tmp=dst;
+    bool lspc=false;
     while (*src)
     {
         // 0x20,0x30-0x39,0x41-0x5A,0x61-0x7A
-        if (*src==0x20) *tmp++=0x20;
-        if ((*src>=0x30) && (*src<=0x39)) *tmp++=*src;
-        if ((*src>=0x41) && (*src<=0x5A)) *tmp++=*src;
-        if ((*src>=0x61) && (*src<=0x7A)) *tmp++=*src;
+        if ((*src==0x20) && (!lspc))
+        {
+            *tmp++=0x20;
+            lspc=true;
+        }
+        if (*src==':')
+        {
+            *tmp++=0x20;
+            lspc=true;
+        }
+        if ((*src>=0x30) && (*src<=0x39))
+        {
+            *tmp++=*src;
+            lspc=false;
+        }
+        if ((*src>=0x41) && (*src<=0x5A))
+        {
+            *tmp++=tolower(*src);
+            lspc=false;
+        }
+        if ((*src>=0x61) && (*src<=0x7A))
+        {
+            *tmp++=*src;
+            lspc=false;
+        }
         src++;
     }
     *tmp=0;
@@ -330,7 +352,6 @@ cEvent *cParse::SearchEvent(cSchedule* schedule, cXMLTVEvent *xevent)
     int maxdiff=INT_MAX;
     int eventTimeDiff=xevent->Duration()/4;
     if (eventTimeDiff<600) eventTimeDiff=600;
-
     for (cEvent *p = schedule->Events()->First(); p; p = schedule->Events()->Next(p))
     {
         int diff=abs((int) difftime(p->StartTime(),start));
@@ -359,17 +380,24 @@ cEvent *cParse::SearchEvent(cSchedule* schedule, cXMLTVEvent *xevent)
                 char *s2=RemoveNonASCII(xevent->Title());
                 if (s1 && s2)
                 {
-                    struct split w1 = split(s1,' ');
-                    struct split w2 = split(s2,' ');
-                    if ((w1.count) && (w2.count))
+                    if (!strcmp(s1,s2))
                     {
-                        for (int i1=0; i1<w1.count; i1++)
+                        wfound++;
+                    }
+                    else
+                    {
+                        struct split w1 = split(s1,' ');
+                        struct split w2 = split(s2,' ');
+                        if ((w1.count) && (w2.count))
                         {
-                            for (int i2=0; i2<w2.count; i2++)
+                            for (int i1=0; i1<w1.count; i1++)
                             {
-                                if (!strcmp(w1.pointers[i1],w2.pointers[i2]))
+                                for (int i2=0; i2<w2.count; i2++)
                                 {
-                                    if (strlen(w1.pointers[i1])>3) wfound++;
+                                    if (!strcmp(w1.pointers[i1],w2.pointers[i2]))
+                                    {
+                                        if (strlen(w1.pointers[i1])>3) wfound++;
+                                    }
                                 }
                             }
                         }
@@ -381,7 +409,8 @@ cEvent *cParse::SearchEvent(cSchedule* schedule, cXMLTVEvent *xevent)
                 {
                     if (diff<=maxdiff)
                     {
-                        dsyslog("xmltv2vdr: '%s' found '%s' for '%s'",name,p->Title(),xevent->Title());
+                        if (p->TableID()!=0)
+                            dsyslog("xmltv2vdr: '%s' found '%s' for '%s'",name,p->Title(),xevent->Title());
                         f=p;
                         maxdiff=diff;
                     }
