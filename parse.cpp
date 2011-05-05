@@ -837,100 +837,117 @@ bool cParse::Process(char *buffer, int bufsize)
             if ((!xmlStrcasecmp(node->name, (const xmlChar *) "programme")))
             {
                 xmlChar *channelid=xmlGetProp(node,(const xmlChar *) "channel");
-                cEPGMapping *map=NULL;
-                if (channelid && (map=EPGMapping((const char *) channelid)))
+                if (channelid)
                 {
-                    time_t end=begin+(86000*map->Days())+3600; // 1 hour overlap
-                    if (oldmap!=map)
+                    cEPGMapping *map=EPGMapping((const char *) channelid);
+                    if (map)
                     {
-                        dsyslog("xmltv2vdr: '%s' processing '%s'",name,channelid);
-                        dsyslog("xmltv2vdr: '%s' from %s",name,ctime(&begin));
-                        dsyslog("xmltv2vdr: '%s' till %s",name,ctime(&end));
-                    }
-                    oldmap=map;
-                    xmlChar *start,*stop;
-                    time_t starttime=(time_t) 0;
-                    time_t stoptime=(time_t) 0;
-                    start=xmlGetProp(node,(const xmlChar *) "start");
-                    if (start)
-                    {
-                        starttime=ConvertXMLTVTime2UnixTime((char *) start);
-                        if (starttime)
+                        time_t end=begin+(86000*map->Days())+3600; // 1 hour overlap
+                        if (oldmap!=map)
                         {
-                            stop=xmlGetProp(node,(const xmlChar *) "stop");
-                            if (stop)
-                            {
-                                stoptime=ConvertXMLTVTime2UnixTime((char *) stop);
-                                xmlFree(stop);
-                            }
+                            dsyslog("xmltv2vdr: '%s' processing '%s'",name,channelid);
+                            dsyslog("xmltv2vdr: '%s' from %s",name,ctime(&begin));
+                            dsyslog("xmltv2vdr: '%s' till %s",name,ctime(&end));
                         }
-                        xmlFree(start);
-                    }
-
-                    if (starttime && (starttime>begin) && (starttime<end))
-                    {
-                        xevent.Clear();
-
-                        xmlChar *vpsstart=xmlGetProp(node,(const xmlChar *) "vps-start");
-                        if (vpsstart)
+                        oldmap=map;
+                        xmlChar *start,*stop;
+                        time_t starttime=(time_t) 0;
+                        time_t stoptime=(time_t) 0;
+                        start=xmlGetProp(node,(const xmlChar *) "start");
+                        if (start)
                         {
-                            time_t vps=ConvertXMLTVTime2UnixTime((char *) vpsstart);
-                            xevent.SetVps(vps);
-                            xmlFree(vpsstart);
-                        }
-
-                        xevent.SetStartTime(starttime);
-                        if (stoptime) xevent.SetDuration(stoptime-starttime);
-                        FetchEvent(node);
-
-                        cSchedulesLock *schedulesLock = new cSchedulesLock(true,2000); // to be safe ;)
-                        const cSchedules *schedules = cSchedules::Schedules(*schedulesLock);
-                        if (schedules)
-                        {
-                            for (int i=0; i<map->NumChannelIDs(); i++)
+                            starttime=ConvertXMLTVTime2UnixTime((char *) start);
+                            if (starttime)
                             {
-                                bool addevents=false;
-                                if ((map->Flags() & OPT_APPEND)==OPT_APPEND) addevents=true;
-
-                                cChannel *channel=Channels.GetByChannelID(map->ChannelIDs()[i]);
-                                if (channel)
+                                stop=xmlGetProp(node,(const xmlChar *) "stop");
+                                if (stop)
                                 {
-                                    cSchedule* schedule = (cSchedule *) schedules->GetSchedule(channel,addevents);
-                                    if (schedule)
+                                    stoptime=ConvertXMLTVTime2UnixTime((char *) stop);
+                                    xmlFree(stop);
+                                }
+                            }
+                            xmlFree(start);
+                        }
+
+                        if (starttime && (starttime>begin) && (starttime<end))
+                        {
+                            xevent.Clear();
+
+                            xmlChar *vpsstart=xmlGetProp(node,(const xmlChar *) "vps-start");
+                            if (vpsstart)
+                            {
+                                time_t vps=ConvertXMLTVTime2UnixTime((char *) vpsstart);
+                                xevent.SetVps(vps);
+                                xmlFree(vpsstart);
+                            }
+
+                            xevent.SetStartTime(starttime);
+                            if (stoptime) xevent.SetDuration(stoptime-starttime);
+                            FetchEvent(node);
+
+                            cSchedulesLock *schedulesLock = new cSchedulesLock(true,2000); // to be safe ;)
+                            const cSchedules *schedules = cSchedules::Schedules(*schedulesLock);
+                            if (schedules)
+                            {
+                                for (int i=0; i<map->NumChannelIDs(); i++)
+                                {
+                                    bool addevents=false;
+                                    if ((map->Flags() & OPT_APPEND)==OPT_APPEND) addevents=true;
+
+                                    cChannel *channel=Channels.GetByChannelID(map->ChannelIDs()[i]);
+                                    if (channel)
                                     {
-                                        cEvent *event=NULL;
-                                        if ((event=SearchEvent(schedule,&xevent)))
+                                        cSchedule* schedule = (cSchedule *) schedules->GetSchedule(channel,addevents);
+                                        if (schedule)
                                         {
-                                            PutEvent(schedule,event,&xevent,map);
-                                        }
-                                        else
-                                        {
-                                            if (addevents)
+                                            cEvent *event=NULL;
+                                            if ((event=SearchEvent(schedule,&xevent)))
                                             {
                                                 PutEvent(schedule,event,&xevent,map);
                                             }
                                             else
                                             {
-                                                time_t start=xevent.StartTime();
-                                                esyslog("xmltv2vdr: cannot find existing event in epg.data for xmltv-event %s@%s",
-                                                        xevent.Title(),ctime(&start));
+                                                if (addevents)
+                                                {
+                                                    PutEvent(schedule,event,&xevent,map);
+                                                }
+                                                else
+                                                {
+                                                    time_t start=xevent.StartTime();
+                                                    esyslog("xmltv2vdr: '%s' cannot find existing event in epg.data for xmltv-event %s@%s",
+                                                            name,xevent.Title(),ctime(&start));
+                                                }
                                             }
+                                        }
+                                        else
+                                        {
+                                            esyslog("xmltv2vdr: '%s' cannot get schedule for channel %s (no import)",
+                                                    name,channel->Name());
                                         }
                                     }
                                     else
                                     {
-                                        esyslog("xmltv2vdr: cannot get schedule for channel %s (no import)",channel->Name());
+                                        esyslog("xmltv2vdr: '%s' channel %s not found in channels.conf",
+                                                name,*map->ChannelIDs()[i].ToString());
                                     }
                                 }
-                                else
-                                {
-                                    esyslog("xmltv2vdr: channel %s not found in channels.conf",*map->ChannelIDs()[i].ToString());
-                                }
                             }
+                            else
+                            {
+                                esyslog("xmltv2vdr: '%s' cannot get schedules",name);
+                            }
+                            delete schedulesLock;
                         }
-                        delete schedulesLock;
+                    }
+                    else
+                    {
+                        esyslog("xmltv2vdr: '%s' no mapping for channelid %s",name,channelid);
                     }
                     xmlFree(channelid);
+                }
+                else
+                {
+                    esyslog("xmltv2vdr: '%s' missing channelid in xmltv file",name);
                 }
             }
         }
