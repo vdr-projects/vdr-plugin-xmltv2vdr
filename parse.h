@@ -149,6 +149,17 @@ class cParse
         int count;
     };
 
+    enum
+    {
+        PARSE_NOERROR=0,
+        PARSE_NOSCHEDULE=1,
+        PARSE_NOCHANNEL=2,
+        PARSE_NOSCHEDULES=3,
+        PARSE_XMLTVERR=4,
+        PARSE_NOMAPPING=5,
+        PARSE_NOCHANNELID=6
+    };
+
 private:
     char *name;
     cEPGMappings *maps;
