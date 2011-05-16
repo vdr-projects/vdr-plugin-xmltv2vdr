@@ -908,22 +908,32 @@ bool cParse::Process(char *buffer, int bufsize)
                                             cSchedule* schedule = (cSchedule *) schedules->GetSchedule(channel,addevents);
                                             if (schedule)
                                             {
-                                                cEvent *event=NULL;
-                                                if ((event=SearchEvent(schedule,&xevent)))
+                                                if ((!schedule->Index()) && (!addevents))
                                                 {
-                                                    PutEvent(schedule,event,&xevent,map);
+                                                    if (lerr!=PARSE_EMPTYSCHEDULE)
+                                                        esyslog("xmltv2vdr: '%s' cannot merge into empty epg (%s)",
+                                                                name,channel->Name());
+                                                    lerr=PARSE_EMPTYSCHEDULE;
                                                 }
                                                 else
                                                 {
-                                                    if (addevents)
+                                                    cEvent *event=NULL;
+                                                    if ((event=SearchEvent(schedule,&xevent)))
                                                     {
                                                         PutEvent(schedule,event,&xevent,map);
                                                     }
                                                     else
                                                     {
-                                                        time_t start=xevent.StartTime();
-                                                        esyslog("xmltv2vdr: '%s' cannot find existing event in epg.data for xmltv-event %s@%s",
-                                                                name,xevent.Title(),ctime(&start));
+                                                        if (addevents)
+                                                        {
+                                                            PutEvent(schedule,event,&xevent,map);
+                                                        }
+                                                        else
+                                                        {
+                                                            time_t start=xevent.StartTime();
+                                                            esyslog("xmltv2vdr: '%s' cannot find existing event in epg.data for xmltv-event %s@%s",
+                                                                    name,xevent.Title(),ctime(&start));
+                                                        }
                                                     }
                                                 }
                                             }

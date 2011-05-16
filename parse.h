@@ -157,7 +157,8 @@ class cParse
         PARSE_NOSCHEDULES=3,
         PARSE_XMLTVERR=4,
         PARSE_NOMAPPING=5,
-        PARSE_NOCHANNELID=6
+        PARSE_NOCHANNELID=6,
+	PARSE_EMPTYSCHEDULE=7
     };
 
 private:
