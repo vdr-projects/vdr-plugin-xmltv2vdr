@@ -148,7 +148,7 @@ public:
     }
     virtual const char *Description ( void )
     {
-        return DESCRIPTION;
+        return tr(DESCRIPTION);
     }
     virtual const char *CommandLineHelp ( void );
     virtual bool ProcessArgs ( int argc, char *argv[] );

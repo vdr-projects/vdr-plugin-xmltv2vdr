@@ -183,5 +183,3 @@ msgstr "xmltv2vdr plugin ist noch aktiv"
 msgid "Imports xmltv epg into vdr"
 msgstr "Importiert xmltv epg in den VDR"
 
-#~ msgid "append"
-#~ msgstr "hinzufügen"
