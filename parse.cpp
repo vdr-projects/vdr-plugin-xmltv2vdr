@@ -894,6 +894,9 @@ bool cParse::Process(char *buffer, int bufsize)
             if (lerr!=PARSE_XMLTVERR)
                 esyslog("xmltv2vdr: '%s' no starttime - error in xmltv file?",name);
             lerr=PARSE_XMLTVERR;
+            xmlFree(channelid);
+            node=node->next;
+            continue;
         }
 
         if ((starttime<begin) || (starttime>end))
@@ -911,6 +914,7 @@ bool cParse::Process(char *buffer, int bufsize)
             dsyslog("xmltv2vdr: '%s' till %s",name,ctime(&end));
         }
         oldmap=map;
+        xmlFree(channelid);
 
         xmlChar *vpsstart=xmlGetProp(node,(const xmlChar *) "vps-start");
         if (vpsstart)
@@ -924,7 +928,6 @@ bool cParse::Process(char *buffer, int bufsize)
         if (stoptime) xevent.SetDuration(stoptime-starttime);
         if (!FetchEvent(node)) // sets xevent
         {
-            xmlFree(channelid);
             node=node->next;
             continue;
         }
@@ -935,7 +938,6 @@ bool cParse::Process(char *buffer, int bufsize)
             if (lerr!=PARSE_NOSCHEDULES)
                 esyslog("xmltv2vdr: '%s' cannot get schedules",name);
             lerr=PARSE_NOSCHEDULES;
-            xmlFree(channelid);
             node=node->next;
             continue;
         }
@@ -996,8 +998,6 @@ bool cParse::Process(char *buffer, int bufsize)
             }
         }
         delete schedulesLock;
-
-        xmlFree(channelid);
         node=node->next;
     }
     xmlFreeDoc(xmltv);

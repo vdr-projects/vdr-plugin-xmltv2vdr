@@ -74,6 +74,7 @@ cEPGMapping::~cEPGMapping()
 
 cEPGMapping::cEPGMapping(cEPGMapping&copy)
 {
+    if (channelname) free((void *) channelname);
     channelname=strdup(copy.channelname);
     channelids=NULL;
     numchannelids=0;

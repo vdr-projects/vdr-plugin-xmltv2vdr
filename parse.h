@@ -79,11 +79,11 @@ public:
     {
         return vps;
     }
-    int Duration()
+    int Duration() const
     {
         return duration;
     }
-    time_t StartTime()
+    time_t StartTime() const
     {
         return starttime;
     }
@@ -103,7 +103,7 @@ public:
     {
         return country;
     }
-    int Year()
+    int Year() const
     {
         return year;
     }
