@@ -46,10 +46,19 @@ void cXMLTVEvent::SetDescription(const char *Description)
     }
 }
 
+bool cXMLTVEvent::RemoveLastCharFromDescription()
+{
+    if (!description) return false;
+    int len=strlen(description);
+    if (!len) return true;
+    description[len-1]=0;
+    return true;
+}
+
 bool cXMLTVEvent::Add2Description(const char *Value)
 {
     description = strcatrealloc(description,Value);
-    return (description);
+    return (description!=NULL);
 }
 
 
@@ -59,7 +68,7 @@ bool cXMLTVEvent::Add2Description(const char *Name, const char *Value)
     description = strcatrealloc(description,": ");
     description = strcatrealloc(description,Value);
     description = strcatrealloc(description,"\n");
-    return (description);
+    return (description!=NULL);
 }
 
 bool cXMLTVEvent::Add2Description(const char *Name, int Value)
@@ -71,7 +80,7 @@ bool cXMLTVEvent::Add2Description(const char *Name, int Value)
     description = strcatrealloc(description,value);
     description = strcatrealloc(description,"\n");
     free(value);
-    return (description);
+    return (description!=NULL);
 }
 
 void cXMLTVEvent::SetCountry(const char *Country)
@@ -95,31 +104,20 @@ void cXMLTVEvent::SetRating(const char *System, const char *Rating)
     if (rating) rating=compactspace(rating);
 }
 
-void cXMLTVEvent::SetDirector(const char *Director)
-{
-    director=strcpyrealloc(director,Director);
-    if (director) director=compactspace(director);
-}
 
-void cXMLTVEvent::AddActor(const char *Actor, const char *ActorRole)
+void cXMLTVEvent::AddCredits(const char *CreditType, const char *Credit, const char *Addendum)
 {
-    if (ActorRole)
+    char *value=NULL;
+    if (Addendum)
     {
-        char *value=NULL;
-        if (asprintf(&value,"%s (%s)",Actor,ActorRole)==-1) return;
-        actors.Append(value);
+        if (asprintf(&value,"%s|%s (%s)",CreditType,Credit,Addendum)==-1) return;
     }
     else
     {
-        actors.Append(strdup(Actor));
+        if (asprintf(&value,"%s|%s",CreditType,Credit)==-1) return;
     }
-}
-
-void cXMLTVEvent::AddOther(const char *OtherType, const char *Other)
-{
-    char *value=NULL;
-    if (asprintf(&value,"%s|%s",OtherType,Other)==-1) return;
-    others.Append(value);
+    credits.Append(value);
+    credits.Sort();
 }
 
 void cXMLTVEvent::Clear()
@@ -164,18 +162,12 @@ void cXMLTVEvent::Clear()
         free(origtitle);
         origtitle=NULL;
     }
-    if (director)
-    {
-        free(director);
-        director=NULL;
-    }
     year=0;
     starttime = 0;
     duration = 0;
     vps= (time_t) 0;
     eventid=0;
-    actors.Clear();
-    others.Clear();
+    credits.Clear();
 }
 
 cXMLTVEvent::cXMLTVEvent()
@@ -188,7 +180,6 @@ cXMLTVEvent::cXMLTVEvent()
     review=NULL;
     rating=NULL;
     origtitle=NULL;
-    director=NULL;
     Clear();
 }
 
@@ -490,67 +481,63 @@ bool cParse::PutEvent(cSchedule* schedule, cEvent *event, cXMLTVEvent *xevent, c
     bool addExt=false;
     if ((map->Flags() & USE_CREDITS)==USE_CREDITS)
     {
-        cStringList *actors=xevent->Actors();
-        cStringList *others=xevent->Others();
-
-        if ((map->Flags() & CREDITS_ACTORS)==CREDITS_ACTORS)
+        cStringList *credits=xevent->Credits();
+        if (credits->Size())
         {
-            if ((map->Flags() & CREDITS_ACTORS_LIST)==CREDITS_ACTORS_LIST)
+            cTEXTMapping *oldtext=NULL;
+            for (int i=0; i<credits->Size(); i++)
             {
-                if (actors->Size())
+                char *ctype=strdup((*credits)[i]);
+                if (ctype)
                 {
-                    addExt=xevent->Add2Description(tr("With"));
-                    addExt=xevent->Add2Description(" ");
-                }
-                for (int i=0; i<actors->Size(); i++)
-                {
-                    addExt=xevent->Add2Description((*actors)[i]);
-                    if (i<actors->Size()-1) addExt=xevent->Add2Description(",");
-                }
-                if (actors->Size()) addExt=xevent->Add2Description("\n");
-            }
-            else
-            {
-                cTEXTMapping *text=TEXTMapping("actor");
-                if (text)
-                {
-                    for (int i=0; i<actors->Size(); i++)
+                    char *cval=strchr(ctype,'|');
+                    if (cval)
                     {
-                        addExt=xevent->Add2Description(text->Value(),(*actors)[i]);
-                    }
-                }
-            }
-        }
-
-        if ((map->Flags() & CREDITS_OTHERS)==CREDITS_OTHERS)
-        {
-            for (int i=0; i<others->Size(); i++)
-            {
-                char *val=strdup((*others)[i]);
-                if (val)
-                {
-                    char *oth=strchr(val,'|');
-                    if (oth)
-                    {
-                        *oth=0;
-                        oth++;
-                        cTEXTMapping *text=TEXTMapping(val);
-                        if (text)
+                        *cval=0;
+                        cval++;
+                        bool add=true;
+                        if (((map->Flags() & CREDITS_ACTORS)!=CREDITS_ACTORS) &&
+                                (!strcasecmp(ctype,"actor"))) add=false;
+                        if (((map->Flags() & CREDITS_DIRECTORS)!=CREDITS_DIRECTORS) &&
+                                (!strcasecmp(ctype,"director"))) add=false;
+                        if (((map->Flags() & CREDITS_OTHERS)!=CREDITS_OTHERS) && (add)) add=false;
+                        if (add)
                         {
-                            addExt=xevent->Add2Description(text->Value(),oth);
+                            cTEXTMapping *text=TEXTMapping(ctype);
+                            if ((map->Flags() & CREDITS_LIST)==CREDITS_LIST)
+                            {
+                                if (oldtext!=text)
+                                {
+                                    if (oldtext)
+                                    {
+                                        addExt=xevent->RemoveLastCharFromDescription();
+                                        addExt=xevent->RemoveLastCharFromDescription();
+                                        addExt=xevent->Add2Description("\n");
+                                    }
+                                    addExt=xevent->Add2Description(text->Value());
+                                    addExt=xevent->Add2Description(": ");
+                                }
+                                addExt=xevent->Add2Description(cval);
+                                addExt=xevent->Add2Description(", ");
+                            }
+                            else
+                            {
+                                if (text)
+                                {
+                                    addExt=xevent->Add2Description(text->Value(),cval);
+                                }
+                            }
+                            oldtext=text;
                         }
                     }
-                    free(val);
+                    free(ctype);
                 }
             }
-        }
-
-        if ((map->Flags() & CREDITS_DIRECTOR)==CREDITS_DIRECTOR)
-        {
-            if (xevent->Director())
+            if ((oldtext) && ((map->Flags() & CREDITS_LIST)==CREDITS_LIST))
             {
-                cTEXTMapping *text=TEXTMapping("director");
-                if (text) addExt=xevent->Add2Description(text->Value(),xevent->Director());
+                addExt=xevent->RemoveLastCharFromDescription();
+                addExt=xevent->RemoveLastCharFromDescription();
+                addExt=xevent->Add2Description("\n");
             }
         }
     }
@@ -675,16 +662,15 @@ bool cParse::FetchEvent(xmlNodePtr enode)
                             xmlChar *content=xmlNodeListGetString(vnode->doc,vnode->xmlChildrenNode,1);
                             if (content)
                             {
-                                xevent.AddActor(conv->Convert((const char *) content));
-                                xmlFree(content);
-                            }
-                        }
-                        else if ((!xmlStrcasecmp(vnode->name, (const xmlChar *) "director")))
-                        {
-                            xmlChar *content=xmlNodeListGetString(vnode->doc,vnode->xmlChildrenNode,1);
-                            if (content)
-                            {
-                                xevent.SetDirector(conv->Convert((const char *) content));
+                                const char *role=NULL;
+                                xmlChar *arole=xmlGetProp(node,(const xmlChar *) "actor role");
+                                if (arole)
+                                {
+                                    role=strdup(conv->Convert((const char *) arole));
+                                    xmlFree(arole);
+                                }
+                                xevent.AddCredits((const char *) vnode->name,conv->Convert((const char *) content),role);
+                                if (role) free((void *) role);
                                 xmlFree(content);
                             }
                         }
@@ -693,7 +679,7 @@ bool cParse::FetchEvent(xmlNodePtr enode)
                             xmlChar *content=xmlNodeListGetString(vnode->doc,vnode->xmlChildrenNode,1);
                             if (content)
                             {
-                                xevent.AddOther((const char *) vnode->name,conv->Convert((const char *) content));
+                                xevent.AddCredits((const char *) vnode->name,conv->Convert((const char *) content));
                                 xmlFree(content);
                             }
                         }

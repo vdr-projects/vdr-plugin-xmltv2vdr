@@ -108,7 +108,7 @@ private:
     cOsdItem *newtitle (const char *s);
     cOsdItem *option(const char *s, bool yesno);
     void epgmappingreplace(cEPGMapping *newmapping);
-    int c1,c2,c3,c4,cm;
+    int c1,c2,c3,cm;
 public:
     cMenuSetupXmltv2vdrChannelMap(cPluginXmltv2vdr *Plugin, cMenuSetupXmltv2vdr *Menu, int Index);
     ~cMenuSetupXmltv2vdrChannelMap();

@@ -26,14 +26,12 @@ private:
     char *review;
     char *rating;
     char *origtitle;
-    char *director;
     int year;
     time_t starttime;
     int duration;
     time_t vps;
     tEventID eventid;
-    cStringList actors;
-    cStringList others;
+    cStringList credits;
 #if VDRVERSNUM >= 10711
     uchar parentalRating;
     uchar contents[MaxEventContents];
@@ -41,6 +39,7 @@ private:
 public:
     cXMLTVEvent();
     ~cXMLTVEvent();
+    bool RemoveLastCharFromDescription();
     bool Add2Description(const char *Name, const char *Value);
     bool Add2Description(const char *Name, int Value);
     bool Add2Description(const char *Value);
@@ -49,9 +48,7 @@ public:
     void SetOrigTitle(const char *OrigTitle);
     void SetShortText(const char *ShortText);
     void SetDescription(const char *Description);
-    void SetDirector(const char *Director);
-    void AddActor(const char *Actor, const char *ActorRole=NULL);
-    void AddOther(const char *OtherType, const char *Other);
+    void AddCredits(const char *CreditType, const char *Credit, const char *Addendum=NULL);
     void SetCountry(const char *Country);
     void SetReview(const char *Review);
     void SetRating(const char *System, const char *Rating);
@@ -127,17 +124,9 @@ public:
     {
         return eventid;
     }
-    cStringList *Actors(void)
+    cStringList *Credits(void)
     {
-        return &actors;
-    }
-    const char *Director(void) const
-    {
-        return director;
-    }
-    cStringList *Others(void)
-    {
-        return &others;
+        return &credits;
     }
 };
 
@@ -158,7 +147,7 @@ class cParse
         PARSE_XMLTVERR=4,
         PARSE_NOMAPPING=5,
         PARSE_NOCHANNELID=6,
-	PARSE_EMPTYSCHEDULE=7
+        PARSE_EMPTYSCHEDULE=7
     };
 
 private:

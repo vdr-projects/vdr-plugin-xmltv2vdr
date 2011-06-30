@@ -722,7 +722,7 @@ cMenuSetupXmltv2vdrChannelMap::cMenuSetupXmltv2vdrChannelMap(cPluginXmltv2vdr *P
     flags=map->Flags();
     days=map->Days();
     daysmax=getdaysmax();
-    c1=c2=c3=c4=cm=0;
+    c1=c2=c3=cm=0;
     output();
 }
 
@@ -812,11 +812,9 @@ void cMenuSetupXmltv2vdrChannelMap::output(void)
     if ((flags & USE_CREDITS)==USE_CREDITS)
     {
         Add(new cMyMenuEditBitItem(tr(" actors"),&flags,CREDITS_ACTORS),true);
-        c4=Current();
-        if ((flags & CREDITS_ACTORS)==CREDITS_ACTORS)
-            Add(new cMyMenuEditBitItem(tr("  add in a list"),&flags,CREDITS_ACTORS_LIST),true);
-        Add(new cMyMenuEditBitItem(tr(" director"),&flags,CREDITS_DIRECTOR),true);
+        Add(new cMyMenuEditBitItem(tr(" director"),&flags,CREDITS_DIRECTORS),true);
         Add(new cMyMenuEditBitItem(tr(" other crew"),&flags,CREDITS_OTHERS),true);
+        Add(new cMyMenuEditBitItem(tr(" output"),&flags,CREDITS_LIST,tr("singleline"),tr("multiline")),true);
     }
 
     Add(new cMyMenuEditBitItem(tr("rating"),&flags,USE_RATING),true);
@@ -868,7 +866,7 @@ eOSState cMenuSetupXmltv2vdrChannelMap::ProcessKey (eKeys Key)
         case kLeft:
         case kRight:
             if ((Current()==c1) || (Current()==c2) ||
-                    (Current()==c3) || (Current()==c4)) output();
+                    (Current()==c3)) output();
             break;
         case kDown:
             if (Current()>=cm)

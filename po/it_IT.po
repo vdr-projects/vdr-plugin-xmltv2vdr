@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: vdr\n"
 "Report-Msgid-Bugs-To: <see README>\n"
-"POT-Creation-Date: 2011-06-21 20:36+0200\n"
+"POT-Creation-Date: 2011-06-29 15:11+0200\n"
 "PO-Revision-Date: 2011-03-05 15:45+0100\n"
 "Last-Translator: Diego Pierotto <vdr-italian@tiscali.it>\n"
 "Language-Team:  <vdr@linuxtv.org>\n"
@@ -14,9 +14,6 @@ msgstr ""
 "X-Poedit-Language: Italian\n"
 "X-Poedit-Country: ITALY\n"
 "X-Poedit-SourceCharset: utf-8\n"
-
-msgid "With"
-msgstr "Con "
 
 msgid "options"
 msgstr "Opzioni"
@@ -144,14 +141,20 @@ msgstr "Categoria"
 msgid " actors"
 msgstr " Attore"
 
-msgid "  add in a list"
-msgstr "  aggiungi ad una lista"
-
 msgid " director"
 msgstr " Regia"
 
 msgid " other crew"
 msgstr " altro gruppo"
+
+msgid " output"
+msgstr ""
+
+msgid "singleline"
+msgstr ""
+
+msgid "multiline"
+msgstr ""
 
 msgid "rating"
 msgstr "Valutazione"
@@ -186,3 +189,9 @@ msgstr "Plugin XMLTV2VDR ancora in esecuzione"
 msgid "Imports xmltv epg into vdr"
 msgstr "Importa EPG di XMLTV in VDR"
 
+#~ msgid "With"
+#~ msgstr "Con "
+
+#, fuzzy
+#~ msgid " add in a list"
+#~ msgstr "  aggiungi ad una lista"
