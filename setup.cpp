@@ -57,7 +57,15 @@ cMenuSetupXmltv2vdr::cMenuSetupXmltv2vdr(cPluginXmltv2vdr *Plugin)
     wakeup=baseplugin->WakeUp;
     upstart=baseplugin->UpStart;
     exectime=baseplugin->ExecTime();
+    cs=NULL;
+    cm=NULL;
     Output();
+}
+
+cMenuSetupXmltv2vdr::~cMenuSetupXmltv2vdr()
+{
+    if (cs) cs->ClearMenu();
+    if (cm) cm->ClearMenu();
 }
 
 void cMenuSetupXmltv2vdr::Output(void)
@@ -202,12 +210,14 @@ eOSState cMenuSetupXmltv2vdr::edit()
 {
     if ((Current()>=sourcesBegin) && (Current()<=sourcesEnd))
     {
-        return AddSubMenu(new cMenuSetupXmltv2vdrChannelSource(baseplugin,this,Current()-sourcesBegin));
+        cs=new cMenuSetupXmltv2vdrChannelSource(baseplugin,this,Current()-sourcesBegin);
+        return AddSubMenu(cs);
     }
 
     if ((Current()>=mappingBegin) && (Current()<=mappingEnd))
     {
-        return AddSubMenu(new cMenuSetupXmltv2vdrChannelMap(baseplugin,this,Current()-mappingBegin));
+        cm=new cMenuSetupXmltv2vdrChannelMap(baseplugin,this,Current()-mappingBegin);
+        return AddSubMenu(cm);
     }
     if (Current()==mappingEntry)
     {
@@ -634,8 +644,12 @@ cMenuSetupXmltv2vdrChannelSource::cMenuSetupXmltv2vdrChannelSource(cPluginXmltv2
 
 cMenuSetupXmltv2vdrChannelSource::~cMenuSetupXmltv2vdrChannelSource()
 {
+    if (menu)
+    {
+        menu->Output();
+        menu->ClearCS();
+    }
     if (sel) delete [] sel;
-    if (menu) menu->Output();
 }
 
 cOsdItem *cMenuSetupXmltv2vdrChannelSource::newtitle(const char *s)
@@ -728,8 +742,12 @@ cMenuSetupXmltv2vdrChannelMap::cMenuSetupXmltv2vdrChannelMap(cPluginXmltv2vdr *P
 
 cMenuSetupXmltv2vdrChannelMap::~cMenuSetupXmltv2vdrChannelMap()
 {
+    if (menu)
+    {
+        menu->Output();
+        menu->ClearCM();
+    }
     if (map) delete map;
-    if (menu) menu->Output();
 }
 
 int cMenuSetupXmltv2vdrChannelMap::getdaysmax()
@@ -814,7 +832,7 @@ void cMenuSetupXmltv2vdrChannelMap::output(void)
         Add(new cMyMenuEditBitItem(tr(" actors"),&flags,CREDITS_ACTORS),true);
         Add(new cMyMenuEditBitItem(tr(" director"),&flags,CREDITS_DIRECTORS),true);
         Add(new cMyMenuEditBitItem(tr(" other crew"),&flags,CREDITS_OTHERS),true);
-        Add(new cMyMenuEditBitItem(tr(" output"),&flags,CREDITS_LIST,tr("singleline"),tr("multiline")),true);
+        Add(new cMyMenuEditBitItem(tr(" output"),&flags,CREDITS_LIST,tr("multiline"),tr("singleline")),true);
     }
 
     Add(new cMyMenuEditBitItem(tr("rating"),&flags,USE_RATING),true);

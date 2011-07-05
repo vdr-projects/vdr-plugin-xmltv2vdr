@@ -56,7 +56,7 @@ private:
 public:
     cEPGSource(const char *Name,cEPGMappings *Maps,cTEXTMappings *Texts);
     ~cEPGSource();
-    bool Execute();
+    int Execute();
     void Store(void);
     void ChangeChannelSelection(int *Selection);
     cEPGChannels *ChannelList()

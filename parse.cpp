@@ -500,7 +500,9 @@ bool cParse::PutEvent(cSchedule* schedule, cEvent *event, cXMLTVEvent *xevent, c
                                 (!strcasecmp(ctype,"actor"))) add=false;
                         if (((map->Flags() & CREDITS_DIRECTORS)!=CREDITS_DIRECTORS) &&
                                 (!strcasecmp(ctype,"director"))) add=false;
-                        if (((map->Flags() & CREDITS_OTHERS)!=CREDITS_OTHERS) && (add)) add=false;
+                        if (((map->Flags() & CREDITS_OTHERS)!=CREDITS_OTHERS) &&
+                                (add) && (strcasecmp(ctype,"actor")) &&
+                                (strcasecmp(ctype,"director"))) add=false;
                         if (add)
                         {
                             cTEXTMapping *text=TEXTMapping(ctype);
@@ -840,7 +842,7 @@ bool cParse::Process(char *buffer, int bufsize)
         if (!channelid)
         {
             if (lerr!=PARSE_NOCHANNELID)
-                esyslog("xmltv2vdr: '%s' missing channelid in xmltv file",name);
+                esyslog("xmltv2vdr: '%s' ERROR missing channelid in xmltv file",name);
             lerr=PARSE_NOCHANNELID;
             node=node->next;
             continue;
@@ -849,7 +851,7 @@ bool cParse::Process(char *buffer, int bufsize)
         if (!map)
         {
             if (lerr!=PARSE_NOMAPPING)
-                esyslog("xmltv2vdr: '%s' no mapping for channelid %s",name,channelid);
+                esyslog("xmltv2vdr: '%s' ERROR no mapping for channelid %s",name,channelid);
             lerr=PARSE_NOMAPPING;
             xmlFree(channelid);
             node=node->next;
@@ -878,7 +880,7 @@ bool cParse::Process(char *buffer, int bufsize)
         if (!starttime)
         {
             if (lerr!=PARSE_XMLTVERR)
-                esyslog("xmltv2vdr: '%s' no starttime - error in xmltv file?",name);
+                esyslog("xmltv2vdr: ERROR '%s' no starttime, check xmltv file",name);
             lerr=PARSE_XMLTVERR;
             xmlFree(channelid);
             node=node->next;
@@ -922,7 +924,7 @@ bool cParse::Process(char *buffer, int bufsize)
         if (!schedules)
         {
             if (lerr!=PARSE_NOSCHEDULES)
-                esyslog("xmltv2vdr: '%s' cannot get schedules",name);
+                esyslog("xmltv2vdr: '%s' ERROR cannot get schedules",name);
             lerr=PARSE_NOSCHEDULES;
             node=node->next;
             continue;
@@ -945,8 +947,8 @@ bool cParse::Process(char *buffer, int bufsize)
             if (!schedule)
             {
                 if (lerr!=PARSE_NOSCHEDULE)
-                    esyslog("xmltv2vdr: '%s' cannot get schedule for channel %s (no import)",
-                            name,channel->Name());
+                    esyslog("xmltv2vdr: '%s' ERROR cannot get schedule for channel %s%s",
+                            name,channel->Name(),addevents ? "" : " - try add option");
                 lerr=PARSE_NOSCHEDULE;
                 continue;
             }
@@ -960,7 +962,7 @@ bool cParse::Process(char *buffer, int bufsize)
                 if (!schedule->Index())
                 {
                     if (lerr!=PARSE_EMPTYSCHEDULE)
-                        esyslog("xmltv2vdr: '%s' cannot merge into empty epg (%s)",
+                        esyslog("xmltv2vdr: '%s' ERROR cannot merge into empty epg (%s) - try add optiopn",
                                 name,channel->Name());
                     lerr=PARSE_EMPTYSCHEDULE;
                 }

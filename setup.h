@@ -22,6 +22,9 @@ public:
     cMyMenuEditBitItem(const char *Name, uint *Value, uint Mask, const char *FalseString=NULL, const char *TrueString=NULL);
 };
 
+class cMenuSetupXmltv2vdrChannelSource;
+class cMenuSetupXmltv2vdrChannelMap;
+
 class cMenuSetupXmltv2vdr : public cMenuSetupPage
 {
 protected:
@@ -29,6 +32,8 @@ protected:
 private:
     cStringList channels;
     cPluginXmltv2vdr *baseplugin;
+    cMenuSetupXmltv2vdrChannelSource *cs;
+    cMenuSetupXmltv2vdrChannelMap *cm;
     int mappingBegin,mappingEnd;
     int sourcesBegin,sourcesEnd;
     int mappingEntry;
@@ -40,7 +45,16 @@ private:
     int upstart;
 public:
     void Output(void);
+    void ClearCS()
+    {
+        cs=NULL;
+    }
+    void ClearCM()
+    {
+        cm=NULL;
+    }
     cMenuSetupXmltv2vdr(cPluginXmltv2vdr *Plugin);
+    ~cMenuSetupXmltv2vdr();
     virtual eOSState ProcessKey(eKeys Key);
     cStringList *ChannelList()
     {
@@ -87,6 +101,10 @@ private:
 public:
     cMenuSetupXmltv2vdrChannelSource(cPluginXmltv2vdr *Plugin, cMenuSetupXmltv2vdr *Menu, int Index);
     ~cMenuSetupXmltv2vdrChannelSource();
+    void ClearMenu()
+    {
+        menu=NULL;
+    }
 };
 
 class cMenuSetupXmltv2vdrChannelMap : public cMenuSetupPage
@@ -115,6 +133,10 @@ public:
     void AddChannel2Map(int ChannelNumber);
     bool EPGMappingExists(tChannelID ChannelID);
     virtual eOSState ProcessKey(eKeys Key);
+    void ClearMenu()
+    {
+        menu=NULL;
+    }
 };
 
 class cMenuSetupXmltv2vdrChannelsVDR : public cOsdMenu

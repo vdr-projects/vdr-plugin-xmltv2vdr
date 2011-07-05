@@ -12,6 +12,10 @@ private:
 public:
     cExtPipe(void);
     ~cExtPipe();
+    FILE *Out()
+    {
+        return f;
+    }
     operator FILE* () const
     {
         return f;
