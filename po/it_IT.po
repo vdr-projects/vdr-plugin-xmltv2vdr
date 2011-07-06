@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: vdr\n"
 "Report-Msgid-Bugs-To: <see README>\n"
-"POT-Creation-Date: 2011-07-05 20:47+0200\n"
+"POT-Creation-Date: 2011-07-06 20:45+0200\n"
 "PO-Revision-Date: 2011-03-05 15:45+0100\n"
 "Last-Translator: Diego Pierotto <vdr-italian@tiscali.it>\n"
 "Language-Team:  <vdr@linuxtv.org>\n"
@@ -96,6 +96,9 @@ msgstr "Ospite"
 msgid "review"
 msgstr "Anteprima"
 
+msgid "category"
+msgstr "Categoria"
+
 msgid "country and date"
 msgstr "Paese e data"
 
@@ -134,9 +137,6 @@ msgstr "Testo completo"
 
 msgid " merge long texts"
 msgstr " Unisci testi completi"
-
-msgid "category"
-msgstr "Categoria"
 
 msgid " actors"
 msgstr " Attore"

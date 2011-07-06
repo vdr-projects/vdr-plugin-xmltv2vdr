@@ -82,6 +82,7 @@ private:
     char commentator[255];
     char guest[255];
     char review[255];
+    char category[255];
     cOsdItem *newtitle (const char *s);
 public:
     cMenuSetupXmltv2vdrTextMap(cPluginXmltv2vdr *Plugin);

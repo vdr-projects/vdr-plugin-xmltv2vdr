@@ -246,7 +246,11 @@ eOSState cMenuSetupXmltv2vdr::ProcessKey (eKeys Key)
                     SetHelp(NULL,NULL,NULL,tr("edit"));
                 }
             }
-            else if (((Current()>=mappingBegin) && (Current()<=mappingEnd)) || (Current()==mappingEntry))
+            else if (Current()==mappingEntry)
+            {
+                SetHelp(NULL,NULL,NULL,tr("edit"));
+            }
+            else if ((Current()>=mappingBegin) && (Current()<=mappingEnd))
             {
                 SetHelp(NULL,NULL,NULL,tr("edit"));
             }
@@ -425,6 +429,15 @@ cMenuSetupXmltv2vdrTextMap::cMenuSetupXmltv2vdrTextMap(cPluginXmltv2vdr *Plugin)
         strcpy(review,tr("review"));
     }
 
+    textmap=baseplugin->TEXTMapping("category");
+    if (textmap)
+    {
+        strn0cpy(review,textmap->Value(),strlen(textmap->Value())+1);
+    }
+    else
+    {
+        strcpy(review,tr("category"));
+    }
 
     Add(newtitle(tr("country and date")));
     Add(new cMenuEditStrItem("country",country,sizeof(country)));
@@ -432,6 +445,9 @@ cMenuSetupXmltv2vdrTextMap::cMenuSetupXmltv2vdrTextMap(cPluginXmltv2vdr *Plugin)
 
     Add(newtitle(tr("original title")));
     Add(new cMenuEditStrItem("originaltitle",originaltitle,sizeof(originaltitle)));
+
+    Add(newtitle(tr("category")));
+    Add(new cMenuEditStrItem("category",category,sizeof(category)));
 
     Add(newtitle(tr("credits")));
     Add(new cMenuEditStrItem("actor",actor,sizeof(actor)));
@@ -485,6 +501,15 @@ void cMenuSetupXmltv2vdrTextMap::Store()
     else
     {
         baseplugin->TEXTMappingAdd(new cTEXTMapping("originaltitle",originaltitle));
+    }
+    textmap=baseplugin->TEXTMapping("category");
+    if (textmap)
+    {
+        textmap->ChangeValue(originaltitle);
+    }
+    else
+    {
+        baseplugin->TEXTMappingAdd(new cTEXTMapping("category",originaltitle));
     }
     textmap=baseplugin->TEXTMapping("actor");
     if (textmap)
@@ -589,6 +614,7 @@ void cMenuSetupXmltv2vdrTextMap::Store()
     SetupStore("textmap.country",country);
     SetupStore("textmap.date",date);
     SetupStore("textmap.originaltitle",originaltitle);
+    SetupStore("textmap.category",category);
     SetupStore("textmap.actor",actor);
     SetupStore("textmap.adapter",adapter);
     SetupStore("textmap.commentator",commentator);
@@ -824,7 +850,7 @@ void cMenuSetupXmltv2vdrChannelMap::output(void)
     }
     Add(new cMyMenuEditBitItem(tr("country and date"),&flags,USE_COUNTRYDATE),true);
     Add(new cMyMenuEditBitItem(tr("original title"),&flags,USE_ORIGTITLE),true);
-    Add(new cMyMenuEditBitItem(tr("category"),&flags,USE_CATEGORY),true);
+    Add(new cMyMenuEditBitItem(tr("category"),&flags,USE_CATEGORIES),true);
     Add(new cMyMenuEditBitItem(tr("credits"),&flags,USE_CREDITS),true);
     c3=Current();
     if ((flags & USE_CREDITS)==USE_CREDITS)

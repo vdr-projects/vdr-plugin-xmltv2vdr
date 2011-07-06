@@ -104,6 +104,11 @@ void cXMLTVEvent::SetRating(const char *System, const char *Rating)
     if (rating) rating=compactspace(rating);
 }
 
+void cXMLTVEvent::AddCategory(const char *Category)
+{
+    categories.Append(compactspace(strdup(Category)));
+    categories.Sort();
+}
 
 void cXMLTVEvent::AddCredits(const char *CreditType, const char *Credit, const char *Addendum)
 {
@@ -168,6 +173,7 @@ void cXMLTVEvent::Clear()
     vps= (time_t) 0;
     eventid=0;
     credits.Clear();
+    categories.Clear();
 }
 
 cXMLTVEvent::cXMLTVEvent()
@@ -425,6 +431,25 @@ bool cParse::PutEvent(cSchedule* schedule, cEvent *event, cXMLTVEvent *xevent, c
     {
         if ((map->Flags() & OPT_APPEND)==OPT_APPEND)
         {
+            /* checking the event sequence */
+            cEvent *last=NULL;
+            if (schedule->Index()) last=schedule->Events()->Last();
+            if (last)
+            {
+                if (xevent->StartTime()<last->StartTime())
+                {
+                    esyslog("xmltv2vdr: '%s' ERROR xmltv data overlaps",name);
+                    return false;
+                }
+                /* set duration, if it doesn't exist */
+                if (!last->Duration()) last->SetDuration((int) difftime(xevent->StartTime(),last->StartTime()));
+                if (xevent->StartTime()!=last->EndTime())
+                {
+                    esyslog("xmltv2vdr: '%s' detected gap of %is between events",name,
+                            (int) difftime(xevent->StartTime(),last->EndTime()));
+                }
+            }
+            /* add event */
             start=xevent->StartTime();
             event=new cEvent(xevent->EventID());
             if (!event) return false;
@@ -560,9 +585,23 @@ bool cParse::PutEvent(cSchedule* schedule, cEvent *event, cXMLTVEvent *xevent, c
     }
     if (((map->Flags() & USE_ORIGTITLE)==USE_ORIGTITLE) && (xevent->OrigTitle()))
     {
-        cTEXTMapping *text;
-        text=TEXTMapping("originaltitle");
+        cTEXTMapping *text=TEXTMapping("originaltitle");
         if (text) addExt=xevent->Add2Description(text->Value(),xevent->OrigTitle());
+    }
+    if (((map->Flags() & USE_CATEGORIES)==USE_CATEGORIES) && (xevent->Categories()->Size()))
+    {
+        cTEXTMapping *text=TEXTMapping("category");
+        if (text)
+        {
+            cStringList *categories=xevent->Categories();
+            addExt=xevent->Add2Description(text->Value(),(*categories)[0]);
+            for (int i=1; i<categories->Size(); i++)
+            {
+                // prevent duplicates
+                if (strcasecmp((*categories)[i],(*categories)[i-1]))
+                    addExt=xevent->Add2Description(text->Value(),(*categories)[i]);
+            }
+        }
     }
     if (((map->Flags() & USE_RATING)==USE_RATING) && (xevent->Rating()) && (xevent->RatingSystem()))
     {
@@ -570,8 +609,7 @@ bool cParse::PutEvent(cSchedule* schedule, cEvent *event, cXMLTVEvent *xevent, c
     }
     if (((map->Flags() & USE_REVIEW)==USE_REVIEW) && (xevent->Review()))
     {
-        cTEXTMapping *text;
-        text=TEXTMapping("review");
+        cTEXTMapping *text=TEXTMapping("review");
         if (text) addExt=xevent->Add2Description(text->Value(),xevent->Review());
     }
     if (addExt) event->SetDescription(xevent->Description());
@@ -710,6 +748,7 @@ bool cParse::FetchEvent(xmlNodePtr enode)
                     }
                     else
                     {
+                        xevent.AddCategory(conv->Convert((const char *) content));
                     }
                     xmlFree(content);
                 }
@@ -904,12 +943,15 @@ bool cParse::Process(char *buffer, int bufsize)
         oldmap=map;
         xmlFree(channelid);
 
-        xmlChar *vpsstart=xmlGetProp(node,(const xmlChar *) "vps-start");
-        if (vpsstart)
+        if ((map->Flags() & OPT_VPS)==OPT_VPS)
         {
-            time_t vps=ConvertXMLTVTime2UnixTime((char *) vpsstart);
-            xevent.SetVps(vps);
-            xmlFree(vpsstart);
+            xmlChar *vpsstart=xmlGetProp(node,(const xmlChar *) "vps-start");
+            if (vpsstart)
+            {
+                time_t vps=ConvertXMLTVTime2UnixTime((char *) vpsstart);
+                xevent.SetVps(vps);
+                xmlFree(vpsstart);
+            }
         }
 
         xevent.SetStartTime(starttime);
@@ -919,7 +961,7 @@ bool cParse::Process(char *buffer, int bufsize)
             node=node->next;
             continue;
         }
-        cSchedulesLock *schedulesLock = new cSchedulesLock(true,2000); // to be safe ;)
+        cSchedulesLock *schedulesLock = new cSchedulesLock(true,5000); // to be safe ;)
         const cSchedules *schedules = cSchedules::Schedules(*schedulesLock);
         if (!schedules)
         {

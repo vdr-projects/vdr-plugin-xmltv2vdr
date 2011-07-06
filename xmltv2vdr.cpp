@@ -496,6 +496,7 @@ cPluginXmltv2vdr::cPluginXmltv2vdr(void) : epgexecutor(&epgsources)
     TEXTMappingAdd(new cTEXTMapping("country",tr("country")));
     TEXTMappingAdd(new cTEXTMapping("date",tr("year")));
     TEXTMappingAdd(new cTEXTMapping("originaltitle",tr("originaltitle")));
+    TEXTMappingAdd(new cTEXTMapping("category",tr("category")));
     TEXTMappingAdd(new cTEXTMapping("actor",tr("actor")));
     TEXTMappingAdd(new cTEXTMapping("adapter",tr("adapter")));
     TEXTMappingAdd(new cTEXTMapping("commentator",tr("commentator")));

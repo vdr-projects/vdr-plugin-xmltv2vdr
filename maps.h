@@ -23,7 +23,7 @@
 #define USE_LONGTEXT           0x2
 #define USE_COUNTRYDATE        0x4
 #define USE_ORIGTITLE          0x8
-#define USE_CATEGORY           0x10
+#define USE_CATEGORIES         0x10
 #define USE_CREDITS            0x20
 #define USE_RATING             0x40
 #define USE_REVIEW             0x80

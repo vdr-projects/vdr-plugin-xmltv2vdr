@@ -32,6 +32,7 @@ private:
     time_t vps;
     tEventID eventid;
     cStringList credits;
+    cStringList categories;
 #if VDRVERSNUM >= 10711
     uchar parentalRating;
     uchar contents[MaxEventContents];
@@ -49,6 +50,7 @@ public:
     void SetShortText(const char *ShortText);
     void SetDescription(const char *Description);
     void AddCredits(const char *CreditType, const char *Credit, const char *Addendum=NULL);
+    void AddCategory(const char *Category);
     void SetCountry(const char *Country);
     void SetReview(const char *Review);
     void SetRating(const char *System, const char *Rating);
@@ -127,6 +129,10 @@ public:
     cStringList *Credits(void)
     {
         return &credits;
+    }
+    cStringList *Categories(void)
+    {
+        return &categories;
     }
 };
 
