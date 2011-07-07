@@ -233,7 +233,7 @@ eOSState cMenuSetupXmltv2vdr::ProcessKey (eKeys Key)
     switch (state)
     {
     case osContinue:
-        if ((Key==kDown) || (Key==kUp))
+        if ((Key==kDown) || (Key==kUp) || (Key==kDown|k_Repeat) || (Key==kUp|k_Repeat))
         {
             if ((Current()>=sourcesBegin) && (Current()<=sourcesEnd))
             {
@@ -908,15 +908,19 @@ eOSState cMenuSetupXmltv2vdrChannelMap::ProcessKey (eKeys Key)
         switch (Key)
         {
         case kLeft:
+        case kLeft|k_Repeat:
         case kRight:
+        case kRight|k_Repeat:
             if ((Current()==c1) || (Current()==c2) ||
                     (Current()==c3)) output();
             break;
         case kDown:
+        case kDown|k_Repeat:
             if (Current()>=cm)
                 SetHelp(tr("unmap"),tr("map"));
             break;
         case kUp:
+        case kUp|k_Repeat:
             if (Current()<cm)
                 SetHelp(NULL,NULL);
         default:
