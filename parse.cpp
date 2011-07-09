@@ -1059,7 +1059,7 @@ cParse::cParse(const char *Name, cEPGMappings *Maps, cTEXTMappings *Texts)
                 CodeSet++;
         }
     }
-    dsyslog("xmltv2vdr: '%s' codeset is '%s'",Name,CodeSet ? CodeSet : "US-ASCII//TRANSLIT");
+    dsyslog("xmltv2vdr: '%s' vdr codeset is '%s'",Name,CodeSet ? CodeSet : "US-ASCII//TRANSLIT");
     conv = new cCharSetConv("UTF-8",CodeSet ? CodeSet : "US-ASCII//TRANSLIT");
     name=strdup(Name);
     maps=Maps;

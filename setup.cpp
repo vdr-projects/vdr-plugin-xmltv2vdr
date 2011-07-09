@@ -239,20 +239,20 @@ eOSState cMenuSetupXmltv2vdr::ProcessKey (eKeys Key)
             {
                 if ((sourcesEnd-sourcesBegin)>0)
                 {
-                    SetHelp(NULL,tr("up"),tr("down"),tr("edit"));
+                    SetHelp(NULL,tr("Button$Up"),tr("Button$Down"),tr("Button$Edit"));
                 }
                 else
                 {
-                    SetHelp(NULL,NULL,NULL,tr("edit"));
+                    SetHelp(NULL,NULL,NULL,tr("Button$Edit"));
                 }
             }
             else if (Current()==mappingEntry)
             {
-                SetHelp(NULL,NULL,NULL,tr("edit"));
+                SetHelp(NULL,NULL,NULL,tr("Button$Edit"));
             }
             else if ((Current()>=mappingBegin) && (Current()<=mappingEnd))
             {
-                SetHelp(NULL,NULL,NULL,tr("edit"));
+                SetHelp(NULL,NULL,NULL,tr("Button$Edit"));
             }
             else
             {
@@ -636,6 +636,7 @@ cMenuSetupXmltv2vdrChannelSource::cMenuSetupXmltv2vdrChannelSource(cPluginXmltv2
     baseplugin=Plugin;
     sel=NULL;
     days=0;
+    pin[0]=0;
 
     epgsrc=baseplugin->EPGSource(Index);
     if (!epgsrc) return;
@@ -645,7 +646,15 @@ cMenuSetupXmltv2vdrChannelSource::cMenuSetupXmltv2vdrChannelSource(cPluginXmltv2
     Add(newtitle(tr("options")));
     days=epgsrc->DaysInAdvance();
     Add(new cMenuEditIntItem(tr("days in advance"),&days,1,epgsrc->DaysMax()));
-
+    if (epgsrc->NeedPin())
+    {
+        if (epgsrc->Pin())
+        {
+            strncpy(pin,epgsrc->Pin(),sizeof(pin)-1);
+            pin[sizeof(pin)-1]=0;
+        }
+        Add(new cMenuEditStrItem(tr("pin"),pin,sizeof(pin)));
+    }
     Add(newtitle(tr("channels provided")));
 
     cEPGChannels *channellist=epgsrc->ChannelList();
@@ -690,6 +699,8 @@ void cMenuSetupXmltv2vdrChannelSource::Store(void)
 
     epgsrc->ChangeChannelSelection(sel);
     epgsrc->ChangeDaysInAdvance(days);
+    if (epgsrc->NeedPin())
+        epgsrc->ChangePin(pin);
     epgsrc->Store();
 
     cEPGChannels *channellist=epgsrc->ChannelList();
@@ -763,6 +774,7 @@ cMenuSetupXmltv2vdrChannelMap::cMenuSetupXmltv2vdrChannelMap(cPluginXmltv2vdr *P
     days=map->Days();
     daysmax=getdaysmax();
     c1=c2=c3=cm=0;
+    SetHelp(NULL,NULL,tr("Button$Reset"),tr("Button$Copy"));
     output();
 }
 
@@ -917,12 +929,12 @@ eOSState cMenuSetupXmltv2vdrChannelMap::ProcessKey (eKeys Key)
         case kDown:
         case kDown|k_Repeat:
             if (Current()>=cm)
-                SetHelp(tr("unmap"),tr("map"));
+                SetHelp(tr("Button$Unmap"),tr("Button$Map"));
             break;
         case kUp:
         case kUp|k_Repeat:
             if (Current()<cm)
-                SetHelp(NULL,NULL);
+                SetHelp(NULL,NULL,tr("Button$Reset"),tr("Button$Copy"));
         default:
             break;
         }
@@ -933,7 +945,7 @@ eOSState cMenuSetupXmltv2vdrChannelMap::ProcessKey (eKeys Key)
         switch (Key)
         {
         case kOk:
-            if ((Current()>=16) && (!hasmaps))
+            if ((Current()>=cm) && (!hasmaps))
             {
                 return AddSubMenu(new cMenuSetupXmltv2vdrChannelsVDR(baseplugin,this,channel,title));
             }
@@ -944,18 +956,66 @@ eOSState cMenuSetupXmltv2vdrChannelMap::ProcessKey (eKeys Key)
             }
             break;
         case kRed:
-            item=Get(Current());
-            if (item)
+            if (Current()>=cm)
             {
-                if (map)
+                item=Get(Current());
+                if (item)
                 {
-                    map->RemoveChannel(atoi(item->Text()));
-                    output();
+                    if (map)
+                    {
+                        map->RemoveChannel(atoi(item->Text()));
+                        output();
+                    }
                 }
             }
             break;
         case kGreen:
-            return AddSubMenu(new cMenuSetupXmltv2vdrChannelsVDR(baseplugin,this,channel,title));
+            if (Current()>=cm)
+                return AddSubMenu(new cMenuSetupXmltv2vdrChannelsVDR(baseplugin,this,channel,title));
+            break;
+        case kBlue: // copy
+            if ((Current()<cm) && (baseplugin))
+            {
+                if (Skins.Message(mtInfo,tr("Copy settings to all channels?"))==kOk)
+                {
+                    const char *oldchannel=channel;
+                    cEPGMapping *tmap=map;
+                    for (int i=0; i<baseplugin->EPGMappingCount();i++)
+                    {
+                        if (strcmp(baseplugin->EPGMapping(i)->ChannelName(),channel))
+                        {
+                            channel=baseplugin->EPGMapping(i)->ChannelName();
+                            map=baseplugin->EPGMapping(i);
+                            Store();
+                        }
+                    }
+                    map=tmap;
+                    channel=oldchannel;
+                    state=osContinue;
+                }
+            }
+            break;
+        case kYellow: // reset
+            if (Current()<cm)
+            {
+                if (Skins.Message(mtInfo,tr("Reset all channel settings?"))==kOk)
+                {
+                    const char *oldchannel=channel;
+                    cEPGMapping *tmap=map;
+                    flags=0;
+                    days=1;
+                    for (int i=0; i<baseplugin->EPGMappingCount();i++)
+                    {
+                        channel=baseplugin->EPGMapping(i)->ChannelName();
+                        map=baseplugin->EPGMapping(i);
+                        Store();
+                    }
+                    map=tmap;
+                    channel=oldchannel;
+                    output();
+                    state=osContinue;
+                }
+            }
             break;
         default:
             break;
@@ -1062,7 +1122,7 @@ cMenuSetupXmltv2vdrChannelsVDR::cMenuSetupXmltv2vdrChannelsVDR(cPluginXmltv2vdr 
 {
     baseplugin=Plugin;
     map=Map;
-    SetHelp(NULL,NULL,tr("choose"));
+    SetHelp(NULL,NULL,tr("Button$Choose"));
     SetTitle(Title);
 
     for (cChannel *channel = Channels.First(); channel; channel=Channels.Next(channel))

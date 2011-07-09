@@ -46,15 +46,18 @@ class cEPGSource : public cListObject
 {
 private:
     const char *name;
+    const char *confdir;
+    const char *pin;
     cParse *parse;
     bool ready2parse;
     bool pipe;
+    bool needpin;
     int daysinadvance;
     int daysmax;
     bool ReadConfig();
     cEPGChannels channels;
 public:
-    cEPGSource(const char *Name,cEPGMappings *Maps,cTEXTMappings *Texts);
+    cEPGSource(const char *Name,const char *ConfDir,cEPGMappings *Maps,cTEXTMappings *Texts);
     ~cEPGSource();
     int Execute();
     void Store(void);
@@ -71,13 +74,26 @@ public:
     {
         return daysinadvance;
     }
+    bool NeedPin()
+    {
+        return needpin;
+    }
     const char *Name()
     {
         return name;
     }
+    const char *Pin()
+    {
+        return pin;
+    }
     void ChangeDaysInAdvance(int NewDaysInAdvance)
     {
         daysinadvance=NewDaysInAdvance;
+    }
+    void ChangePin(const char *NewPin)
+    {
+        if (pin) free((void *) pin);
+        pin=strdup(NewPin);
     }
 };
 
@@ -105,6 +121,7 @@ private:
     bool epgsourceexists(const char *name);
     int exectime;
     time_t exectime_t,last_exectime_t;
+    char *confdir;
 public:
     int ExecTime()
     {

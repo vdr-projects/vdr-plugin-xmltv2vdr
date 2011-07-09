@@ -98,6 +98,7 @@ private:
     cEPGSource *epgsrc;
     int *sel;
     int days;
+    char pin[255];
     cOsdItem *newtitle (const char *s);
 public:
     cMenuSetupXmltv2vdrChannelSource(cPluginXmltv2vdr *Plugin, cMenuSetupXmltv2vdr *Menu, int Index);

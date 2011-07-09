@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: vdr\n"
 "Report-Msgid-Bugs-To: <see README>\n"
-"POT-Creation-Date: 2011-07-06 20:45+0200\n"
+"POT-Creation-Date: 2011-07-09 19:55+0200\n"
 "PO-Revision-Date: 2011-03-05 15:45+0100\n"
 "Last-Translator: Diego Pierotto <vdr-italian@tiscali.it>\n"
 "Language-Team:  <vdr@linuxtv.org>\n"
@@ -42,13 +42,13 @@ msgstr "Canali sorgente EPG"
 msgid "mapped"
 msgstr "Mappato"
 
-msgid "up"
+msgid "Button$Up"
 msgstr "Su"
 
-msgid "down"
-msgstr "Giù"
+msgid "Button$Down"
+msgstr "Giu"
 
-msgid "edit"
+msgid "Button$Edit"
 msgstr "Modifica"
 
 msgid "texts"
@@ -111,11 +111,20 @@ msgstr "Crediti"
 msgid "days in advance"
 msgstr "Giorni in anticipo"
 
+msgid "pin"
+msgstr "Pin"
+
 msgid "channels provided"
 msgstr "Canali forniti"
 
 msgid "selected"
 msgstr "Selezionato"
+
+msgid "Button$Reset"
+msgstr ""
+
+msgid "Button$Copy"
+msgstr ""
 
 msgid "epg source channel options"
 msgstr "Opzioni canali sorgente EPG"
@@ -174,13 +183,20 @@ msgstr "Mappature canali sorgente EPG"
 msgid "none"
 msgstr "Nessuno"
 
-msgid "unmap"
+msgid "Button$Unmap"
 msgstr "Non mappare"
 
-msgid "map"
-msgstr "Mappa"
+msgid "Button$Map"
+msgstr "Mappare"
 
-msgid "choose"
+msgid "Copy settings to all channels?"
+msgstr ""
+
+#, fuzzy
+msgid "Reset all channel settings?"
+msgstr "Opzioni canali sorgente EPG"
+
+msgid "Button$Choose"
 msgstr "Scegli"
 
 msgid "xmltv2vdr plugin still working"
@@ -188,4 +204,3 @@ msgstr "Plugin XMLTV2VDR ancora in esecuzione"
 
 msgid "Imports xmltv epg into vdr"
 msgstr "Importa EPG di XMLTV in VDR"
-
