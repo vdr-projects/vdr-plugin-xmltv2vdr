@@ -292,7 +292,7 @@ cMenuSetupXmltv2vdrTextMap::cMenuSetupXmltv2vdrTextMap(cPluginXmltv2vdr *Plugin)
     textmap=baseplugin->TEXTMapping("country");
     if (textmap)
     {
-        strn0cpy(country,textmap->Value(),strlen(textmap->Value())+1);
+        strn0cpy(country,textmap->Value(),sizeof(country)-1);
     }
     else
     {
@@ -302,7 +302,7 @@ cMenuSetupXmltv2vdrTextMap::cMenuSetupXmltv2vdrTextMap(cPluginXmltv2vdr *Plugin)
     textmap=baseplugin->TEXTMapping("date");
     if (textmap)
     {
-        strn0cpy(date,textmap->Value(),strlen(textmap->Value())+1);
+        strn0cpy(date,textmap->Value(),sizeof(date)-1);
     }
     else
     {
@@ -312,7 +312,7 @@ cMenuSetupXmltv2vdrTextMap::cMenuSetupXmltv2vdrTextMap(cPluginXmltv2vdr *Plugin)
     textmap=baseplugin->TEXTMapping("originaltitle");
     if (textmap)
     {
-        strn0cpy(originaltitle,textmap->Value(),strlen(textmap->Value())+1);
+        strn0cpy(originaltitle,textmap->Value(),sizeof(originaltitle)-1);
     }
     else
     {
@@ -322,7 +322,7 @@ cMenuSetupXmltv2vdrTextMap::cMenuSetupXmltv2vdrTextMap(cPluginXmltv2vdr *Plugin)
     textmap=baseplugin->TEXTMapping("director");
     if (textmap)
     {
-        strn0cpy(director,textmap->Value(),strlen(textmap->Value())+1);
+        strn0cpy(director,textmap->Value(),sizeof(director)-1);
     }
     else
     {
@@ -332,7 +332,7 @@ cMenuSetupXmltv2vdrTextMap::cMenuSetupXmltv2vdrTextMap(cPluginXmltv2vdr *Plugin)
     textmap=baseplugin->TEXTMapping("actor");
     if (textmap)
     {
-        strn0cpy(actor,textmap->Value(),strlen(textmap->Value())+1);
+        strn0cpy(actor,textmap->Value(),sizeof(actor)-1);
     }
     else
     {
@@ -342,7 +342,7 @@ cMenuSetupXmltv2vdrTextMap::cMenuSetupXmltv2vdrTextMap(cPluginXmltv2vdr *Plugin)
     textmap=baseplugin->TEXTMapping("writer");
     if (textmap)
     {
-        strn0cpy(writer,textmap->Value(),strlen(textmap->Value())+1);
+        strn0cpy(writer,textmap->Value(),sizeof(writer)-1);
     }
     else
     {
@@ -352,7 +352,7 @@ cMenuSetupXmltv2vdrTextMap::cMenuSetupXmltv2vdrTextMap(cPluginXmltv2vdr *Plugin)
     textmap=baseplugin->TEXTMapping("adapter");
     if (textmap)
     {
-        strn0cpy(adapter,textmap->Value(),strlen(textmap->Value())+1);
+        strn0cpy(adapter,textmap->Value(),sizeof(adapter)-1);
     }
     else
     {
@@ -362,7 +362,7 @@ cMenuSetupXmltv2vdrTextMap::cMenuSetupXmltv2vdrTextMap(cPluginXmltv2vdr *Plugin)
     textmap=baseplugin->TEXTMapping("producer");
     if (textmap)
     {
-        strn0cpy(producer,textmap->Value(),strlen(textmap->Value())+1);
+        strn0cpy(producer,textmap->Value(),sizeof(producer)-1);
     }
     else
     {
@@ -372,7 +372,7 @@ cMenuSetupXmltv2vdrTextMap::cMenuSetupXmltv2vdrTextMap(cPluginXmltv2vdr *Plugin)
     textmap=baseplugin->TEXTMapping("composer");
     if (textmap)
     {
-        strn0cpy(composer,textmap->Value(),strlen(textmap->Value())+1);
+        strn0cpy(composer,textmap->Value(),sizeof(composer)-1);
     }
     else
     {
@@ -382,7 +382,7 @@ cMenuSetupXmltv2vdrTextMap::cMenuSetupXmltv2vdrTextMap(cPluginXmltv2vdr *Plugin)
     textmap=baseplugin->TEXTMapping("editor");
     if (textmap)
     {
-        strn0cpy(editor,textmap->Value(),strlen(textmap->Value())+1);
+        strn0cpy(editor,textmap->Value(),sizeof(editor)-1);
     }
     else
     {
@@ -392,7 +392,7 @@ cMenuSetupXmltv2vdrTextMap::cMenuSetupXmltv2vdrTextMap(cPluginXmltv2vdr *Plugin)
     textmap=baseplugin->TEXTMapping("presenter");
     if (textmap)
     {
-        strn0cpy(presenter,textmap->Value(),strlen(textmap->Value())+1);
+        strn0cpy(presenter,textmap->Value(),sizeof(presenter)-1);
     }
     else
     {
@@ -402,7 +402,7 @@ cMenuSetupXmltv2vdrTextMap::cMenuSetupXmltv2vdrTextMap(cPluginXmltv2vdr *Plugin)
     textmap=baseplugin->TEXTMapping("commentator");
     if (textmap)
     {
-        strn0cpy(commentator,textmap->Value(),strlen(textmap->Value())+1);
+        strn0cpy(commentator,textmap->Value(),sizeof(commentator)-1);
     }
     else
     {
@@ -412,7 +412,7 @@ cMenuSetupXmltv2vdrTextMap::cMenuSetupXmltv2vdrTextMap(cPluginXmltv2vdr *Plugin)
     textmap=baseplugin->TEXTMapping("guest");
     if (textmap)
     {
-        strn0cpy(guest,textmap->Value(),strlen(textmap->Value())+1);
+        strn0cpy(guest,textmap->Value(),sizeof(guest)-1);
     }
     else
     {
@@ -422,7 +422,7 @@ cMenuSetupXmltv2vdrTextMap::cMenuSetupXmltv2vdrTextMap(cPluginXmltv2vdr *Plugin)
     textmap=baseplugin->TEXTMapping("review");
     if (textmap)
     {
-        strn0cpy(review,textmap->Value(),strlen(textmap->Value())+1);
+        strn0cpy(review,textmap->Value(),sizeof(review)-1);
     }
     else
     {
@@ -432,11 +432,11 @@ cMenuSetupXmltv2vdrTextMap::cMenuSetupXmltv2vdrTextMap(cPluginXmltv2vdr *Plugin)
     textmap=baseplugin->TEXTMapping("category");
     if (textmap)
     {
-        strn0cpy(review,textmap->Value(),strlen(textmap->Value())+1);
+        strn0cpy(category,textmap->Value(),sizeof(category)-1);
     }
     else
     {
-        strcpy(review,tr("category"));
+        strcpy(category,tr("category"));
     }
 
     Add(newtitle(tr("country and date")));
@@ -505,11 +505,11 @@ void cMenuSetupXmltv2vdrTextMap::Store()
     textmap=baseplugin->TEXTMapping("category");
     if (textmap)
     {
-        textmap->ChangeValue(originaltitle);
+        textmap->ChangeValue(category);
     }
     else
     {
-        baseplugin->TEXTMappingAdd(new cTEXTMapping("category",originaltitle));
+        baseplugin->TEXTMappingAdd(new cTEXTMapping("category",category));
     }
     textmap=baseplugin->TEXTMapping("actor");
     if (textmap)
