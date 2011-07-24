@@ -104,7 +104,7 @@ bool cEPGSource::ReadConfig()
         esyslog("xmltv2vdr: '%s' out of memory",name);
         return false;
     }
-    FILE *f=fopen(fname,"r+");
+    FILE *f=fopen(fname,"r");
     if (!f)
     {
         esyslog("xmltv2vdr: '%s' ERROR cannot read config file %s",name,fname);
@@ -542,7 +542,7 @@ void cPluginXmltv2vdr::ReadInEPGSources(bool Reload)
             char *path=NULL;
             if (asprintf(&path,"%s/%s",EPGSOURCES,dirent->d_name)!=-1)
             {
-                if (access(path,R_OK|W_OK)!=-1)
+                if (access(path,R_OK)!=-1)
                 {
                     int fd=open(path,O_RDONLY);
                     if (fd!=-1)
