@@ -18,10 +18,16 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#define esyslog(a...) void( (SysLogLevel > 0) ? syslog_with_tid(a) : void() )
-#define isyslog(a...) void( (SysLogLevel > 1) ? syslog_with_tid(a) : void() )
-#define dsyslog(a...) void( (SysLogLevel > 2) ? syslog_with_tid(a) : void() )
-#define tsyslog(a...) void( (SysLogLevel > 3) ? syslog_with_tid(a) : void() )
+#if __GNUC__ > 3
+#define UNUSED(v) UNUSED_ ## v __attribute__((unused))
+#else
+#define UNUSED(x) x
+#endif
+
+#define esyslog(a...) void( (SysLogLevel > 0) ? syslog_redir(a) : void() )
+#define isyslog(a...) void( (SysLogLevel > 1) ? syslog_redir(a) : void() )
+#define dsyslog(a...) void( (SysLogLevel > 2) ? syslog_redir(a) : void() )
+#define tsyslog(a...) void( (SysLogLevel > 3) ? syslog_redir(a) : void() )
 
 #define EPGDATA2XMLTV_USERAGENT "libcurl-agent/1.0"
 #define EPGDATA2XMLTV_URL "http://www.epgdata.com/index.php?action=sendPackage&iOEM=VDR&dataType=xml&dayOffset=%s"

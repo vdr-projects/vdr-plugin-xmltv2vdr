@@ -13,12 +13,9 @@
 
 #include <fcntl.h>
 
-#define xstr(s) str(s)
-#define str(s) #s
-
 int SysLogLevel=1;
 
-void syslog_with_tid(const char *format, ...)
+void syslog_redir(const char *format, ...)
 {
     va_list ap;
     char fmt[255];
@@ -28,6 +25,10 @@ void syslog_with_tid(const char *format, ...)
     va_end(ap);
     fprintf(stderr,"\n");
     fflush(stderr);
+}
+
+void tvmGenericErrorFunc(void *UNUSED(ctx), const char *UNUSED(msg), ...)
+{
 }
 
 cepgdata2xmltv::cepgdata2xmltv ()
@@ -51,6 +52,7 @@ cepgdata2xmltv::~cepgdata2xmltv ()
 void cepgdata2xmltv::LoadXSLT()
 {
     if (pxsltStylesheet) return;
+    xmlSetGenericErrorFunc(NULL,tvmGenericErrorFunc);
     xmlSubstituteEntitiesDefault (1);
     xmlLoadExtDtdDefaultValue = 1;
     exsltRegisterAll();
