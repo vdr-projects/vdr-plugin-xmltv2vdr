@@ -7,6 +7,7 @@
 
 #include <vdr/plugin.h>
 #include <string.h>
+#include <time.h>
 #include <sys/wait.h>
 #include "xmltv2vdr.h"
 #include "extpipe.h"
@@ -184,8 +185,10 @@ bool cEPGSource::ReadConfig()
                 // backward compatibility
                 cname++;
             }
-            cEPGChannel *epgchannel= new cEPGChannel(cname,false);
-            if (epgchannel) channels.Add(epgchannel);
+            if (!strchr(cname,' ') && (strlen(cname)>0)) {
+                cEPGChannel *epgchannel= new cEPGChannel(cname,false);
+                if (epgchannel) channels.Add(epgchannel);
+            }
         }
         linenr++;
     }
