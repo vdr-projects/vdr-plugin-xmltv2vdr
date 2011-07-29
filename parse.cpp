@@ -431,26 +431,32 @@ bool cParse::PutEvent(cSchedule* schedule, cEvent *event, cXMLTVEvent *xevent, c
     {
         if ((map->Flags() & OPT_APPEND)==OPT_APPEND)
         {
+            start=xevent->StartTime();
             /* checking the event sequence */
             cEvent *last=NULL;
             if (schedule->Index()) last=schedule->Events()->Last();
             if (last)
             {
-                if (xevent->StartTime()<last->StartTime())
+                if (start<last->StartTime())
                 {
-                    esyslog("xmltv2vdr: '%s' ERROR xmltv data overlaps",name);
+                    esyslog("xmltv2vdr: '%s' ERROR xmltv data overlaps:",name);
+                    time_t lstart=last->StartTime();
+                    esyslog("xmltv2vdr: '%s' ERROR last event '%s' @%s", name,last->Title(),
+                            ctime(&lstart));
+                    esyslog("xmltv2vdr: '%s' ERROR next event '%s' @%s", name,xevent->Title(),
+                            ctime(&start));
                     return false;
                 }
                 /* set duration, if it doesn't exist */
-                if (!last->Duration()) last->SetDuration((int) difftime(xevent->StartTime(),last->StartTime()));
-                if (xevent->StartTime()!=last->EndTime())
+                if (!last->Duration()) last->SetDuration((int) difftime(start,
+                            last->StartTime()));
+                if (start!=last->EndTime())
                 {
                     esyslog("xmltv2vdr: '%s' detected gap of %is between events",name,
-                            (int) difftime(xevent->StartTime(),last->EndTime()));
+                            (int) difftime(start,last->EndTime()));
                 }
             }
             /* add event */
-            start=xevent->StartTime();
             event=new cEvent(xevent->EventID());
             if (!event) return false;
             event->SetStartTime(start);

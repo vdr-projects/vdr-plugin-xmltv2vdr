@@ -51,7 +51,7 @@ PKG-INCLUDES += libxml-2.0
 
 INCLUDES += -I$(VDRDIR)/include
 
-DEFINES += -D_GNU_SOURCE -DPLUGIN_NAME_I18N='"$(PLUGIN)"'
+DEFINES += -D_GNU_SOURCE -D_XOPEN_SOURCE -DPLUGIN_NAME_I18N='"$(PLUGIN)"'
 
 INCLUDES += $(shell $(PKG-CONFIG) --cflags $(PKG-INCLUDES))
 LIBS    += $(shell $(PKG-CONFIG) --libs $(PKG-LIBS))
@@ -105,12 +105,11 @@ i18n: $(I18Nmsgs) $(I18Npot)
 
 ### Targets:
 
-#parse: parse.o
-#	$(CXX) $(CXXFLAGS) parse.o $(LIBS) -o parse
-
 libvdr-$(PLUGIN).so: $(OBJS)
 	$(CXX) $(CXXFLAGS) -shared $(OBJS) $(LIBS) -o $@
 	@cp --remove-destination $@ $(LIBDIR)/$@.$(APIVERSION)
+
+install:
 
 dist: clean
 	@-rm -rf $(TMPDIR)/$(ARCHIVE)
@@ -121,4 +120,4 @@ dist: clean
 	@echo Distribution package created as $(PACKAGE).tgz
 
 clean:
-	@-rm -f $(OBJS) $(DEPFILE) *.so *.tgz core* *~ $(PODIR)/*.mo $(PODIR)/*.pot
+	@-rm -f $(OBJS) $(DEPFILE) *.so *.tgz core* *~ $(PODIR)/*.mo $(PODIR)/*.pot 

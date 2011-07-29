@@ -60,10 +60,10 @@ epgdata2xmltv_xsl:
 	sed -e "s/\"/\\\\\"/g;" epgdata2xmltv.xsl | awk '{ printf("%s",$$0); }' >> epgdata2xmltv_xsl.h
 	echo "\";" >> epgdata2xmltv_xsl.h
 
-epgdata2xmltv: $(OBJS)
+epgdata2xmltv: epgdata2xmltv_xsl $(OBJS)
 	$(CXX) $(CXXFLAGS) $(OBJS) $(LIBS) -o $@
 
-install: epgdata2xmltv_xsl epgdata2xmltv
+install: epgdata2xmltv
 	@cp epgdata2xmltv $(INSTALL)
 	$(STRIP) $(INSTALL)/epgdata2xmltv
 	@mkdir -p /var/lib/epgsources
