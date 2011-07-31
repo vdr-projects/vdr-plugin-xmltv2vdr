@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: vdr\n"
 "Report-Msgid-Bugs-To: <see README>\n"
-"POT-Creation-Date: 2011-07-28 17:56+0200\n"
+"POT-Creation-Date: 2011-08-01 00:24+0200\n"
 "PO-Revision-Date: 2011-03-05 15:45+0100\n"
 "Last-Translator: Diego Pierotto <vdr-italian@tiscali.it>\n"
 "Language-Team:  <vdr@linuxtv.org>\n"
@@ -190,12 +190,11 @@ msgstr "Non mappare"
 msgid "Button$Map"
 msgstr "Mappare"
 
-msgid "Copy settings to all channels?"
+msgid "Copy to all mapped channels?"
 msgstr ""
 
-#, fuzzy
 msgid "Reset all channel settings?"
-msgstr "Opzioni canali sorgente EPG"
+msgstr ""
 
 msgid "Button$Choose"
 msgstr "Scegli"

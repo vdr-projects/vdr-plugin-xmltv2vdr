@@ -12,7 +12,8 @@
 cExtPipe::cExtPipe(void)
 {
     pid = -1;
-    f = NULL;
+    f_stderr = -1;
+    f_stdout=  -1;
 }
 
 cExtPipe::~cExtPipe()
@@ -21,68 +22,100 @@ cExtPipe::~cExtPipe()
     Close(status);
 }
 
-bool cExtPipe::Open(const char *Command, const char *Mode)
+bool cExtPipe::Open(const char *Command)
 {
-    int fd[2];
+    int fd_stdout[2];
+    int fd_stderr[2];
 
-    if (pipe(fd) < 0)
+    if (pipe(fd_stdout) < 0)
     {
         LOG_ERROR;
         return false;
     }
+    if (pipe(fd_stderr) < 0)
+    {
+        close(fd_stdout[0]);
+        close(fd_stdout[1]);
+        LOG_ERROR;
+        return false;
+    }
+
     if ((pid = fork()) < 0)   // fork failed
     {
         LOG_ERROR;
-        close(fd[0]);
-        close(fd[1]);
+        close(fd_stdout[0]);
+        close(fd_stdout[1]);
+        close(fd_stderr[0]);
+        close(fd_stderr[1]);
         return false;
     }
 
-    const char *mode = "w";
-    int iopipe = 0;
-
     if (pid > 0)   // parent process
     {
-        if (strcmp(Mode, "r") == 0)
-        {
-            mode = "r";
-            iopipe = 1;
-        }
-        close(fd[iopipe]);
-        if ((f = fdopen(fd[1 - iopipe], mode)) == NULL)
-        {
+        close(fd_stdout[1]); // close write fd, we need only read fd
+        close(fd_stderr[1]); // close write fd, we need only read fd
+        int flags=fcntl(fd_stdout[0],F_GETFL,0);
+        if (flags==-1) {
             LOG_ERROR;
-            close(fd[1 - iopipe]);
+            close(fd_stdout[0]);
+            close(fd_stderr[0]);
+            return false;
         }
-        return f != NULL;
+        flags|=O_NONBLOCK;
+        if (fcntl(fd_stdout[0],F_SETFL,flags)==-1) {
+            LOG_ERROR;
+            close(fd_stdout[0]);
+            close(fd_stderr[0]);
+            return false;
+        }
+        flags=fcntl(fd_stderr[0],F_GETFL,0);
+        if (flags==-1) {
+            LOG_ERROR;
+            close(fd_stdout[0]);
+            close(fd_stderr[0]);
+            return false;
+
+        }
+        if (fcntl(fd_stderr[0],F_SETFL,flags)==-1) {
+            LOG_ERROR;
+            close(fd_stdout[0]);
+            close(fd_stderr[0]);
+            return false;
+        }
+        f_stdout = fd_stdout[0];
+        f_stderr = fd_stderr[0];        
+        return true;
     }
     else   // child process
     {
-        int iofd = STDOUT_FILENO;
-        if (strcmp(Mode, "w") == 0)
-        {
-            mode = "r";
-            iopipe = 1;
-            iofd = STDIN_FILENO;
-        }
-        close(fd[iopipe]);
-        if (dup2(fd[1 - iopipe], iofd) == -1)   // now redirect
+        close(fd_stdout[0]); // close read fd, we need only write fd
+        close(fd_stderr[0]); // close read fd, we need only write fd
+
+        if (dup2(fd_stdout[1], STDOUT_FILENO) == -1)   // now redirect
         {
             LOG_ERROR;
-            close(fd[1 - iopipe]);
+            close(fd_stderr[1]);
+            close(fd_stdout[1]);
             _exit(-1);
         }
-        else
+
+        if (dup2(fd_stderr[1], STDERR_FILENO) == -1)   // now redirect
         {
-            int MaxPossibleFileDescriptors = getdtablesize();
-            for (int i = STDERR_FILENO + 1; i < MaxPossibleFileDescriptors; i++)
-                close(i); //close all dup'ed filedescriptors
-            if (execl("/bin/sh", "sh", "-c", Command, NULL) == -1)
-            {
-                LOG_ERROR_STR(Command);
-                close(fd[1 - iopipe]);
-                _exit(-1);
-            }
+            LOG_ERROR;
+            close(fd_stderr[1]);
+            close(fd_stdout[1]);
+            _exit(-1);
+        }
+
+        int MaxPossibleFileDescriptors = getdtablesize();
+        for (int i = STDERR_FILENO + 1; i < MaxPossibleFileDescriptors; i++)
+            close(i); //close all dup'ed filedescriptors
+        if (execl("/bin/sh", "sh", "-c", Command, NULL) == -1)
+        {
+            LOG_ERROR_STR(Command);
+            close(fd_stderr[1]);
+            close(fd_stdout[1]);
+            _exit(-1);
         }
         _exit(0);
     }
@@ -92,10 +125,16 @@ int cExtPipe::Close(int &status)
 {
     int ret = -1;
 
-    if (f)
+    if (f_stderr!=-1)
     {
-        fclose(f);
-        f = NULL;
+        close(f_stderr);
+        f_stderr = -1;
+    }
+
+    if (f_stdout!=-1)
+    {
+        close(f_stdout);
+        f_stdout=-1;
     }
 
     if (pid > 0)

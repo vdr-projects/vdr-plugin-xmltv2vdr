@@ -50,11 +50,12 @@ private:
     const char *pin;
     cParse *parse;
     bool ready2parse;
-    bool pipe;
+    bool usepipe;
     bool needpin;
     int daysinadvance;
     int daysmax;
     bool ReadConfig();
+    int ReadOutput(char *&result, size_t &l);
     cEPGChannels channels;
 public:
     cEPGSource(const char *Name,const char *ConfDir,cEPGMappings *Maps,cTEXTMappings *Texts);

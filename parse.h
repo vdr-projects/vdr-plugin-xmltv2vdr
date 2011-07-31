@@ -147,13 +147,12 @@ class cParse
     enum
     {
         PARSE_NOERROR=0,
-        PARSE_NOSCHEDULE=1,
-        PARSE_NOCHANNEL=2,
-        PARSE_NOSCHEDULES=3,
-        PARSE_XMLTVERR=4,
-        PARSE_NOMAPPING=5,
-        PARSE_NOCHANNELID=6,
-        PARSE_EMPTYSCHEDULE=7
+        PARSE_NOSCHEDULE,
+        PARSE_NOCHANNEL,
+        PARSE_XMLTVERR,
+        PARSE_NOMAPPING,
+        PARSE_NOCHANNELID,
+        PARSE_EMPTYSCHEDULE
     };
 
 private:
@@ -170,7 +169,8 @@ private:
     bool FetchEvent(xmlNodePtr node);
     cEPGMapping *EPGMapping(const char *ChannelName);
     cTEXTMapping *TEXTMapping(const char *Name);
-    bool PutEvent(cSchedule* schedule,cEvent *event,cXMLTVEvent *xevent, cEPGMapping *map);
+    bool PutEvent(cSchedule* schedule,cEvent *event,cXMLTVEvent *xevent, cEPGMapping *map,
+                  int mapindex);
 public:
     cParse(const char *Name, cEPGMappings *Maps, cTEXTMappings *Texts);
     ~cParse();

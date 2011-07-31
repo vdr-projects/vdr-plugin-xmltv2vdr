@@ -80,7 +80,7 @@ cEPGSource::cEPGSource(const char *Name, const char *ConfDir, cEPGMappings *Maps
     name=strdup(Name);
     confdir=strdup(ConfDir);
     pin=NULL;
-    pipe=false;
+    usepipe=false;
     needpin=false;
     daysinadvance=0;
     ready2parse=ReadConfig();
@@ -123,12 +123,12 @@ bool cEPGSource::ReadConfig()
             if (!strncmp(line,"pipe",4))
             {
                 dsyslog("xmltv2vdr: '%s' is providing data through a pipe",name);
-                pipe=true;
+                usepipe=true;
             }
             else
             {
                 dsyslog("xmltv2vdr: '%s' is providing data through a file",name);
-                pipe=false;
+                usepipe=false;
             }
             char *ndt=strchr(line,';');
             if (ndt)
@@ -262,15 +262,66 @@ bool cEPGSource::ReadConfig()
     return true;
 }
 
+int cEPGSource::ReadOutput(char *&result, size_t &l)
+{
+    int ret=0;
+    char *fname=NULL;
+    if (asprintf(&fname,"%s/%s.xmltv",EPGSOURCES,name)==-1)
+    {
+        esyslog("xmltv2vdr: '%s' ERROR out of memory",name);
+        return 134;
+    }
+    dsyslog("xmltv2vdr: '%s' reading from '%s'",name,fname);
+
+    int fd=open(fname,O_RDONLY);
+    if (fd==-1)
+    {
+        esyslog("xmltv2vdr: '%s' ERROR failed to open '%s'",name,fname);
+        free(fname);
+        return 157;
+    }
+
+    struct stat statbuf;
+    if (fstat(fd,&statbuf)==-1)
+    {
+        esyslog("xmltv2vdr: '%s' ERROR failed to stat '%s'",name,fname);
+        close(fd);
+        free(fname);
+        return 157;
+    }
+    l=statbuf.st_size;
+    result=(char *) malloc(l+1);
+    if (!result)
+    {
+        close(fd);
+        free(fname);
+        esyslog("xmltv2vdr: '%s' ERROR out of memory",name);
+        return 134;
+    }
+    if (read(fd,result,statbuf.st_size)==statbuf.st_size)
+    {
+    }
+    else
+    {
+        esyslog("xmltv2vdr: '%s' ERROR failed to read '%s'",name,fname);
+        ret=149;
+    }
+    free(result);
+    close(fd);
+    free(fname);
+    return ret;
+}
+
 int cEPGSource::Execute()
 {
     if (!ready2parse) return false;
     if (!parse) return false;
-    char *result=NULL;
-    int l=0;
+    char *r_out=NULL;
+    char *r_err=NULL;
+    int l_out=0;
+    int l_err=0;
 
     int ret=0;
-    cExtPipe p;
 
     char *cmd=NULL;
     if (asprintf(&cmd,"%s %i '%s'",name,daysinadvance,pin ? pin : "")==-1)
@@ -298,8 +349,9 @@ int cEPGSource::Execute()
             strcat(cmd," ");
         }
     }
-    dsyslog("xmltv2vdr: '%s' %s",name,cmd);
-    if (!p.Open(cmd,"r"))
+    //dsyslog("xmltv2vdr: '%s' %s",name,cmd);
+    cExtPipe p;    
+    if (!p.Open(cmd))
     {
         free(cmd);
         esyslog("xmltv2vdr: '%s' ERROR failed to open pipe",name);
@@ -307,23 +359,55 @@ int cEPGSource::Execute()
     }
     free(cmd);
     dsyslog("xmltv2vdr: '%s' executing epgsource",name);
-    if (pipe)
-    {
-        int c;
-        while ((c=fgetc(p.Out()))!=EOF)
-        {
-            if (l%20==0) result=(char *) realloc(result, l+21);
-            result[l++]=c;
+
+    int fdsopen=2;
+    while (fdsopen>0) {
+        struct pollfd fds[2];
+        fds[0].fd=p.Out();
+        fds[0].events=POLLIN;
+        fds[1].fd=p.Err();
+        fds[1].events=POLLIN;
+        if (poll(fds,2,500)>=0) {
+            if (fds[0].revents & POLLIN) {
+                unsigned char c;
+                if (read(p.Out(),&c,1)==1)
+                {
+                    if (l_out%20==0) r_out=(char *) realloc(r_out, l_out+21);
+                    r_out[l_out++]=c;
+                }
+            }
+            if (fds[1].revents & POLLIN) {
+                unsigned char c;
+                if (read(p.Err(),&c,1)==1)
+                {
+                    if (l_err%20==0) r_err=(char *) realloc(r_err, l_err+21);
+                    r_err[l_err++]=c;
+                }
+            }
+            if (fds[0].revents & POLLHUP) {
+                fdsopen--;
+            }
+            if (fds[1].revents & POLLHUP) {
+                fdsopen--;
+            }
+        } else {
+            esyslog("xmltv2vdr: '%s' ERROR polling",name);
+            break;
         }
+    }
+    if (r_out) r_out[l_out]=0;
+    if (r_err) r_err[l_err]=0;
+
+    if (usepipe)
+    {
         int status;
         if (p.Close(status)>0)
         {
             int returncode=WEXITSTATUS(status);
-            if ((!returncode) && (result))
+            if ((!returncode) && (r_out))
             {
                 dsyslog("xmltv2vdr: '%s' parsing output",name);
-                result[l]=0;
-                if (!parse->Process(result,l))
+                if (!parse->Process(r_out,l_out))
                 {
                     esyslog("xmltv2vdr: '%s' ERROR failed to parse output",name);
                     ret=141;
@@ -340,67 +424,26 @@ int cEPGSource::Execute()
             esyslog("xmltv2vdr: '%s' ERROR failed to execute",name);
             ret=126;
         }
-        if (result) free(result);
     }
     else
     {
-        while ((fgetc(p.Out()))!=EOF) { }
-
         int status;
         if (p.Close(status)>0)
         {
             int returncode=WEXITSTATUS(status);
             if (!returncode)
             {
-                char *fname=NULL;
-                if (asprintf(&fname,"%s/%s.xmltv",EPGSOURCES,name)==-1)
-                {
-                    esyslog("xmltv2vdr: '%s' ERROR out of memory",name);
-                    return 134;
-                }
-                dsyslog("xmltv2vdr: '%s' reading from '%s'",name,fname);
-
-                int fd=open(fname,O_RDONLY);
-                if (fd==-1)
-                {
-                    esyslog("xmltv2vdr: '%s' ERROR failed to open '%s'",name,fname);
-                    free(fname);
-                    return 157;
-                }
-
-                struct stat statbuf;
-                if (fstat(fd,&statbuf)==-1)
-                {
-                    esyslog("xmltv2vdr: '%s' ERROR failed to stat '%s'",name,fname);
-                    close(fd);
-                    free(fname);
-                    return 157;
-                }
-                l=statbuf.st_size;
-                result=(char *) malloc(l+1);
-                if (!result)
-                {
-                    close(fd);
-                    free(fname);
-                    esyslog("xmltv2vdr: '%s' ERROR out of memory",name);
-                    return 134;
-                }
-                if (read(fd,result,statbuf.st_size)==statbuf.st_size)
-                {
+                size_t l;
+                char *result=NULL;
+                ret=ReadOutput(result,l);
+                if ((!ret) && (result)) {
                     if (!parse->Process(result,l))
                     {
                         esyslog("xmltv2vdr: '%s' failed to parse output",name);
                         ret=149;
                     }
                 }
-                else
-                {
-                    esyslog("xmltv2vdr: '%s' ERROR failed to read '%s'",name,fname);
-                    ret=149;
-                }
-                free(result);
-                close(fd);
-                free(fname);
+                if (result) free(result);
             }
             else
             {
@@ -409,6 +452,16 @@ int cEPGSource::Execute()
             }
         }
     }
+    if (r_out) free(r_out);
+    if (r_err) {
+        char *pch=strtok(r_err,"\n");
+        while (pch) {
+            esyslog("xmltv2vdr: '%s' ERROR %s",name,pch);
+            pch=strtok(NULL,"\n");
+        }
+        free(r_err);
+    }
+
     return ret;
 }
 

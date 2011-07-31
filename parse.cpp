@@ -21,7 +21,9 @@ extern char *strcatrealloc(char *dest, const char *src);
 void cXMLTVEvent::SetTitle(const char *Title)
 {
     title = strcpyrealloc(title, Title);
-    if (title) title = compactspace(title);
+    if (title) {
+      title = compactspace(title);
+    }
 }
 
 void cXMLTVEvent::SetOrigTitle(const char *OrigTitle)
@@ -420,7 +422,8 @@ cEvent *cParse::SearchEvent(cSchedule* schedule, cXMLTVEvent *xevent)
     return f;
 }
 
-bool cParse::PutEvent(cSchedule* schedule, cEvent *event, cXMLTVEvent *xevent, cEPGMapping *map)
+bool cParse::PutEvent(cSchedule* schedule, cEvent *event, cXMLTVEvent *xevent, cEPGMapping *map,
+                      int mapindex)
 {
     if (!schedule) return false;
     if (!xevent) return false;
@@ -441,9 +444,11 @@ bool cParse::PutEvent(cSchedule* schedule, cEvent *event, cXMLTVEvent *xevent, c
                 {
                     esyslog("xmltv2vdr: '%s' ERROR xmltv data overlaps:",name);
                     time_t lstart=last->StartTime();
-                    esyslog("xmltv2vdr: '%s' ERROR last event '%s' @%s", name,last->Title(),
+                    esyslog("xmltv2vdr: '%s' ERROR last event '%s' (%s) @%s", name,
+                            *schedule->ChannelID().ToString(),last->Title(),
                             ctime(&lstart));
-                    esyslog("xmltv2vdr: '%s' ERROR next event '%s' @%s", name,xevent->Title(),
+                    esyslog("xmltv2vdr: '%s' ERROR next event '%s' (%s) @%s", name,
+                            *map->ChannelIDs()[mapindex].ToString(),xevent->Title(),
                             ctime(&start));
                     return false;
                 }
@@ -466,6 +471,7 @@ bool cParse::PutEvent(cSchedule* schedule, cEvent *event, cXMLTVEvent *xevent, c
             event->SetDescription(xevent->Description());
             event->SetVersion(0);
             schedule->AddEvent(event);
+            schedule->Sort();
             dsyslog("xmltv2vdr: '%s' adding event '%s' @%s",name,xevent->Title(),ctime(&start));
         }
         else
@@ -867,6 +873,14 @@ bool cParse::Process(char *buffer, int bufsize)
         return false;
     }
 
+    cSchedulesLock schedulesLock(true,25000); // wait up to 25 secs for lock!
+    const cSchedules *schedules = cSchedules::Schedules(schedulesLock);
+    if (!schedules)
+    {
+        esyslog("xmltv2vdr: '%s' cannot get schedules, try later",name);
+        return false;
+    }
+
     time_t begin=time(NULL);
     xmlNodePtr node=rootnode->xmlChildrenNode;
     cEPGMapping *oldmap=NULL;
@@ -964,16 +978,7 @@ bool cParse::Process(char *buffer, int bufsize)
         if (stoptime) xevent.SetDuration(stoptime-starttime);
         if (!FetchEvent(node)) // sets xevent
         {
-            node=node->next;
-            continue;
-        }
-        cSchedulesLock *schedulesLock = new cSchedulesLock(true,5000); // to be safe ;)
-        const cSchedules *schedules = cSchedules::Schedules(*schedulesLock);
-        if (!schedules)
-        {
-            if (lerr!=PARSE_NOSCHEDULES)
-                esyslog("xmltv2vdr: '%s' ERROR cannot get schedules",name);
-            lerr=PARSE_NOSCHEDULES;
+            dsyslog("xmltv2vdr: '%s' failed to fetch event",name);
             node=node->next;
             continue;
         }
@@ -1003,14 +1008,14 @@ bool cParse::Process(char *buffer, int bufsize)
             if (addevents)
             {
                 cEvent *event=SearchEvent(schedule,&xevent);
-                PutEvent(schedule,event,&xevent,map);
+                PutEvent(schedule,event,&xevent,map,i);
             }
             else
             {
                 if (!schedule->Index())
                 {
                     if (lerr!=PARSE_EMPTYSCHEDULE)
-                        esyslog("xmltv2vdr: '%s' ERROR cannot merge into empty epg (%s) - try add optiopn",
+                        esyslog("xmltv2vdr: '%s' ERROR cannot merge into empty epg (%s) - try add option",
                                 name,channel->Name());
                     lerr=PARSE_EMPTYSCHEDULE;
                 }
@@ -1021,7 +1026,7 @@ bool cParse::Process(char *buffer, int bufsize)
                     {
                         if ((event=SearchEvent(schedule,&xevent)))
                         {
-                            PutEvent(schedule,event,&xevent,map);
+                            PutEvent(schedule,event,&xevent,map,i);
                         }
                         else
                         {
@@ -1033,7 +1038,6 @@ bool cParse::Process(char *buffer, int bufsize)
                 }
             }
         }
-        delete schedulesLock;
         node=node->next;
     }
     xmlFreeDoc(xmltv);

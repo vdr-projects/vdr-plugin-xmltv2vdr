@@ -976,7 +976,7 @@ eOSState cMenuSetupXmltv2vdrChannelMap::ProcessKey (eKeys Key)
         case kBlue: // copy
             if ((Current()<cm) && (baseplugin))
             {
-                if (Skins.Message(mtInfo,tr("Copy settings to all channels?"))==kOk)
+                if (Skins.Message(mtInfo,tr("Copy to all mapped channels?"))==kOk)
                 {
                     const char *oldchannel=channel;
                     cEPGMapping *tmap=map;

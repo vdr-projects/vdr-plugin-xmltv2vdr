@@ -8,19 +8,20 @@ class cExtPipe
 {
 private:
     pid_t pid;
-    FILE *f;
+    int f_stdout;
+    int f_stderr;
 public:
     cExtPipe(void);
     ~cExtPipe();
-    FILE *Out()
+    int Out() const
     {
-        return f;
+        return f_stdout;
     }
-    operator FILE* () const
+    int Err() const
     {
-        return f;
+      return f_stderr;
     }
-    bool Open(const char *Command, const char *Mode);
+    bool Open(const char *Command);
     int Close(int &status);
 };
 

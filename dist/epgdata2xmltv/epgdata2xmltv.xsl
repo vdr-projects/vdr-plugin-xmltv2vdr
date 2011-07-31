@@ -7,21 +7,7 @@
 
 <xsl:template match="/">
 <xsl:for-each select="//data[d2=$channelnum]">
-
-<!--
-<xsl:variable name="start_xmltv">
-<xsl:value-of select="d4"/>
-</xsl:variable>
-
-<xsl:variable name="stop_xmltv">
-<xsl:value-of select="d5"/>
-</xsl:variable>
-
-<xsl:variable name="vps_xmltv">
-<xsl:value-of select="d8"/>
-</xsl:variable>
--->
-
+<xsl:sort select="d4"/>
 <xsl:variable name="EVENTID">
 <xsl:value-of select="d0"/>
 </xsl:variable>
