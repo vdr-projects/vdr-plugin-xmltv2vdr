@@ -851,7 +851,7 @@ void cMenuSetupXmltv2vdrChannelMap::output(void)
     c1=Current();
     if ((flags & OPT_APPEND)!=OPT_APPEND)
     {
-        Add(new cMenuEditIntItem(tr("days in advance"),&days,1,daysmax),true);
+        Add(optionN(tr("days in advance"),1),true);      
         Add(new cMyMenuEditBitItem(tr("short text"),&flags,USE_SHORTTEXT),true);
         Add(new cMyMenuEditBitItem(tr("long text"),&flags,USE_LONGTEXT),true);
         c2=Current();
@@ -862,7 +862,7 @@ void cMenuSetupXmltv2vdrChannelMap::output(void)
     }
     else
     {
-        Add(optionN(tr("days in advance"),1),true);
+        Add(new cMenuEditIntItem(tr("days in advance"),&days,1,daysmax),true);
         Add(option(tr("short text"),true),true);
         Add(option(tr("long text"),true),true);
         Add(option(tr(" merge long texts"),false),true);
