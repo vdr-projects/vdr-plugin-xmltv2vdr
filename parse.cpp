@@ -22,7 +22,7 @@ void cXMLTVEvent::SetTitle(const char *Title)
 {
     title = strcpyrealloc(title, Title);
     if (title) {
-      title = compactspace(title);
+        title = compactspace(title);
     }
 }
 
@@ -857,28 +857,32 @@ cEPGMapping *cParse::EPGMapping(const char *ChannelName)
     return NULL;
 }
 
-bool cParse::Process(char *buffer, int bufsize)
+int cParse::Process(char *buffer, int bufsize)
 {
-    if (!buffer) return false;
-    if (!bufsize) return false;
+    if (!buffer) return 134;
+    if (!bufsize) return 134;
 
     xmlDocPtr xmltv;
     xmltv=xmlReadMemory(buffer,bufsize,NULL,NULL,0);
-    if (!xmltv) return false;
+    if (!xmltv) {
+        esyslog("xmltv2vdr: '%s' ERROR failed to parse xmltv",name);
+        return 141;
+    }
 
     xmlNodePtr rootnode=xmlDocGetRootElement(xmltv);
     if (!rootnode)
     {
+        esyslog("xmltv2vdr: '%s' ERROR no rootnode in xmltv",name);
         xmlFreeDoc(xmltv);
-        return false;
+        return 141;
     }
 
     cSchedulesLock schedulesLock(true,25000); // wait up to 25 secs for lock!
     const cSchedules *schedules = cSchedules::Schedules(schedulesLock);
     if (!schedules)
     {
-        esyslog("xmltv2vdr: '%s' cannot get schedules, try later",name);
-        return false;
+        esyslog("xmltv2vdr: '%s' cannot get schedules now, trying later",name);
+        return 1;
     }
 
     time_t begin=time(NULL);
@@ -916,7 +920,9 @@ bool cParse::Process(char *buffer, int bufsize)
             node=node->next;
             continue;
         }
-        time_t end=begin+(86000*map->Days())+3600; // 1 hour overlap
+        int days=map->Days();
+        if ((map->Flags() & OPT_APPEND)!=OPT_APPEND) days=1; // only one day with merge
+        time_t end=begin+(86000*days)+3600; // 1 hour overlap
         xmlChar *start,*stop;
         time_t starttime=(time_t) 0;
         time_t stoptime=(time_t) 0;
@@ -1041,7 +1047,7 @@ bool cParse::Process(char *buffer, int bufsize)
         node=node->next;
     }
     xmlFreeDoc(xmltv);
-    return true;
+    return 0;
 }
 
 void cParse::InitLibXML()

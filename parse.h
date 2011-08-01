@@ -174,7 +174,7 @@ private:
 public:
     cParse(const char *Name, cEPGMappings *Maps, cTEXTMappings *Texts);
     ~cParse();
-    bool Process(char *buffer, int bufsize);
+    int Process(char *buffer, int bufsize);
     static void InitLibXML();
     static void CleanupLibXML();
 };

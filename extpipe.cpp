@@ -54,36 +54,8 @@ bool cExtPipe::Open(const char *Command)
     {
         close(fd_stdout[1]); // close write fd, we need only read fd
         close(fd_stderr[1]); // close write fd, we need only read fd
-        int flags=fcntl(fd_stdout[0],F_GETFL,0);
-        if (flags==-1) {
-            LOG_ERROR;
-            close(fd_stdout[0]);
-            close(fd_stderr[0]);
-            return false;
-        }
-        flags|=O_NONBLOCK;
-        if (fcntl(fd_stdout[0],F_SETFL,flags)==-1) {
-            LOG_ERROR;
-            close(fd_stdout[0]);
-            close(fd_stderr[0]);
-            return false;
-        }
-        flags=fcntl(fd_stderr[0],F_GETFL,0);
-        if (flags==-1) {
-            LOG_ERROR;
-            close(fd_stdout[0]);
-            close(fd_stderr[0]);
-            return false;
-
-        }
-        if (fcntl(fd_stderr[0],F_SETFL,flags)==-1) {
-            LOG_ERROR;
-            close(fd_stdout[0]);
-            close(fd_stderr[0]);
-            return false;
-        }
         f_stdout = fd_stdout[0];
-        f_stderr = fd_stderr[0];        
+        f_stderr = fd_stderr[0];
         return true;
     }
     else   // child process

@@ -9,6 +9,7 @@
 #include <string.h>
 #include <time.h>
 #include <sys/wait.h>
+#include <sys/ioctl.h>
 #include "xmltv2vdr.h"
 #include "extpipe.h"
 #include "setup.h"
@@ -349,8 +350,26 @@ int cEPGSource::Execute()
             strcat(cmd," ");
         }
     }
-    //dsyslog("xmltv2vdr: '%s' %s",name,cmd);
-    cExtPipe p;    
+    char *pcmd=strdup(cmd);
+    if (pcmd) {
+        char *pa=strchr(pcmd,'\'');
+        char *pe=strchr(pa+1,'\'');
+        if (pa && pe) {
+            pa++;
+            for (char *c=pa; c<pe; c++)
+            {
+                if (c==pa) {
+                    *c='X';
+                } else {
+                    *c='@';
+                }
+            }
+            // TODO: strip @
+            isyslog("xmltv2vdr: '%s' %s",name,pcmd);
+        }
+        free(pcmd);
+    }
+    cExtPipe p;
     if (!p.Open(cmd))
     {
         free(cmd);
@@ -369,19 +388,26 @@ int cEPGSource::Execute()
         fds[1].events=POLLIN;
         if (poll(fds,2,500)>=0) {
             if (fds[0].revents & POLLIN) {
-                unsigned char c;
-                if (read(p.Out(),&c,1)==1)
+                int n;
+                if (ioctl(p.Out(),FIONREAD,&n)<0) {
+                    n=1;
+                }
+                r_out=(char *) realloc(r_out, l_out+n+1);
+                int l=read(p.Out(),r_out+l_out,n);
+                if (l>0)
                 {
-                    if (l_out%20==0) r_out=(char *) realloc(r_out, l_out+21);
-                    r_out[l_out++]=c;
+                    l_out+=l;
                 }
             }
             if (fds[1].revents & POLLIN) {
-                unsigned char c;
-                if (read(p.Err(),&c,1)==1)
-                {
-                    if (l_err%20==0) r_err=(char *) realloc(r_err, l_err+21);
-                    r_err[l_err++]=c;
+                int n;
+                if (ioctl(p.Err(),FIONREAD,&n)<0) {
+                    n=1;
+                }
+                r_err=(char *) realloc(r_err, l_err+n+1);
+                int l=read(p.Err(),r_err+l_err,n);
+                if (l>0) {
+                    l_err+=l;
                 }
             }
             if (fds[0].revents & POLLHUP) {
@@ -407,11 +433,7 @@ int cEPGSource::Execute()
             if ((!returncode) && (r_out))
             {
                 dsyslog("xmltv2vdr: '%s' parsing output",name);
-                if (!parse->Process(r_out,l_out))
-                {
-                    esyslog("xmltv2vdr: '%s' ERROR failed to parse output",name);
-                    ret=141;
-                }
+                ret=parse->Process(r_out,l_out);
             }
             else
             {
@@ -437,11 +459,7 @@ int cEPGSource::Execute()
                 char *result=NULL;
                 ret=ReadOutput(result,l);
                 if ((!ret) && (result)) {
-                    if (!parse->Process(result,l))
-                    {
-                        esyslog("xmltv2vdr: '%s' failed to parse output",name);
-                        ret=149;
-                    }
+                    ret=parse->Process(result,l);
                 }
                 if (result) free(result);
             }

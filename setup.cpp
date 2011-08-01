@@ -819,6 +819,12 @@ int cMenuSetupXmltv2vdrChannelMap::getdaysmax()
     return ret;
 }
 
+cOsdItem *cMenuSetupXmltv2vdrChannelMap::optionN(const char *s, int num)
+{
+   cString buffer = cString::sprintf("%s:\t%i", s, num);
+   return new cOsdItem(buffer,osUnknown,false);
+}
+
 cOsdItem *cMenuSetupXmltv2vdrChannelMap::option(const char *s, bool yesno)
 {
     cString buffer = cString::sprintf("%s:\t%s", s, yesno ? trVDR("yes") : trVDR("no"));
@@ -846,6 +852,7 @@ void cMenuSetupXmltv2vdrChannelMap::output(void)
     c1=Current();
     if ((flags & OPT_APPEND)!=OPT_APPEND)
     {
+        Add(new cMenuEditIntItem(tr("days in advance"),&days,1,daysmax),true);
         Add(new cMyMenuEditBitItem(tr("short text"),&flags,USE_SHORTTEXT),true);
         Add(new cMyMenuEditBitItem(tr("long text"),&flags,USE_LONGTEXT),true);
         c2=Current();
@@ -856,6 +863,7 @@ void cMenuSetupXmltv2vdrChannelMap::output(void)
     }
     else
     {
+        Add(optionN(tr("days in advance"),1),true);
         Add(option(tr("short text"),true),true);
         Add(option(tr("long text"),true),true);
         Add(option(tr(" merge long texts"),false),true);

@@ -126,6 +126,7 @@ private:
     const char *channel;
     int getdaysmax();
     cOsdItem *newtitle (const char *s);
+    cOsdItem *optionN(const char *s, int num);
     cOsdItem *option(const char *s, bool yesno);
     void epgmappingreplace(cEPGMapping *newmapping);
     int c1,c2,c3,cm;
