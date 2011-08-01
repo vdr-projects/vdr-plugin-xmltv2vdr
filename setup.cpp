@@ -847,7 +847,6 @@ void cMenuSetupXmltv2vdrChannelMap::output(void)
     cOsdItem *first=newtitle(tr("epg source channel options"));
     Add(first,true);
 
-    Add(new cMenuEditIntItem(tr("days in advance"),&days,1,daysmax),true);
     Add(new cMyMenuEditBitItem(tr("type of processing"),&flags,OPT_APPEND,tr("merge"),tr("create")),true);
     c1=Current();
     if ((flags & OPT_APPEND)!=OPT_APPEND)
