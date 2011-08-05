@@ -11,6 +11,7 @@
 #include <sys/wait.h>
 #include <sys/ioctl.h>
 #include "xmltv2vdr.h"
+#include "parse.h"
 #include "extpipe.h"
 #include "setup.h"
 
@@ -55,11 +56,22 @@ void cEPGExecutor::Action()
         int retries=0;
         while (retries<2)
         {
-            ret=epgs->Execute();
+            ret=epgs->Execute(*this);
             if ((ret>0) && (ret<126))
             {
                 dsyslog("xmltv2vdr: '%s' waiting 60 seconds",epgs->Name());
-                sleep(60);
+                int l=0;
+                while (l<300) {
+                    struct timespec req;
+                    req.tv_sec=0;
+                    req.tv_nsec=200000000; // 200ms
+                    nanosleep(&req,NULL);
+                    if (!Running()) {
+                        isyslog("xmltv2vdr: '%s' request to stop from vdr",epgs->Name());
+                        return;
+                    }
+                    l++;
+                }
                 retries++;
             }
             else
@@ -313,8 +325,9 @@ int cEPGSource::ReadOutput(char *&result, size_t &l)
     return ret;
 }
 
-int cEPGSource::Execute()
+int cEPGSource::Execute(cEPGExecutor &myExecutor)
 {
+
     if (!ready2parse) return false;
     if (!parse) return false;
     char *r_out=NULL;
@@ -416,6 +429,15 @@ int cEPGSource::Execute()
             if (fds[1].revents & POLLHUP) {
                 fdsopen--;
             }
+            if (!myExecutor.StillRunning()) {
+                int status;
+                p.Close(status);
+                if (r_out) free(r_out);
+                if (r_err) free(r_err);
+                isyslog("xmltv2vdr: '%s' request to stop from vdr",name);
+                return 0;
+            }
+
         } else {
             esyslog("xmltv2vdr: '%s' ERROR polling",name);
             break;
@@ -433,7 +455,7 @@ int cEPGSource::Execute()
             if ((!returncode) && (r_out))
             {
                 dsyslog("xmltv2vdr: '%s' parsing output",name);
-                ret=parse->Process(r_out,l_out);
+                ret=parse->Process(myExecutor,r_out,l_out);
             }
             else
             {
@@ -459,7 +481,7 @@ int cEPGSource::Execute()
                 char *result=NULL;
                 ret=ReadOutput(result,l);
                 if ((!ret) && (result)) {
-                    ret=parse->Process(result,l);
+                    ret=parse->Process(myExecutor,result,l);
                 }
                 if (result) free(result);
             }
@@ -735,6 +757,7 @@ bool cPluginXmltv2vdr::Start(void)
 void cPluginXmltv2vdr::Stop(void)
 {
     // Stop any background activities the plugin is performing.
+    epgexecutor.Stop();
     removeepgsources();
     removeepgmappings();
     removetextmappings();

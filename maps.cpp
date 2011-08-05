@@ -187,7 +187,41 @@ void cEPGMapping::ReplaceChannels(int NumChannelIDs, tChannelID *ChannelIDs)
     }
 }
 
-void cEPGMapping::RemoveChannel(int ChannelNumber)
+void cEPGMapping::RemoveInvalidChannels()
+{
+    qsort(channelids,numchannelids,sizeof(tChannelID),compare);
+    for (int i=0; i<numchannelids; i++)
+    {
+        if (channelids[i]==tChannelID::InvalidID)
+        {
+            numchannelids--;
+        }
+    }
+}
+
+void cEPGMapping::RemoveChannel(tChannelID ChannelID, bool MarkOnly)
+{
+    bool found=false;
+    int i;
+    for (i=0; i<numchannelids; i++)
+    {
+        if (channelids[i]==ChannelID)
+        {
+            found=true;
+            break;
+        }
+    }
+    if (found)
+    {
+        channelids[i]=tChannelID::InvalidID;
+        if (!MarkOnly) {
+            qsort(channelids,numchannelids,sizeof(tChannelID),compare);
+            numchannelids--;
+        }
+    }
+}
+
+void cEPGMapping::RemoveChannel(int ChannelNumber, bool MarkOnly)
 {
     if (!ChannelNumber) return;
     cChannel *chan=Channels.GetByNumber(ChannelNumber);
@@ -206,7 +240,9 @@ void cEPGMapping::RemoveChannel(int ChannelNumber)
     if (found)
     {
         channelids[i]=tChannelID::InvalidID;
-        qsort(channelids,numchannelids,sizeof(tChannelID),compare);
-        numchannelids--;
+        if (!MarkOnly) {
+            qsort(channelids,numchannelids,sizeof(tChannelID),compare);
+            numchannelids--;
+        }
     }
 }

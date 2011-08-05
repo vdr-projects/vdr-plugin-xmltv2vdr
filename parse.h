@@ -15,6 +15,8 @@
 
 #include "maps.h"
 
+class cEPGExecutor;
+
 class cXMLTVEvent
 {
 private:
@@ -174,7 +176,7 @@ private:
 public:
     cParse(const char *Name, cEPGMappings *Maps, cTEXTMappings *Texts);
     ~cParse();
-    int Process(char *buffer, int bufsize);
+    int Process(cEPGExecutor &myExecutor, char *buffer, int bufsize);
     static void InitLibXML();
     static void CleanupLibXML();
 };

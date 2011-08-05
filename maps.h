@@ -84,7 +84,9 @@ public:
     }
     void ReplaceChannels(int NumChannelIDs, tChannelID *ChannelIDs);
     void AddChannel(int ChannelNumber);
-    void RemoveChannel(int ChannelNumber);
+    void RemoveChannel(int ChannelNumber, bool MarkOnly=false);
+    void RemoveChannel(tChannelID ChannelID, bool MarkOnly=false);
+    void RemoveInvalidChannels();
     int Flags()
     {
         return flags;

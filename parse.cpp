@@ -14,6 +14,7 @@
 #include <locale.h>
 #include <langinfo.h>
 
+#include "xmltv2vdr.h"
 #include "parse.h"
 
 extern char *strcatrealloc(char *dest, const char *src);
@@ -857,7 +858,7 @@ cEPGMapping *cParse::EPGMapping(const char *ChannelName)
     return NULL;
 }
 
-int cParse::Process(char *buffer, int bufsize)
+int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
 {
     if (!buffer) return 134;
     if (!bufsize) return 134;
@@ -877,8 +878,19 @@ int cParse::Process(char *buffer, int bufsize)
         return 141;
     }
 
-    cSchedulesLock schedulesLock(true,25000); // wait up to 25 secs for lock!
-    const cSchedules *schedules = cSchedules::Schedules(schedulesLock);
+    const cSchedules *schedules=NULL;
+    int l=0;
+    while (l<300) {
+        cSchedulesLock schedulesLock(true,200); // wait up to 60 secs for lock!
+        schedules = cSchedules::Schedules(schedulesLock);
+        if (!myExecutor.StillRunning()) {
+            isyslog("xmltv2vdr: '%s' request to stop from vdr",name);
+            return 0;
+        }
+        if (schedules) break;
+        l++;
+    }
+
     if (!schedules)
     {
         esyslog("xmltv2vdr: '%s' cannot get schedules now, trying later",name);
@@ -1045,6 +1057,11 @@ int cParse::Process(char *buffer, int bufsize)
             }
         }
         node=node->next;
+        if (!myExecutor.StillRunning()) {
+            xmlFreeDoc(xmltv);
+            isyslog("xmltv2vdr: '%s' request to stop from vdr",name);
+            return 0;
+        }
     }
     xmlFreeDoc(xmltv);
     return 0;

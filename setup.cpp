@@ -133,12 +133,6 @@ void cMenuSetupXmltv2vdr::Output(void)
 
 void cMenuSetupXmltv2vdr::generatesumchannellist()
 {
-    cStringList oldchannels;
-    for (int i=0; i<channels.Size(); i++)
-    {
-        oldchannels.Append(strdup(channels[i]));
-    }
-
     channels.Clear();
     for (int i=0; i<baseplugin->EPGSourceCount(); i++)
     {
@@ -168,25 +162,6 @@ void cMenuSetupXmltv2vdr::generatesumchannellist()
         }
     }
     channels.Sort();
-
-    for (int i=0; i<oldchannels.Size(); i++)
-    {
-        if (channels.Find(oldchannels[i])==-1)
-        {
-            cEPGMapping *map=baseplugin->EPGMapping(oldchannels[i]);
-            if (map)
-            {
-                map->ReplaceChannels(0,NULL);
-                map->ChangeFlags(0);
-                char *name=NULL;
-                if (asprintf(&name,"channel.%s",map->ChannelName())!=-1)
-                {
-                    SetupStore(name,"1;0;");
-                    free(name);
-                }
-            }
-        }
-    }
 }
 
 cOsdItem *cMenuSetupXmltv2vdr::newtitle(const char *s)
@@ -821,8 +796,8 @@ int cMenuSetupXmltv2vdrChannelMap::getdaysmax()
 
 cOsdItem *cMenuSetupXmltv2vdrChannelMap::optionN(const char *s, int num)
 {
-   cString buffer = cString::sprintf("%s:\t%i", s, num);
-   return new cOsdItem(buffer,osUnknown,false);
+    cString buffer = cString::sprintf("%s:\t%i", s, num);
+    return new cOsdItem(buffer,osUnknown,false);
 }
 
 cOsdItem *cMenuSetupXmltv2vdrChannelMap::option(const char *s, bool yesno)
@@ -851,7 +826,7 @@ void cMenuSetupXmltv2vdrChannelMap::output(void)
     c1=Current();
     if ((flags & OPT_APPEND)!=OPT_APPEND)
     {
-        Add(optionN(tr("days in advance"),1),true);      
+        Add(optionN(tr("days in advance"),1),true);
         Add(new cMyMenuEditBitItem(tr("short text"),&flags,USE_SHORTTEXT),true);
         Add(new cMyMenuEditBitItem(tr("long text"),&flags,USE_LONGTEXT),true);
         c2=Current();
@@ -897,8 +872,12 @@ void cMenuSetupXmltv2vdrChannelMap::output(void)
             Add(new cOsdItem(buffer),true);
             if (!hasmaps) cm=Current();
             hasmaps=true;
+        } else {
+            // invalid channelid? remove from list
+            map->RemoveChannel(map->ChannelIDs()[i],true);
         }
     }
+    map->RemoveInvalidChannels();
     if (!hasmaps)
     {
         Add(new cOsdItem(tr("none")),true);

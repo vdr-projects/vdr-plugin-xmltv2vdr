@@ -42,6 +42,8 @@ public:
 
 class cEPGChannels : public cList<cEPGChannel> {};
 
+class cEPGExecutor;
+
 class cEPGSource : public cListObject
 {
 private:
@@ -60,7 +62,7 @@ private:
 public:
     cEPGSource(const char *Name,const char *ConfDir,cEPGMappings *Maps,cTEXTMappings *Texts);
     ~cEPGSource();
-    int Execute();
+    int Execute(cEPGExecutor &myExecutor);
     void Store(void);
     void ChangeChannelSelection(int *Selection);
     cEPGChannels *ChannelList()
@@ -106,6 +108,13 @@ private:
     cEPGSources *sources;
 public:
     cEPGExecutor(cEPGSources *Sources);
+    bool StillRunning() {
+        return Running();
+    }
+    void Stop()
+    {
+        Cancel(3);
+    }        
     virtual void Action();
 };
 
