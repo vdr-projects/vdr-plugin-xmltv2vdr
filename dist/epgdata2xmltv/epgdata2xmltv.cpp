@@ -363,7 +363,7 @@ int cepgdata2xmltv::Process(int argc, char *argv[])
             xmlmem[size]=0;
             zip_fclose(zfile);
             xmlmem=strreplace(xmlmem,"?>\n","?>\n<!DOCTYPE pack [\n");
-
+            xmlmem=strreplace(xmlmem,"ISO-8859-1","Windows-1252");
             int entries=zip_get_num_files(zip);
             for (int i=0; i<entries; i++)
             {
