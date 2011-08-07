@@ -7,7 +7,7 @@
 
 <xsl:template match="/">
 <xsl:for-each select="//data[d2=$channelnum]">
-<xsl:sort select="d4"/>
+<!-- <xsl:sort select="d4"/> --> 
 <xsl:variable name="EVENTID">
 <xsl:value-of select="d0"/>
 </xsl:variable>

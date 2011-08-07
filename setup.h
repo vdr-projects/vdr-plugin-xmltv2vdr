@@ -37,7 +37,7 @@ private:
     int mappingBegin,mappingEnd;
     int sourcesBegin,sourcesEnd;
     int mappingEntry;
-    cOsdItem *newtitle (const char *s);
+    int updateEntry;
     eOSState edit(void);
     void generatesumchannellist();
     int exectime;
@@ -45,6 +45,7 @@ private:
     int upstart;
 public:
     void Output(void);
+    static cOsdItem *NewTitle(const char *s);
     void ClearCS()
     {
         cs=NULL;
@@ -83,7 +84,6 @@ private:
     char guest[255];
     char review[255];
     char category[255];
-    cOsdItem *newtitle (const char *s);
 public:
     cMenuSetupXmltv2vdrTextMap(cPluginXmltv2vdr *Plugin);
 };
@@ -99,7 +99,6 @@ private:
     int *sel;
     int days;
     char pin[255];
-    cOsdItem *newtitle (const char *s);
 public:
     cMenuSetupXmltv2vdrChannelSource(cPluginXmltv2vdr *Plugin, cMenuSetupXmltv2vdr *Menu, int Index);
     ~cMenuSetupXmltv2vdrChannelSource();
@@ -125,7 +124,6 @@ private:
     cString title;
     const char *channel;
     int getdaysmax();
-    cOsdItem *newtitle (const char *s);
     cOsdItem *optionN(const char *s, int num);
     cOsdItem *option(const char *s, bool yesno);
     void epgmappingreplace(cEPGMapping *newmapping);
@@ -151,6 +149,35 @@ private:
 public:
     cMenuSetupXmltv2vdrChannelsVDR(cPluginXmltv2vdr *Plugin, cMenuSetupXmltv2vdrChannelMap *Map,
                                    const char *Channel, cString Title);
+    virtual eOSState ProcessKey(eKeys Key);
+    virtual const char *MenuKind()
+    {
+        return "MenuChannels";
+    }
+};
+
+class cMenuSetupXmltv2vdrLog : public cOsdMenu
+{
+private:
+    enum
+    {
+        VIEW_ERROR=1,
+        VIEW_INFO,
+        VIEW_DEBUG
+    };
+    int level;
+    cEPGSource *src;
+    char lastexec_str[30];
+    void output(void);
+    int width;
+    time_t lastrefresh;
+    const cFont *font;
+public:
+    cMenuSetupXmltv2vdrLog(cPluginXmltv2vdr *Plugin, cEPGSource *Source);
+    virtual const char *MenuKind()
+    {
+        return "MenuLog";
+    }
     virtual eOSState ProcessKey(eKeys Key);
 };
 

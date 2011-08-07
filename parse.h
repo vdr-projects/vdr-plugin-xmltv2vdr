@@ -16,6 +16,7 @@
 #include "maps.h"
 
 class cEPGExecutor;
+class cEPGSource;
 
 class cXMLTVEvent
 {
@@ -158,11 +159,12 @@ class cParse
     };
 
 private:
-    char *name;
+    cEPGSource *source;
     cEPGMappings *maps;
     cTEXTMappings *texts;
     cXMLTVEvent xevent;
     cCharSetConv *conv;
+    char cbuf[80];
     char *RemoveNonASCII(const char *src);
     struct split split(char *in, char delim);
     u_long DoSum(u_long sum, const char *buf, int nBytes);
@@ -171,10 +173,10 @@ private:
     bool FetchEvent(xmlNodePtr node);
     cEPGMapping *EPGMapping(const char *ChannelName);
     cTEXTMapping *TEXTMapping(const char *Name);
-    bool PutEvent(cSchedule* schedule,cEvent *event,cXMLTVEvent *xevent, cEPGMapping *map,
-                  int mapindex);
+    bool PutEvent(cSchedule* schedule,cEvent *event,cXMLTVEvent *xevent, cEPGMapping *map);
+    cEvent *GetEventBefore(cSchedule *schedule, time_t start);
 public:
-    cParse(const char *Name, cEPGMappings *Maps, cTEXTMappings *Texts);
+    cParse(cEPGSource *Source, cEPGMappings *Maps, cTEXTMappings *Texts);
     ~cParse();
     int Process(cEPGExecutor &myExecutor, char *buffer, int bufsize);
     static void InitLibXML();

@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: vdr\n"
 "Report-Msgid-Bugs-To: <see README>\n"
-"POT-Creation-Date: 2011-08-01 00:24+0200\n"
+"POT-Creation-Date: 2011-08-07 18:55+0200\n"
 "PO-Revision-Date: 2010-12-23 23:59+0100\n"
 "Last-Translator: Jochen Dolze <vdr@dolze.de>\n"
 "Language-Team: <vdr@linuxtv.org>\n"
@@ -16,14 +16,20 @@ msgstr ""
 msgid "options"
 msgstr "Optionen"
 
-msgid "update on start"
-msgstr "ausführen beim Start"
+msgid "update"
+msgstr "Ausführung"
+
+msgid "on time"
+msgstr "Zeitpunkt"
+
+msgid "on start"
+msgstr "beim Start"
+
+msgid "update at"
+msgstr "Ausführung um"
 
 msgid "automatic wakeup"
 msgstr "automatisch Aufwachen"
-
-msgid "execution time"
-msgstr "Ausführung um"
 
 msgid "text mapping"
 msgstr "Textzuordnungen"
@@ -45,6 +51,9 @@ msgstr "hoch"
 
 msgid "Button$Down"
 msgstr "runter"
+
+msgid "Button$Log"
+msgstr "Log"
 
 msgid "Button$Edit"
 msgstr "editieren"
@@ -105,6 +114,27 @@ msgstr "Originaltitel"
 
 msgid "credits"
 msgstr "Mitwirkende"
+
+msgid "overview"
+msgstr "Übersicht"
+
+msgid "last execution"
+msgstr "Letzte Ausführung"
+
+msgid "active"
+msgstr "aktiv"
+
+msgid "log"
+msgstr "Logdatei"
+
+msgid "Button$Errors"
+msgstr "Fehler"
+
+msgid "Button$Info"
+msgstr "Info"
+
+msgid "Button$Debug"
+msgstr "Debug"
 
 msgid "days in advance"
 msgstr "Anzahl Tage"
@@ -201,3 +231,4 @@ msgstr "xmltv2vdr plugin ist noch aktiv"
 
 msgid "Imports xmltv epg into vdr"
 msgstr "Importiert xmltv epg in den VDR"
+

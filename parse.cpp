@@ -13,6 +13,7 @@
 #include <unistd.h>
 #include <locale.h>
 #include <langinfo.h>
+#include <time.h>
 
 #include "xmltv2vdr.h"
 #include "parse.h"
@@ -22,7 +23,8 @@ extern char *strcatrealloc(char *dest, const char *src);
 void cXMLTVEvent::SetTitle(const char *Title)
 {
     title = strcpyrealloc(title, Title);
-    if (title) {
+    if (title)
+    {
         title = compactspace(title);
     }
 }
@@ -332,7 +334,6 @@ char *cParse::RemoveNonASCII(const char *src)
 cEvent *cParse::SearchEvent(cSchedule* schedule, cXMLTVEvent *xevent)
 {
     if (!xevent) return NULL;
-    if (!xevent->Duration()) return NULL;
     if (!xevent->StartTime()) return NULL;
     if (!xevent->Title()) return NULL;
     cEvent *f=NULL;
@@ -352,7 +353,8 @@ cEvent *cParse::SearchEvent(cSchedule* schedule, cXMLTVEvent *xevent)
     if (f) return f;
     // 3rd with StartTime +/- WaitTime
     int maxdiff=INT_MAX;
-    int eventTimeDiff=xevent->Duration()/4;
+    int eventTimeDiff=0;
+    if (xevent->Duration()) eventTimeDiff=xevent->Duration()/4;
     if (eventTimeDiff<600) eventTimeDiff=600;
     for (cEvent *p = schedule->Events()->First(); p; p = schedule->Events()->Next(p))
     {
@@ -412,7 +414,7 @@ cEvent *cParse::SearchEvent(cSchedule* schedule, cXMLTVEvent *xevent)
                     if (diff<=maxdiff)
                     {
                         if (p->TableID()!=0)
-                            dsyslog("xmltv2vdr: '%s' found '%s' for '%s'",name,p->Title(),xevent->Title());
+                            source->Dlog("found '%s' for '%s'",p->Title(),xevent->Title());
                         f=p;
                         maxdiff=diff;
                     }
@@ -423,43 +425,133 @@ cEvent *cParse::SearchEvent(cSchedule* schedule, cXMLTVEvent *xevent)
     return f;
 }
 
-bool cParse::PutEvent(cSchedule* schedule, cEvent *event, cXMLTVEvent *xevent, cEPGMapping *map,
-                      int mapindex)
+cEvent *cParse::GetEventBefore(cSchedule* schedule, time_t start)
+{
+    if (!schedule) return NULL;
+    if (!schedule->Events()) return NULL;
+    if (!schedule->Events()->Count()) return NULL;
+    cEvent *last=schedule->Events()->Last();
+    if ((last) && (last->StartTime()<start)) return last;
+    for (cEvent *p=schedule->Events()->First(); p; p=schedule->Events()->Next(p))
+    {
+        if (p->StartTime()>start)
+        {
+            return (cEvent *) p->Prev();
+        }
+    }
+    if (last) return last;
+    return NULL;
+}
+
+bool cParse::PutEvent(cSchedule* schedule, cEvent *event, cXMLTVEvent *xevent, cEPGMapping *map)
 {
     if (!schedule) return false;
     if (!xevent) return false;
     if (!map) return false;
 
-    time_t start;
+    struct tm tm;
+    char from[80];
+    char till[80];
+    time_t start,end;
     if (!event)
     {
         if ((map->Flags() & OPT_APPEND)==OPT_APPEND)
         {
             start=xevent->StartTime();
-            /* checking the event sequence */
-            cEvent *last=NULL;
-            if (schedule->Index()) last=schedule->Events()->Last();
-            if (last)
+            end=start+xevent->Duration();
+
+            /* checking the "space" for our new event */
+            cEvent *prev=GetEventBefore(schedule,start);
+            if (prev)
             {
-                if (start<last->StartTime())
+                if (cEvent *next=(cEvent *) prev->Next())
                 {
-                    esyslog("xmltv2vdr: '%s' ERROR xmltv data overlaps:",name);
-                    time_t lstart=last->StartTime();
-                    esyslog("xmltv2vdr: '%s' ERROR last event '%s' (%s) @%s", name,
-                            *schedule->ChannelID().ToString(),last->Title(),
-                            ctime(&lstart));
-                    esyslog("xmltv2vdr: '%s' ERROR next event '%s' (%s) @%s", name,
-                            *map->ChannelIDs()[mapindex].ToString(),xevent->Title(),
-                            ctime(&start));
-                    return false;
+                    if (prev->EndTime()==next->StartTime())
+                    {
+                        localtime_r(&start,&tm);
+                        strftime(from,sizeof(from)-1,"%b %d %H:%M",&tm);
+                        localtime_r(&end,&tm);
+                        strftime(till,sizeof(till)-1,"%b %d %H:%M",&tm);
+                        source->Elog("cannot add '%s'@%s-%s",xevent->Title(),from,till);
+
+                        time_t pstart=prev->StartTime();
+                        time_t pstop=prev->EndTime();
+                        localtime_r(&pstart,&tm);
+                        strftime(from,sizeof(from)-1,"%b %d %H:%M",&tm);
+                        localtime_r(&pstop,&tm);
+                        strftime(till,sizeof(till)-1,"%b %d %H:%M",&tm);
+                        source->Elog("found '%s'@%s-%s",prev->Title(),from,till);
+
+                        time_t nstart=next->StartTime();
+                        time_t nstop=next->EndTime();
+                        localtime_r(&nstart,&tm);
+                        strftime(from,sizeof(from)-1,"%b %d %H:%M",&tm);
+                        localtime_r(&nstop,&tm);
+                        strftime(till,sizeof(till)-1,"%b %d %H:%M",&tm);
+                        source->Elog("found '%s'@%s-%s",next->Title(),from,till);
+                        return false;
+                    }
+
+                    if (end>next->StartTime())
+                    {
+                        int diff=(int) difftime(prev->EndTime(),start);
+                        if (diff>300)
+                        {
+
+                            localtime_r(&start,&tm);
+                            strftime(from,sizeof(from)-1,"%b %d %H:%M",&tm);
+                            localtime_r(&end,&tm);
+                            strftime(till,sizeof(till)-1,"%b %d %H:%M",&tm);
+                            source->Elog("cannot add '%s'@%s-%s",xevent->Title(),from,till);
+
+                            time_t nstart=next->StartTime();
+                            time_t nstop=next->EndTime();
+                            localtime_r(&nstart,&tm);
+                            strftime(from,sizeof(from)-1,"%b %d %H:%M",&tm);
+                            localtime_r(&nstop,&tm);
+                            strftime(till,sizeof(till)-1,"%b %d %H:%M",&tm);
+                            source->Elog("found '%s'@%s-%s",next->Title(),from,till);
+                            return false;
+                        }
+                        else
+                        {
+                            xevent->SetDuration(xevent->Duration()-diff);
+                        }
+                    }
                 }
-                /* set duration, if it doesn't exist */
-                if (!last->Duration()) last->SetDuration((int) difftime(start,
-                            last->StartTime()));
-                if (start!=last->EndTime())
+
+                if (prev->EndTime()>start)
                 {
-                    esyslog("xmltv2vdr: '%s' detected gap of %is between events",name,
-                            (int) difftime(start,last->EndTime()));
+                    int diff=(int) difftime(prev->EndTime(),start);
+                    if (diff>300)
+                    {
+                        localtime_r(&start,&tm);
+                        strftime(from,sizeof(from)-1,"%b %d %H:%M",&tm);
+                        localtime_r(&end,&tm);
+                        strftime(till,sizeof(till)-1,"%b %d %H:%M",&tm);
+                        source->Elog("cannot add '%s'@%s-%s",xevent->Title(),from,till);
+
+                        time_t pstart=prev->StartTime();
+                        time_t pstop=prev->EndTime();
+                        localtime_r(&pstart,&tm);
+                        strftime(from,sizeof(from)-1,"%b %d %H:%M",&tm);
+                        localtime_r(&pstop,&tm);
+                        strftime(till,sizeof(till)-1,"%b %d %H:%M",&tm);
+                        source->Elog("found '%s'@%s-%s",prev->Title(),from,till);
+                        return false;
+                    }
+                    else
+                    {
+                        prev->SetDuration(prev->Duration()-diff);
+                    }
+                }
+
+                if (!xevent->Duration())
+                {
+                    if (!prev->Duration())
+                    {
+                        prev->SetDuration(start-prev->StartTime());
+                    }
                 }
             }
             /* add event */
@@ -473,7 +565,11 @@ bool cParse::PutEvent(cSchedule* schedule, cEvent *event, cXMLTVEvent *xevent, c
             event->SetVersion(0);
             schedule->AddEvent(event);
             schedule->Sort();
-            dsyslog("xmltv2vdr: '%s' adding event '%s' @%s",name,xevent->Title(),ctime(&start));
+            localtime_r(&start,&tm);
+            strftime(from,sizeof(from)-1,"%b %d %H:%M",&tm);
+            localtime_r(&end,&tm);
+            strftime(till,sizeof(till)-1,"%b %d %H:%M",&tm);
+            source->Dlog("adding '%s'@%s-%s",xevent->Title(),from,till);
         }
         else
         {
@@ -484,7 +580,12 @@ bool cParse::PutEvent(cSchedule* schedule, cEvent *event, cXMLTVEvent *xevent, c
     {
         if (event->TableID()==0) return true;
         start=event->StartTime();
-        dsyslog("xmltv2vdr: '%s' changing event '%s' @%s",name,event->Title(),ctime(&start));
+        end=event->EndTime();
+        localtime_r(&start,&tm);
+        strftime(from,sizeof(from)-1,"%b %d %H:%M",&tm);
+        localtime_r(&end,&tm);
+        strftime(till,sizeof(till)-1,"%b %d %H:%M",&tm);
+        source->Dlog("changing '%s'@%s-%s",event->Title(),from,till);
     }
     if ((map->Flags() & USE_SHORTTEXT)==USE_SHORTTEXT)
     {
@@ -492,7 +593,7 @@ bool cParse::PutEvent(cSchedule* schedule, cEvent *event, cXMLTVEvent *xevent, c
         {
             if (!strcmp(xevent->ShortText(),event->Title()))
             {
-                dsyslog("xmltv2vdr: '%s' title and subtitle equal, clearing subtitle",name);
+                source->Dlog("title and subtitle equal, clearing subtitle");
                 event->SetShortText("");
             }
             else
@@ -830,7 +931,7 @@ bool cParse::FetchEvent(xmlNodePtr enode)
             }
             else
             {
-                esyslog("xmltv2vdr: '%s' unknown element %s, please report!",name,node->name);
+                source->Elog("unknown element %s, please report!",node->name);
             }
         }
         node=node->next;
@@ -865,26 +966,29 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
 
     xmlDocPtr xmltv;
     xmltv=xmlReadMemory(buffer,bufsize,NULL,NULL,0);
-    if (!xmltv) {
-        esyslog("xmltv2vdr: '%s' ERROR failed to parse xmltv",name);
+    if (!xmltv)
+    {
+        source->Elog("failed to parse xmltv");
         return 141;
     }
 
     xmlNodePtr rootnode=xmlDocGetRootElement(xmltv);
     if (!rootnode)
     {
-        esyslog("xmltv2vdr: '%s' ERROR no rootnode in xmltv",name);
+        source->Elog("no rootnode in xmltv");
         xmlFreeDoc(xmltv);
         return 141;
     }
 
     const cSchedules *schedules=NULL;
     int l=0;
-    while (l<300) {
+    while (l<300)
+    {
         cSchedulesLock schedulesLock(true,200); // wait up to 60 secs for lock!
         schedules = cSchedules::Schedules(schedulesLock);
-        if (!myExecutor.StillRunning()) {
-            isyslog("xmltv2vdr: '%s' request to stop from vdr",name);
+        if (!myExecutor.StillRunning())
+        {
+            source->Ilog("request to stop from vdr");
             return 0;
         }
         if (schedules) break;
@@ -893,7 +997,7 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
 
     if (!schedules)
     {
-        esyslog("xmltv2vdr: '%s' cannot get schedules now, trying later",name);
+        source->Elog("cannot get schedules now, trying later");
         return 1;
     }
 
@@ -917,7 +1021,7 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
         if (!channelid)
         {
             if (lerr!=PARSE_NOCHANNELID)
-                esyslog("xmltv2vdr: '%s' ERROR missing channelid in xmltv file",name);
+                source->Elog("missing channelid in xmltv file");
             lerr=PARSE_NOCHANNELID;
             node=node->next;
             continue;
@@ -926,7 +1030,7 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
         if (!map)
         {
             if (lerr!=PARSE_NOMAPPING)
-                esyslog("xmltv2vdr: '%s' ERROR no mapping for channelid %s",name,channelid);
+                source->Elog("no mapping for channelid %s",channelid);
             lerr=PARSE_NOMAPPING;
             xmlFree(channelid);
             node=node->next;
@@ -957,7 +1061,7 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
         if (!starttime)
         {
             if (lerr!=PARSE_XMLTVERR)
-                esyslog("xmltv2vdr: ERROR '%s' no starttime, check xmltv file",name);
+                source->Elog("xmltv2vdr: '%s' no starttime, check xmltv file");
             lerr=PARSE_XMLTVERR;
             xmlFree(channelid);
             node=node->next;
@@ -974,9 +1078,9 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
 
         if (oldmap!=map)
         {
-            dsyslog("xmltv2vdr: '%s' processing '%s'",name,channelid);
-            dsyslog("xmltv2vdr: '%s' from %s",name,ctime(&begin));
-            dsyslog("xmltv2vdr: '%s' till %s",name,ctime(&end));
+            source->Dlog("processing '%s'",channelid);
+            source->Dlog("from %s",ctime_r(&begin,(char *) &cbuf));
+            source->Dlog("till %s",ctime_r(&end,(char *) &cbuf));
         }
         oldmap=map;
         xmlFree(channelid);
@@ -996,7 +1100,7 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
         if (stoptime) xevent.SetDuration(stoptime-starttime);
         if (!FetchEvent(node)) // sets xevent
         {
-            dsyslog("xmltv2vdr: '%s' failed to fetch event",name);
+            source->Dlog("failed to fetch event");
             node=node->next;
             continue;
         }
@@ -1009,8 +1113,8 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
             if (!channel)
             {
                 if (lerr!=PARSE_NOCHANNEL)
-                    esyslog("xmltv2vdr: '%s' channel %s not found in channels.conf",
-                            name,*map->ChannelIDs()[i].ToString());
+                    source->Elog("channel %s not found in channels.conf",
+                                 *map->ChannelIDs()[i].ToString());
                 lerr=PARSE_NOCHANNEL;
                 continue;
             }
@@ -1018,23 +1122,24 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
             if (!schedule)
             {
                 if (lerr!=PARSE_NOSCHEDULE)
-                    esyslog("xmltv2vdr: '%s' ERROR cannot get schedule for channel %s%s",
-                            name,channel->Name(),addevents ? "" : " - try add option");
+                    source->Elog("cannot get schedule for channel %s%s",
+                                 channel->Name(),addevents ? "" : " - try add option");
                 lerr=PARSE_NOSCHEDULE;
                 continue;
             }
             if (addevents)
             {
                 cEvent *event=SearchEvent(schedule,&xevent);
-                PutEvent(schedule,event,&xevent,map,i);
+                if (!event)
+                    PutEvent(schedule,event,&xevent,map);
             }
             else
             {
                 if (!schedule->Index())
                 {
                     if (lerr!=PARSE_EMPTYSCHEDULE)
-                        esyslog("xmltv2vdr: '%s' ERROR cannot merge into empty epg (%s) - try add option",
-                                name,channel->Name());
+                        source->Elog("cannot merge into empty epg (%s) - try add option",
+                                     channel->Name());
                     lerr=PARSE_EMPTYSCHEDULE;
                 }
                 else
@@ -1044,22 +1149,23 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
                     {
                         if ((event=SearchEvent(schedule,&xevent)))
                         {
-                            PutEvent(schedule,event,&xevent,map,i);
+                            PutEvent(schedule,event,&xevent,map);
                         }
                         else
                         {
                             time_t start=xevent.StartTime();
-                            esyslog("xmltv2vdr: '%s' cannot find existing event in epg.data for xmltv-event %s@%s",
-                                    name,xevent.Title(),ctime(&start));
+                            source->Elog("cannot find existing event in epg.data for xmltv-event %s@%s",
+                                         xevent.Title(),ctime_r(&start,(char *) &cbuf));
                         }
                     }
                 }
             }
         }
         node=node->next;
-        if (!myExecutor.StillRunning()) {
+        if (!myExecutor.StillRunning())
+        {
             xmlFreeDoc(xmltv);
-            isyslog("xmltv2vdr: '%s' request to stop from vdr",name);
+            source->Ilog("request to stop from vdr");
             return 0;
         }
     }
@@ -1077,8 +1183,12 @@ void cParse::CleanupLibXML()
     xmlCleanupParser();
 }
 
-cParse::cParse(const char *Name, cEPGMappings *Maps, cTEXTMappings *Texts)
+cParse::cParse(cEPGSource *Source, cEPGMappings *Maps, cTEXTMappings *Texts)
 {
+    source=Source;
+    maps=Maps;
+    texts=Texts;
+
     char *CodeSet=NULL;
     if (setlocale(LC_CTYPE,""))
         CodeSet=nl_langinfo(CODESET);
@@ -1092,15 +1202,11 @@ cParse::cParse(const char *Name, cEPGMappings *Maps, cTEXTMappings *Texts)
                 CodeSet++;
         }
     }
-    dsyslog("xmltv2vdr: '%s' vdr codeset is '%s'",Name,CodeSet ? CodeSet : "US-ASCII//TRANSLIT");
+    source->Dlog("vdr codeset is '%s'",CodeSet ? CodeSet : "US-ASCII//TRANSLIT");
     conv = new cCharSetConv("UTF-8",CodeSet ? CodeSet : "US-ASCII//TRANSLIT");
-    name=strdup(Name);
-    maps=Maps;
-    texts=Texts;
 }
 
 cParse::~cParse()
 {
     delete conv;
-    free(name);
 }

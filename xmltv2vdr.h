@@ -14,8 +14,8 @@
 #include "maps.h"
 #include "parse.h"
 
-static const char *VERSION        = "0.0.1";
-static const char *DESCRIPTION    = trNOOP ( "Imports xmltv epg into vdr" );
+static const char *VERSION        = "0.0.2pre";
+static const char *DESCRIPTION    = trNOOP("Imports xmltv epg into vdr");
 
 class cEPGChannel : public cListObject
 {
@@ -50,12 +50,16 @@ private:
     const char *name;
     const char *confdir;
     const char *pin;
+    int loglen;
     cParse *parse;
     bool ready2parse;
     bool usepipe;
     bool needpin;
+    bool running;
     int daysinadvance;
     int daysmax;
+    time_t lastexec;
+    void add2Log(const char prefix, const char *line);
     bool ReadConfig();
     int ReadOutput(char *&result, size_t &l);
     cEPGChannels channels;
@@ -65,6 +69,7 @@ public:
     int Execute(cEPGExecutor &myExecutor);
     void Store(void);
     void ChangeChannelSelection(int *Selection);
+    char *Log;
     cEPGChannels *ChannelList()
     {
         return &channels;
@@ -98,6 +103,17 @@ public:
         if (pin) free((void *) pin);
         pin=strdup(NewPin);
     }
+    time_t LastExecution()
+    {
+        return lastexec;
+    }
+    void Dlog(const char *format, ...);
+    void Elog(const char *format, ...);
+    void Ilog(const char *format, ...);
+    bool Active()
+    {
+      return running;
+    }
 };
 
 class cEPGSources : public cList<cEPGSource> {};
@@ -108,13 +124,14 @@ private:
     cEPGSources *sources;
 public:
     cEPGExecutor(cEPGSources *Sources);
-    bool StillRunning() {
+    bool StillRunning()
+    {
         return Running();
     }
     void Stop()
     {
         Cancel(3);
-    }        
+    }
     virtual void Action();
 };
 
@@ -167,32 +184,32 @@ public:
     {
         textmappings.Add(TextMap);
     }
-    cPluginXmltv2vdr ( void );
+    cPluginXmltv2vdr(void);
     virtual ~cPluginXmltv2vdr();
-    virtual const char *Version ( void )
+    virtual const char *Version(void)
     {
         return VERSION;
     }
-    virtual const char *Description ( void )
+    virtual const char *Description(void)
     {
         return tr(DESCRIPTION);
     }
-    virtual const char *CommandLineHelp ( void );
-    virtual bool ProcessArgs ( int argc, char *argv[] );
-    virtual bool Initialize ( void );
-    virtual bool Start ( void );
-    virtual void Stop ( void );
-    virtual void Housekeeping ( void );
-    virtual void MainThreadHook ( void );
-    virtual cString Active ( void );
-    virtual time_t WakeupTime ( void );
-    virtual const char *MainMenuEntry ( void );
-    virtual cOsdObject *MainMenuAction ( void );
-    virtual cMenuSetupPage *SetupMenu ( void );
-    virtual bool SetupParse ( const char *Name, const char *Value );
-    virtual bool Service ( const char *Id, void *Data = NULL );
-    virtual const char **SVDRPHelpPages ( void );
-    virtual cString SVDRPCommand ( const char *Command, const char *Option, int &ReplyCode );
+    virtual const char *CommandLineHelp(void);
+    virtual bool ProcessArgs(int argc, char *argv[]);
+    virtual bool Initialize(void);
+    virtual bool Start(void);
+    virtual void Stop(void);
+    virtual void Housekeeping(void);
+    virtual void MainThreadHook(void);
+    virtual cString Active(void);
+    virtual time_t WakeupTime(void);
+    virtual const char *MainMenuEntry(void);
+    virtual cOsdObject *MainMenuAction(void);
+    virtual cMenuSetupPage *SetupMenu(void);
+    virtual bool SetupParse(const char *Name, const char *Value);
+    virtual bool Service(const char *Id, void *Data = NULL);
+    virtual const char **SVDRPHelpPages(void);
+    virtual cString SVDRPCommand(const char *Command, const char *Option, int &ReplyCode);
 };
 
 #endif
