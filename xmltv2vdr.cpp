@@ -320,15 +320,13 @@ int cEPGSource::ReadOutput(char *&result, size_t &l)
         Elog("out of memory");
         return 134;
     }
-    if (read(fd,result,statbuf.st_size)==statbuf.st_size)
-    {
-    }
-    else
+    if (read(fd,result,statbuf.st_size)!=statbuf.st_size)
     {
         Elog("failed to read '%s'",fname);
         ret=149;
+        free(result);
+        result=NULL;
     }
-    free(result);
     close(fd);
     free(fname);
     return ret;
@@ -345,11 +343,11 @@ int cEPGSource::Execute(cEPGExecutor &myExecutor)
     int ret=0;
 
     if ((Log) && (lastexec)) {
-      free(Log);
-      Log=NULL;
-      loglen=0;
+        free(Log);
+        Log=NULL;
+        loglen=0;
     }
-        
+
     char *cmd=NULL;
     if (asprintf(&cmd,"%s %i '%s'",name,daysinadvance,pin ? pin : "")==-1)
     {
@@ -475,7 +473,7 @@ int cEPGSource::Execute(cEPGExecutor &myExecutor)
                 if (r_out) free(r_out);
                 if (r_err) free(r_err);
                 Ilog("request to stop from vdr");
-		running=false;
+                running=false;
                 return 0;
             }
         }
@@ -497,7 +495,7 @@ int cEPGSource::Execute(cEPGExecutor &myExecutor)
             if ((!returncode) && (r_out))
             {
                 //Dlog("xmltv2vdr: '%s' parsing output");
-		Dlog("parsing output");
+                Dlog("parsing output");
                 ret=parse->Process(myExecutor,r_out,l_out);
             }
             else
@@ -637,7 +635,7 @@ void cEPGSource::add2Log(const char Prefix, const char *line)
         prefix[0]=Prefix;
         prefix[1]=0;
         strcat(Log,prefix);
-	strcat(Log,dt);
+        strcat(Log,dt);
         strcat(Log,line);
         strcat(Log,"\n");
         Log[loglen-1]=0;
@@ -874,8 +872,10 @@ bool cPluginXmltv2vdr::Start(void)
     }
     else
     {
-        exectime_t=time(NULL)-60;
-        last_exectime_t=exectime_t;
+        if (!exectime_t) {
+            exectime_t=time(NULL)-60;
+            last_exectime_t=exectime_t;
+        }
     }
     return true;
 }

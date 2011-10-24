@@ -929,6 +929,14 @@ bool cParse::FetchEvent(xmlNodePtr enode)
             {
                 // http-link inside -> just ignore
             }
+            else if ((!xmlStrcasecmp(node->name, (const xmlChar *) "length")))
+            {
+                // length without advertisements -> just ignore
+            }
+            else if ((!xmlStrcasecmp(node->name, (const xmlChar *) "episode-num")))
+            {
+                // episode-num in not usable format -> just ignore
+            }
             else
             {
                 source->Elog("unknown element %s, please report!",node->name);
@@ -1135,7 +1143,7 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
             }
             else
             {
-                if (!schedule->Index())
+                if (!schedule->Events()->Count())
                 {
                     if (lerr!=PARSE_EMPTYSCHEDULE)
                         source->Elog("cannot merge into empty epg (%s) - try add option",
