@@ -8,12 +8,14 @@
 #include <string.h>
 #include <locale.h>
 #include <zip.h>
+#include <libxml/parserInternals.h>
 #include "epgdata2xmltv.h"
 #include "epgdata2xmltv_xsl.h"
 
 #include <fcntl.h>
 
 int SysLogLevel=1;
+char *dtdmem=NULL;
 
 void syslog_redir(const char *format, ...)
 {
@@ -47,6 +49,19 @@ cepgdata2xmltv::~cepgdata2xmltv ()
         xsltCleanupGlobals();
         xmlCleanupParser();
     }
+    if (dtdmem) {
+        free(dtdmem);
+        dtdmem=NULL;
+    }
+}
+
+xmlParserInputPtr xmlMyExternalEntityLoader(const char *URL,
+        const char *UNUSED(ID), xmlParserCtxtPtr ctxt)
+{
+    if (!strcmp(URL,"qy.dtd") && (dtdmem)) {
+        return xmlNewStringInputStream(ctxt,(const xmlChar *) dtdmem);
+    }
+    return NULL;
 }
 
 void cepgdata2xmltv::LoadXSLT()
@@ -55,6 +70,7 @@ void cepgdata2xmltv::LoadXSLT()
     xmlSetGenericErrorFunc(NULL,tvmGenericErrorFunc);
     xmlSubstituteEntitiesDefault (1);
     xmlLoadExtDtdDefaultValue = 1;
+    xmlSetExternalEntityLoader(xmlMyExternalEntityLoader);
     exsltRegisterAll();
 
     if ((sxmlDoc = xmlReadMemory (xsl, sizeof(xsl), NULL,NULL,0)) != NULL)
@@ -351,8 +367,12 @@ int cepgdata2xmltv::Process(int argc, char *argv[])
                 break;
             }
             if (sizeof(sb.size>4)) sb.size &= 0x00FFFFFF; // just to be sure
-            xmlmem=(char *) malloc(sb.size+1);
-            int size=zip_fread(zfile,xmlmem,sb.size);
+            if (dtdmem) {
+                free(dtdmem);
+                dtdmem=NULL;
+            }
+            dtdmem=(char *) malloc(sb.size+1);
+            int size=zip_fread(zfile,dtdmem,sb.size);
             if (size!=sb.size)
             {
                 zip_fclose(zfile);
@@ -360,10 +380,10 @@ int cepgdata2xmltv::Process(int argc, char *argv[])
                 ok=true;
                 break;
             }
-            xmlmem[size]=0;
+            dtdmem[size]=0;
+            dtdmem=strreplace(dtdmem,"ISO-8859-1","Windows-1252");
             zip_fclose(zfile);
-            xmlmem=strreplace(xmlmem,"?>\n","?>\n<!DOCTYPE pack [\n");
-            xmlmem=strreplace(xmlmem,"ISO-8859-1","Windows-1252");
+
             int entries=zip_get_num_files(zip);
             for (int i=0; i<entries; i++)
             {
@@ -390,6 +410,7 @@ int cepgdata2xmltv::Process(int argc, char *argv[])
                             ok=true;
                             break;
                         }
+
                         struct zip_stat sb;
                         memset(&sb,0,sizeof(sb));
                         if (zip_stat_index(zip,i,ZIP_FL_UNCHANGED,&sb)==-1)
@@ -409,22 +430,8 @@ int cepgdata2xmltv::Process(int argc, char *argv[])
                             break;
                         }
                         if (sizeof(sb.size>4)) sb.size &= 0x00FFFFFF; // just to be sure
-                        int lpos=strlen(xmlmem);
-                        char *nptr=(char *) realloc(xmlmem,lpos+sb.size+1);
-                        if (nptr)
-                        {
-                            xmlmem=nptr;
-                        }
-                        else
-                        {
-                            zip_fclose(zfile);
-                            free(xmlmem);
-                            xmlmem=NULL;
-                            esyslog("out of memory");
-                            ok=true;
-                            break;
-                        }
-                        int size=zip_fread(zfile,xmlmem+lpos,sb.size);
+                        xmlmem=(char *) malloc(sb.size+1);
+                        int size=zip_fread(zfile,xmlmem,sb.size);
                         if (size!=sb.size)
                         {
                             zip_fclose(zfile);
@@ -434,25 +441,11 @@ int cepgdata2xmltv::Process(int argc, char *argv[])
                             ok=true;
                             break;
                         }
+                        xmlmem[size]=0;
+                        xmlmem=strreplace(xmlmem,"iso-8859-1","Windows-1252");
                         zip_fclose(zfile);
-                        xmlmem[lpos+size]=0;
-                        xmlmem[lpos++]=']';
-                        xmlmem[lpos++]='>';
-                        xmlmem[lpos++]='\n';
-                        while (xmlmem[lpos]!='?')
-                        {
-                            xmlmem[lpos]=' ';
-                            lpos++;
-                        }
-                        xmlmem[lpos++]=' ';
-                        xmlmem[lpos++]=' ';
-                        while (xmlmem[lpos]!='>')
-                        {
-                            xmlmem[lpos]=' ';
-                            lpos++;
-                        }
-                        xmlmem[lpos++]=' ';
                         ok=true;
+                        break;
                     }
                 }
             }
@@ -553,8 +546,14 @@ int cepgdata2xmltv::Process(int argc, char *argv[])
         }
         xmlFreeDoc (pxmlDoc);
         fseek(f,offset,SEEK_SET);
-        if (xmlmem) free(xmlmem);
-        xmlmem=NULL;
+        if (dtdmem) {
+            free(dtdmem);
+            dtdmem=NULL;
+        }
+        if (xmlmem) {
+            free(xmlmem);
+            xmlmem=NULL;
+        }
     }
     if (line) free(line);
     fclose(f);

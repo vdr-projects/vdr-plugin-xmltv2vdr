@@ -49,7 +49,10 @@ private:
     int  DownloadData(const char *url);
     bool Translate(xmlDocPtr pxmlDoc, const char **params);
     void LoadXSLT();
-public:
+/*    xmlParserInputPtr xmlMyExternalEntityLoader(const char *URL,
+            const char *ID,
+            xmlParserCtxtPtr ctxt);        */
+  public:
     cepgdata2xmltv();
     ~cepgdata2xmltv();
     int Process(int argc, char *argv[]);
