@@ -9,6 +9,7 @@
 
 #include <vdr/osdbase.h>
 #include <time.h>
+#include <pwd.h>
 
 #define CHNUMWIDTH (numdigits(Channels.MaxNumber())+1)
 
@@ -431,6 +432,26 @@ cMenuSetupXmltv2vdrTextMap::cMenuSetupXmltv2vdrTextMap(cPluginXmltv2vdr *Plugin)
         strcpy(category,tr("category"));
     }
 
+    textmap=baseplugin->TEXTMapping("season");
+    if (textmap)
+    {
+        strn0cpy(season,textmap->Value(),sizeof(season)-1);
+    }
+    else
+    {
+        strcpy(season,tr("season"));
+    }
+
+    textmap=baseplugin->TEXTMapping("episode");
+    if (textmap)
+    {
+        strn0cpy(episode,textmap->Value(),sizeof(episode)-1);
+    }
+    else
+    {
+        strcpy(episode,tr("episode"));
+    }
+
     Add(NewTitle(tr("country and date")));
     Add(new cMenuEditStrItem("country",country,sizeof(country)));
     Add(new cMenuEditStrItem("date",date,sizeof(date)));
@@ -455,6 +476,11 @@ cMenuSetupXmltv2vdrTextMap::cMenuSetupXmltv2vdrTextMap(cPluginXmltv2vdr *Plugin)
 
     Add(NewTitle(tr("review")));
     Add(new cMenuEditStrItem("review",review,sizeof(review)));
+
+    Add(NewTitle(tr("season and episode")));
+    Add(new cMenuEditStrItem("season",season,sizeof(season)));
+    Add(new cMenuEditStrItem("episode",episode,sizeof(episode)));
+
 }
 
 void cMenuSetupXmltv2vdrTextMap::Store()
@@ -596,6 +622,24 @@ void cMenuSetupXmltv2vdrTextMap::Store()
     {
         baseplugin->TEXTMappingAdd(new cTEXTMapping("review",review));
     }
+    textmap=baseplugin->TEXTMapping("season");
+    if (textmap)
+    {
+        textmap->ChangeValue(season);
+    }
+    else
+    {
+        baseplugin->TEXTMappingAdd(new cTEXTMapping("season",season));
+    }
+    textmap=baseplugin->TEXTMapping("episode");
+    if (textmap)
+    {
+        textmap->ChangeValue(episode);
+    }
+    else
+    {
+        baseplugin->TEXTMappingAdd(new cTEXTMapping("episode",episode));
+    }
 
     SetupStore("textmap.country",country);
     SetupStore("textmap.date",date);
@@ -612,6 +656,8 @@ void cMenuSetupXmltv2vdrTextMap::Store()
     SetupStore("textmap.producer",producer);
     SetupStore("textmap.writer",writer);
     SetupStore("textmap.review",review);
+    SetupStore("textmap.season",season);
+    SetupStore("textmap.episode",episode);
 }
 
 // --------------------------------------------------------------------------------------------------------
@@ -1046,6 +1092,18 @@ void cMenuSetupXmltv2vdrChannelMap::output(void)
     Add(new cMyMenuEditBitItem(tr("video"),&flags,USE_VIDEO),true);
     Add(new cMyMenuEditBitItem(tr("audio"),&flags,USE_AUDIO),true);
     Add(new cMyMenuEditBitItem(tr("vps"),&flags,OPT_VPS),true);
+
+    struct passwd *pw=getpwuid(getuid());
+    if (pw)
+    {
+        char *path=NULL;
+        if (asprintf(&path,"%s/.eplists/lists",pw->pw_dir)!=-1)
+        {
+            if (!access(path,R_OK))
+                Add(new cMyMenuEditBitItem(tr("season and episode"),&flags,USE_SEASON),true);
+            free(path);
+        }
+    }
 
     hasmaps=false;
     Add(NewTitle(tr("epg source channel mappings")),true);

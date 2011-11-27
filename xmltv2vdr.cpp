@@ -831,6 +831,8 @@ cPluginXmltv2vdr::cPluginXmltv2vdr(void) : epgexecutor(&epgsources)
     TEXTMappingAdd(new cTEXTMapping("producer",tr("producer")));
     TEXTMappingAdd(new cTEXTMapping("writer",tr("writer")));
     TEXTMappingAdd(new cTEXTMapping("review",tr("review")));
+    TEXTMappingAdd(new cTEXTMapping("season",tr("season")));
+    TEXTMappingAdd(new cTEXTMapping("episode",tr("episode")));
 }
 
 cPluginXmltv2vdr::~cPluginXmltv2vdr()

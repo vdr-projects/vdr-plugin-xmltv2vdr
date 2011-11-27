@@ -11,8 +11,8 @@ STRIP ?= strip
 
 ### Includes and Defines (add further entries here):
 
-PKG-LIBS += libxml-2.0 libxslt libexslt libcurl libzip
-PKG-INCLUDES += libxml-2.0 libxslt libexslt libcurl libzip
+PKG-LIBS += libxml-2.0 libxslt libexslt libcurl libzip libpcrecpp enca
+PKG-INCLUDES += libxml-2.0 libxslt libexslt libcurl libzip libpcrecpp enca
 
 DEFINES += -D_GNU_SOURCE 
 DEFINES += -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE

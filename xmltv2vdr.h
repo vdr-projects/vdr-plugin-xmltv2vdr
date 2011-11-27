@@ -14,7 +14,7 @@
 #include "maps.h"
 #include "parse.h"
 
-static const char *VERSION        = "0.0.2pre";
+static const char *VERSION        = "0.0.2";
 static const char *DESCRIPTION    = trNOOP("Imports xmltv epg into vdr");
 
 class cEPGChannel : public cListObject

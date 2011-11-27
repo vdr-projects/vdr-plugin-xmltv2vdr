@@ -8,6 +8,8 @@
 #include <string.h>
 #include <locale.h>
 #include <zip.h>
+#include <pcrecpp.h>
+#include <enca.h>
 #include <libxml/parserInternals.h>
 #include "epgdata2xmltv.h"
 #include "epgdata2xmltv_xsl.h"
@@ -381,7 +383,6 @@ int cepgdata2xmltv::Process(int argc, char *argv[])
                 break;
             }
             dtdmem[size]=0;
-            dtdmem=strreplace(dtdmem,"ISO-8859-1","Windows-1252");
             zip_fclose(zfile);
 
             int entries=zip_get_num_files(zip);
@@ -484,11 +485,38 @@ int cepgdata2xmltv::Process(int argc, char *argv[])
 
         xmlDocPtr pxmlDoc;
         if (!pxsltStylesheet) LoadXSLT();
-        if ((pxmlDoc=xmlParseMemory(xmlmem,strlen(xmlmem)))==NULL)
+        int xmlsize=strlen(xmlmem);
+        if ((pxmlDoc=xmlParseMemory(xmlmem,xmlsize))==NULL)
         {
-            esyslog("failed parsing xml");
-            free(xmlmem);
-            continue;
+            EncaAnalyser analyser=enca_analyser_alloc("__");
+            if (analyser) {
+                EncaEncoding encoding=enca_analyse_const(analyser, (unsigned char *) xmlmem,xmlsize);
+                const char *cs=enca_charset_name(encoding.charset, ENCA_NAME_STYLE_ICONV);
+                if (cs) {
+                    if (!strcmp(cs,"UTF-8")) {
+                        xmlmem=strreplace(xmlmem,"Windows-1252","UTF-8");
+                    } else {
+                        esyslog("enca returned %s, please report!",cs);
+                    }
+                }
+                enca_analyser_free(analyser);
+            }
+
+            string s = xmlmem;
+            int reps=pcrecpp::RE("&(?![a-zA-Z]{1,8};)").GlobalReplace("%amp;",&s);
+            if (reps) {
+                xmlmem = (char *)realloc(xmlmem, s.size()+1);
+                xmlsize = s.size();
+                strcpy(xmlmem,s.c_str());
+            }
+
+            if ((pxmlDoc=xmlParseMemory(xmlmem,xmlsize))==NULL)
+            {
+                esyslog("failed parsing xml");
+                free(xmlmem);
+                xmlmem=NULL;
+                continue;
+            }
         }
 
         for (;;)

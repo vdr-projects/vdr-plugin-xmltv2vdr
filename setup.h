@@ -84,6 +84,8 @@ private:
     char guest[255];
     char review[255];
     char category[255];
+    char season[255];
+    char episode[255];
 public:
     cMenuSetupXmltv2vdrTextMap(cPluginXmltv2vdr *Plugin);
 };

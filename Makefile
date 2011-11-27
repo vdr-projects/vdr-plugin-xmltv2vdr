@@ -114,7 +114,9 @@ install:
 dist: clean
 	@-rm -rf $(TMPDIR)/$(ARCHIVE)
 	@mkdir $(TMPDIR)/$(ARCHIVE)
-	@cp -a *.cpp *.h HISTORY Makefile README po $(TMPDIR)/$(ARCHIVE)
+	@cp -a *.cpp *.h HISTORY COPYING Makefile README po $(TMPDIR)/$(ARCHIVE)
+	@mkdir -p $(TMPDIR)/$(ARCHIVE)/dist/epgdata2xmltv
+	@cp -a dist/epgdata2xmltv/*.cpp dist/epgdata2xmltv/*.h dist/epgdata2xmltv/Makefile dist/epgdata2xmltv/INSTALL dist/epgdata2xmltv/COPYING dist/epgdata2xmltv/epgdata2xmltv.dist $(TMPDIR)/$(ARCHIVE)/dist/epgdata2xmltv 
 	@tar czf $(PACKAGE).tgz -C $(TMPDIR) --exclude debian --exclude CVS --exclude .svn $(ARCHIVE)
 	@-rm -rf $(TMPDIR)/$(ARCHIVE)
 	@echo Distribution package created as $(PACKAGE).tgz

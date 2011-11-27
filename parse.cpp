@@ -14,6 +14,7 @@
 #include <locale.h>
 #include <langinfo.h>
 #include <time.h>
+#include <pwd.h>
 
 #include "xmltv2vdr.h"
 #include "parse.h"
@@ -179,6 +180,8 @@ void cXMLTVEvent::Clear()
     eventid=0;
     credits.Clear();
     categories.Clear();
+    season=0;
+    episode=0;
 }
 
 cXMLTVEvent::cXMLTVEvent()
@@ -350,12 +353,19 @@ cEvent *cParse::SearchEvent(cSchedule* schedule, cXMLTVEvent *xevent)
     if (f) return f;
     // 2nd with StartTime
     f=(cEvent *) schedule->GetEvent((tEventID) 0,start);
-    if (f) return f;
+    if (f)
+    {
+        if (!strcmp(f->Title(),xevent->Title()))
+        {
+            return f;
+        }
+    }
     // 3rd with StartTime +/- WaitTime
     int maxdiff=INT_MAX;
     int eventTimeDiff=0;
     if (xevent->Duration()) eventTimeDiff=xevent->Duration()/4;
-    if (eventTimeDiff<600) eventTimeDiff=600;
+    if (eventTimeDiff<780) eventTimeDiff=780;
+
     for (cEvent *p = schedule->Events()->First(); p; p = schedule->Events()->Next(p))
     {
         int diff=abs((int) difftime(p->StartTime(),start));
@@ -372,6 +382,7 @@ cEvent *cParse::SearchEvent(cSchedule* schedule, cXMLTVEvent *xevent)
             }
             else
             {
+                if (f) continue; // we already have an event!
                 // cut both titles into pieces and check
                 // if we have at least one match with
                 // minimum length of 4 characters
@@ -406,9 +417,10 @@ cEvent *cParse::SearchEvent(cSchedule* schedule, cXMLTVEvent *xevent)
                             }
                         }
                     }
-                    free(s1);
-                    free(s2);
                 }
+                if (s1) free(s1);
+                if (s2) free(s2);
+
                 if (wfound)
                 {
                     if (diff<=maxdiff)
@@ -441,6 +453,56 @@ cEvent *cParse::GetEventBefore(cSchedule* schedule, time_t start)
     }
     if (last) return last;
     return NULL;
+}
+
+void cParse::FetchSeasonEpisode(cEvent *event)
+{
+    if (!epdir) return;
+    if (!event) return;
+    if (!event->ShortText()) return;
+    if (!event->Title()) return;
+    char *epfile=NULL;
+    if (asprintf(&epfile,"%s/.eplists/lists/%s.episodes",epdir,event->Title())==-1) return;
+
+    struct stat statbuf;
+    if (stat(epfile,&statbuf)==-1)
+    {
+        free(epfile);
+        return;
+    }
+
+    FILE *f=fopen(epfile,"r");
+    if (!f)
+    {
+        free(epfile);
+        return;
+    }
+
+    char *line=NULL;
+    size_t length;
+    while (getline(&line,&length,f)!=-1)
+    {
+        if (line[0]=='#') continue;
+        char title[256]="";
+        int season;
+        int episode;
+        if (sscanf(line,"%i\t%i\t%*i\t%255c",&season,&episode,title)==3)
+        {
+            char *lf=strchr(title,'\n');
+            if (lf) *lf=0;
+            if (!strcmp(event->ShortText(),title))
+            {
+                xevent.SetSeason(season);
+                xevent.SetEpisode(episode);
+                break;
+            }
+        }
+    }
+    if (line) free(line);
+    fclose(f);
+
+    free(epfile);
+    return;
 }
 
 bool cParse::PutEvent(cSchedule* schedule, cEvent *event, cXMLTVEvent *xevent, cEPGMapping *map)
@@ -576,17 +638,7 @@ bool cParse::PutEvent(cSchedule* schedule, cEvent *event, cXMLTVEvent *xevent, c
             return true;
         }
     }
-    else
-    {
-        if (event->TableID()==0) return true;
-        start=event->StartTime();
-        end=event->EndTime();
-        localtime_r(&start,&tm);
-        strftime(from,sizeof(from)-1,"%b %d %H:%M",&tm);
-        localtime_r(&end,&tm);
-        strftime(till,sizeof(till)-1,"%b %d %H:%M",&tm);
-        source->Dlog("changing '%s'@%s-%s",event->Title(),from,till);
-    }
+
     if ((map->Flags() & USE_SHORTTEXT)==USE_SHORTTEXT)
     {
         if (xevent->ShortText() && (strlen(xevent->ShortText())>0))
@@ -602,6 +654,13 @@ bool cParse::PutEvent(cSchedule* schedule, cEvent *event, cXMLTVEvent *xevent, c
             }
         }
     }
+
+    if (event->ShortText() && (strlen(event->ShortText())>0) && ((map->Flags() & USE_SEASON)==USE_SEASON))
+    {
+        // Try to fetch season and episode from eplist
+        FetchSeasonEpisode(event);
+    }
+
     if ((map->Flags() & USE_LONGTEXT)==USE_LONGTEXT)
     {
         if (xevent->Description() && (strlen(xevent->Description())>0))
@@ -697,6 +756,21 @@ bool cParse::PutEvent(cSchedule* schedule, cEvent *event, cXMLTVEvent *xevent, c
             if (text) addExt=xevent->Add2Description(text->Value(),xevent->Year());
         }
     }
+    if ((map->Flags() & USE_SEASON)==USE_SEASON)
+    {
+        if (xevent->Season())
+        {
+            cTEXTMapping *text=TEXTMapping("season");
+            if (text) addExt=xevent->Add2Description(text->Value(),xevent->Season());
+        }
+
+        if (xevent->Episode())
+        {
+            cTEXTMapping *text=TEXTMapping("episode");
+            if (text) addExt=xevent->Add2Description(text->Value(),xevent->Episode());
+        }
+    }
+
     if (((map->Flags() & USE_ORIGTITLE)==USE_ORIGTITLE) && (xevent->OrigTitle()))
     {
         cTEXTMapping *text=TEXTMapping("originaltitle");
@@ -725,6 +799,17 @@ bool cParse::PutEvent(cSchedule* schedule, cEvent *event, cXMLTVEvent *xevent, c
     {
         cTEXTMapping *text=TEXTMapping("review");
         if (text) addExt=xevent->Add2Description(text->Value(),xevent->Review());
+    }
+    if (event->TableID()==0) return true;
+    if ((map->Flags() & OPT_APPEND)!=OPT_APPEND)
+    {
+        start=event->StartTime();
+        end=event->EndTime();
+        localtime_r(&start,&tm);
+        strftime(from,sizeof(from)-1,"%b %d %H:%M",&tm);
+        localtime_r(&end,&tm);
+        strftime(till,sizeof(till)-1,"%b %d %H:%M",&tm);
+        source->Dlog("changing '%s'@%s-%s",event->Title(),from,till);
     }
     if (addExt) event->SetDescription(xevent->Description());
     event->SetTableID(0); // prevent EIT EPG to update this event
@@ -1212,9 +1297,20 @@ cParse::cParse(cEPGSource *Source, cEPGMappings *Maps, cTEXTMappings *Texts)
     }
     source->Dlog("vdr codeset is '%s'",CodeSet ? CodeSet : "US-ASCII//TRANSLIT");
     conv = new cCharSetConv("UTF-8",CodeSet ? CodeSet : "US-ASCII//TRANSLIT");
+
+    struct passwd *pw=getpwuid(getuid());
+    if (pw)
+    {
+        epdir=strdup(pw->pw_dir);
+    }
+    else
+    {
+        epdir=NULL;
+    }
 }
 
 cParse::~cParse()
 {
+    if (epdir) free(epdir);
     delete conv;
 }

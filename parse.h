@@ -33,6 +33,8 @@ private:
     time_t starttime;
     int duration;
     time_t vps;
+    int season;
+    int episode;
     tEventID eventid;
     cStringList credits;
     cStringList categories;
@@ -57,6 +59,14 @@ public:
     void SetCountry(const char *Country);
     void SetReview(const char *Review);
     void SetRating(const char *System, const char *Rating);
+    void SetSeason(int Season)
+    {
+        season=Season;
+    }
+    void SetEpisode(int Episode)
+    {
+        episode=Episode;
+    }
     void SetYear(int Year)
     {
         year=Year;
@@ -137,6 +147,14 @@ public:
     {
         return &categories;
     }
+    int Season(void)
+    {
+        return season;
+    }
+    int Episode(void)
+    {
+        return episode;
+    }
 };
 
 class cParse
@@ -164,6 +182,7 @@ private:
     cTEXTMappings *texts;
     cXMLTVEvent xevent;
     cCharSetConv *conv;
+    char *epdir;
     char cbuf[80];
     char *RemoveNonASCII(const char *src);
     struct split split(char *in, char delim);
@@ -171,6 +190,7 @@ private:
     cEvent *SearchEvent(cSchedule* schedule, cXMLTVEvent *xevent);
     time_t ConvertXMLTVTime2UnixTime(char *xmltvtime);
     bool FetchEvent(xmlNodePtr node);
+    void FetchSeasonEpisode(cEvent *event);
     cEPGMapping *EPGMapping(const char *ChannelName);
     cTEXTMapping *TEXTMapping(const char *Name);
     bool PutEvent(cSchedule* schedule,cEvent *event,cXMLTVEvent *xevent, cEPGMapping *map);
