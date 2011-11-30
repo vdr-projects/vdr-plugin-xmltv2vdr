@@ -490,7 +490,7 @@ void cParse::FetchSeasonEpisode(cEvent *event)
         {
             char *lf=strchr(title,'\n');
             if (lf) *lf=0;
-            if (!strcmp(event->ShortText(),title))
+            if (!strncasecmp(event->ShortText(),title,strlen(title)))
             {
                 xevent.SetSeason(season);
                 xevent.SetEpisode(episode);
