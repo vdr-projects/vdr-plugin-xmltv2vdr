@@ -60,6 +60,7 @@ cMenuSetupXmltv2vdr::cMenuSetupXmltv2vdr(cPluginXmltv2vdr *Plugin)
     sourcesBegin=sourcesEnd=mappingBegin=mappingEnd=mappingEntry=0;
     wakeup=(int) baseplugin->WakeUp;
     upstart=(int) baseplugin->UpStart;
+    epall=(int) baseplugin->EPAll();
     exectime=baseplugin->ExecTime();
     cs=NULL;
     cm=NULL;
@@ -87,6 +88,22 @@ void cMenuSetupXmltv2vdr::Output(void)
         Add(new cMenuEditTimeItem(tr("update at"),&exectime),true);
         Add(new cMenuEditBoolItem(tr("automatic wakeup"),&wakeup),true);
     }
+
+    epEntry=0;
+    struct passwd *pw=getpwuid(getuid());
+    if (pw)
+    {
+        char *path=NULL;
+        if (asprintf(&path,"%s/.eplists/lists",pw->pw_dir)!=-1)
+        {
+            if (!access(path,R_OK))
+            {
+                Add(new cMenuEditBoolItem(tr("add season/episode on all timer channels"),&epall),true);
+            }
+            free(path);
+        }
+    }
+
     Add(new cOsdItem(tr("text mapping")),true);
     mappingEntry=Current();
     Add(NewTitle(tr("epg sources")),true);
@@ -178,10 +195,12 @@ void cMenuSetupXmltv2vdr::Store(void)
     SetupStore("options.exectime",exectime);
     SetupStore("options.wakeup",wakeup);
     SetupStore("options.upstart",upstart);
+    SetupStore("options.epall",epall);
 
     baseplugin->UpStart=upstart;
     baseplugin->WakeUp=wakeup;
     baseplugin->SetExecTime(exectime);
+    baseplugin->SetEPAll((bool) epall);
 }
 
 eOSState cMenuSetupXmltv2vdr::edit()
@@ -214,6 +233,10 @@ eOSState cMenuSetupXmltv2vdr::ProcessKey(eKeys Key)
         if ((Key==kLeft) || (Key==kRight) || (Key==kLeft|k_Repeat) || (Key==kRight|k_Repeat))
         {
             if (Current()==updateEntry) Output();
+        }
+        if ((Key==kLeft) || (Key==kRight) || (Key==kLeft|k_Repeat) || (Key==kRight|k_Repeat))
+        {
+            if ((epEntry) && (Current()==epEntry)) Output();
         }
         if ((Key==kDown) || (Key==kUp) || (Key==kDown|k_Repeat) || (Key==kUp|k_Repeat))
         {
@@ -862,8 +885,13 @@ cMenuSetupXmltv2vdrChannelSource::cMenuSetupXmltv2vdrChannelSource(cPluginXmltv2
 
     SetSection(cString::sprintf("%s '%s' : %s",trVDR("Plugin"), baseplugin->Name(), epgsrc->Name()));
 
+    time_t day;
+    int weekday,start;
+    
     Add(NewTitle(tr("options")));
-    days=epgsrc->DaysInAdvance();
+    Add(new cMenuEditDateItem(trVDR("Day"),&day,&weekday));
+    Add(new cMenuEditTimeItem(trVDR("Start"),&start));
+    days=epgsrc->DaysInAdvance();    
     Add(new cMenuEditIntItem(tr("days in advance"),&days,1,epgsrc->DaysMax()));
     if (epgsrc->NeedPin())
     {

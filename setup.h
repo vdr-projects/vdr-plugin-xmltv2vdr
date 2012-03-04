@@ -38,11 +38,13 @@ private:
     int sourcesBegin,sourcesEnd;
     int mappingEntry;
     int updateEntry;
+    int epEntry;
     eOSState edit(void);
     void generatesumchannellist();
     int exectime;
     int wakeup;
     int upstart;
+    int epall;
 public:
     void Output(void);
     static cOsdItem *NewTitle(const char *s);

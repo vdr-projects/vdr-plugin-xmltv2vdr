@@ -115,7 +115,7 @@ int cepgdata2xmltv::DownloadData(const char *url)
     curl_easy_setopt(curl_handle, CURLOPT_FOLLOWLOCATION, 0);  // don't follow redirects
     curl_easy_setopt(curl_handle, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);  // Send all data to this function
     curl_easy_setopt(curl_handle, CURLOPT_WRITEDATA, (void *) &data);  // Pass our 'data' struct to the callback function
-    curl_easy_setopt(curl_handle, CURLOPT_MAXFILESIZE, 20971520);  // Set maximum file size to get (bytes)
+    curl_easy_setopt(curl_handle, CURLOPT_MAXFILESIZE, 45971520);  // Set maximum file size to get (bytes)
     curl_easy_setopt(curl_handle, CURLOPT_NOPROGRESS, 1);  // No progress meter
     curl_easy_setopt(curl_handle, CURLOPT_NOSIGNAL, 1);  // No signaling
     curl_easy_setopt(curl_handle, CURLOPT_TIMEOUT, 240);  // Set timeout to 240 seconds
@@ -210,6 +210,11 @@ int cepgdata2xmltv::Fetch(const char *dest, const char *pin, int day)
         return 1;
 
     }
+    if (ret==-63)
+    {
+      esyslog("filesize exceeded, please report this!");
+      return 1;
+    }
     return 0;
 }
 
@@ -274,7 +279,7 @@ int cepgdata2xmltv::Process(int argc, char *argv[])
         sprintf(vgl,"%04i%02i%02i",tm->tm_year+1900,tm->tm_mon+1,tm->tm_mday);
 
         char *dest=NULL;
-        if (asprintf(&dest,"/tmp/epgdata_%02i.zip",day)==-1)
+        if (asprintf(&dest,"/tmp/%s_epgdata.zip",vgl)==-1)
         {
             esyslog("failed to allocate string");
             continue;

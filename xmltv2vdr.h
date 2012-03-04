@@ -14,7 +14,7 @@
 #include "maps.h"
 #include "parse.h"
 
-static const char *VERSION        = "0.0.2";
+static const char *VERSION        = "0.0.3pre";
 static const char *DESCRIPTION    = trNOOP("Imports xmltv epg into vdr");
 
 class cEPGChannel : public cListObject
@@ -121,7 +121,9 @@ class cEPGSources : public cList<cEPGSource> {};
 class cEPGExecutor : public cThread
 {
 private:
-    cEPGSources *sources;
+    cEPGSources *sources;    
+    cTEXTMappings *textmappings;
+    bool epall;
 public:
     cEPGExecutor(cEPGSources *Sources);
     bool StillRunning()
@@ -131,6 +133,10 @@ public:
     void Stop()
     {
         Cancel(3);
+    }
+    void SetOptions(bool EPAll, cTEXTMappings *TextMappings) {      
+      epall=EPAll;
+      textmappings=TextMappings;
     }
     virtual void Action();
 };
@@ -149,6 +155,7 @@ private:
     int exectime;
     time_t exectime_t,last_exectime_t;
     char *confdir;
+    bool epall;
 public:
     int ExecTime()
     {
@@ -157,6 +164,11 @@ public:
     void SetExecTime(int ExecTime);
     bool UpStart;
     bool WakeUp;
+    void SetEPAll(bool Value) {
+      epall=Value;
+      epgexecutor.SetOptions(epall,&textmappings);
+    }
+    bool EPAll() { return epall; }
     void ReadInEPGSources(bool Reload=false);
     int EPGSourceCount()
     {

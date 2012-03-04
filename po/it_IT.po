@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: vdr\n"
 "Report-Msgid-Bugs-To: <see README>\n"
-"POT-Creation-Date: 2011-11-25 19:04+0100\n"
+"POT-Creation-Date: 2012-01-13 14:04+0100\n"
 "PO-Revision-Date: 2011-03-05 15:45+0100\n"
 "Last-Translator: Diego Pierotto <vdr-italian@tiscali.it>\n"
 "Language-Team:  <vdr@linuxtv.org>\n"
@@ -33,6 +33,9 @@ msgstr "Ora esecuzione"
 
 msgid "automatic wakeup"
 msgstr "Risveglio automatico"
+
+msgid "add season/episode on all timer channels"
+msgstr ""
 
 msgid "text mapping"
 msgstr "Mappatura testo"

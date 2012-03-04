@@ -11,6 +11,7 @@
 #include <sys/wait.h>
 #include <sys/ioctl.h>
 #include <stdarg.h>
+#include <pwd.h>
 #include "xmltv2vdr.h"
 #include "parse.h"
 #include "extpipe.h"
@@ -46,6 +47,8 @@ int cEPGChannel::Compare(const cListObject &ListObject) const
 cEPGExecutor::cEPGExecutor(cEPGSources *Sources) : cThread("xmltv2vdr importer")
 {
     sources=Sources;
+    textmappings=NULL;
+    epall=false;
 }
 
 void cEPGExecutor::Action()
@@ -85,8 +88,41 @@ void cEPGExecutor::Action()
         if (retries>=2) epgs->Elog("skipping after %i retries",retries);
         if (!ret) break; // TODO: check if we must execute second/third source!
     }
+    if (!ret && epall && textmappings)
+    {
+        struct passwd pwd,*pwdbuf;
+        char buf[1024];
+        getpwuid_r(getuid(),&pwd,buf,sizeof(buf),&pwdbuf);
+        if (pwdbuf)
+        {
+            char *epdir;
+            if (asprintf(&epdir,"%s/.eplists/lists",pwdbuf->pw_dir)!=-1)
+            {
+                if (!access(epdir,R_OK))
+                {
+                    int retries=0;
+                    while (retries<=2)
+                    {
+
+                        if (!cParse::AddSeasonEpisode2TimerChannels(epdir,textmappings))
+                        {
+                            dsyslog("waiting 60 seconds");
+                            retries++;
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+                }
+                free(epdir);
+            }
+        }
+    }
     if (!ret) cSchedules::Cleanup(true);
 }
+
+
 
 // -------------------------------------------------------------
 
@@ -342,7 +378,8 @@ int cEPGSource::Execute(cEPGExecutor &myExecutor)
     int l_err=0;
     int ret=0;
 
-    if ((Log) && (lastexec)) {
+    if ((Log) && (lastexec))
+    {
         free(Log);
         Log=NULL;
         loglen=0;
@@ -815,6 +852,7 @@ cPluginXmltv2vdr::cPluginXmltv2vdr(void) : epgexecutor(&epgsources)
     UpStart=1;
     last_exectime_t=0;
     exectime=200;
+    SetEPAll(false);
     SetExecTime(exectime);
     TEXTMappingAdd(new cTEXTMapping("country",tr("country")));
     TEXTMappingAdd(new cTEXTMapping("date",tr("year")));
@@ -874,7 +912,8 @@ bool cPluginXmltv2vdr::Start(void)
     }
     else
     {
-        if (!exectime_t) {
+        if (!exectime_t)
+        {
             exectime_t=time(NULL)-60;
             last_exectime_t=exectime_t;
         }
@@ -997,6 +1036,10 @@ bool cPluginXmltv2vdr::SetupParse(const char *Name, const char *Value)
     else if (!strcasecmp(Name,"options.upstart"))
     {
         UpStart=atoi(Value);
+    }
+    else if (!strcasecmp(Name,"options.epall"))
+    {
+        SetEPAll((bool) atoi(Value));
     }
     else return false;
     return true;

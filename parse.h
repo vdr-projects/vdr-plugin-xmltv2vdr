@@ -189,18 +189,20 @@ private:
     u_long DoSum(u_long sum, const char *buf, int nBytes);
     cEvent *SearchEvent(cSchedule* schedule, cXMLTVEvent *xevent);
     time_t ConvertXMLTVTime2UnixTime(char *xmltvtime);
-    bool FetchEvent(xmlNodePtr node);
-    void FetchSeasonEpisode(cEvent *event);
+    bool FetchEvent(xmlNodePtr node);    
+    static bool FetchSeasonEpisode(const char *epdir, const char *title, const char *shorttext, 
+				   int &season, int &episode);        
     cEPGMapping *EPGMapping(const char *ChannelName);
-    cTEXTMapping *TEXTMapping(const char *Name);
+    static cTEXTMapping *TEXTMapping_(const char *Name, cTEXTMappings *texts);
     bool PutEvent(cSchedule* schedule,cEvent *event,cXMLTVEvent *xevent, cEPGMapping *map);
-    cEvent *GetEventBefore(cSchedule *schedule, time_t start);
+    cEvent *GetEventBefore(cSchedule *schedule, time_t start);    
 public:
     cParse(cEPGSource *Source, cEPGMappings *Maps, cTEXTMappings *Texts);
     ~cParse();
     int Process(cEPGExecutor &myExecutor, char *buffer, int bufsize);
     static void InitLibXML();
-    static void CleanupLibXML();
+    static void CleanupLibXML();    
+    static bool AddSeasonEpisode2TimerChannels(const char *epdir, cTEXTMappings *Texts);
 };
 
 #endif

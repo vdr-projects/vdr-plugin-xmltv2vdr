@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: vdr\n"
 "Report-Msgid-Bugs-To: <see README>\n"
-"POT-Creation-Date: 2011-11-25 19:04+0100\n"
+"POT-Creation-Date: 2012-01-13 14:04+0100\n"
 "PO-Revision-Date: 2010-12-23 23:59+0100\n"
 "Last-Translator: Jochen Dolze <vdr@dolze.de>\n"
 "Language-Team: <vdr@linuxtv.org>\n"
@@ -30,6 +30,9 @@ msgstr "Ausführung um"
 
 msgid "automatic wakeup"
 msgstr "automatisch Aufwachen"
+
+msgid "add season/episode on all timer channels"
+msgstr "Staffel/Episode an alle Timerkanäle anhängen"
 
 msgid "text mapping"
 msgstr "Textzuordnungen"
@@ -240,3 +243,4 @@ msgstr "xmltv2vdr plugin ist noch aktiv"
 
 msgid "Imports xmltv epg into vdr"
 msgstr "Importiert xmltv epg in den VDR"
+

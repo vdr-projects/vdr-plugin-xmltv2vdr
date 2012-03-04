@@ -15,11 +15,13 @@
 #include <langinfo.h>
 #include <time.h>
 #include <pwd.h>
+#include <vdr/timers.h>
 
 #include "xmltv2vdr.h"
 #include "parse.h"
 
 extern char *strcatrealloc(char *dest, const char *src);
+#define TEXTMapping(a) TEXTMapping_(a,texts)
 
 void cXMLTVEvent::SetTitle(const char *Title)
 {
@@ -455,45 +457,146 @@ cEvent *cParse::GetEventBefore(cSchedule* schedule, time_t start)
     return NULL;
 }
 
-void cParse::FetchSeasonEpisode(cEvent *event)
+bool cParse::AddSeasonEpisode2TimerChannels(const char *epdir, cTEXTMappings *texts)
 {
-    if (!epdir) return;
-    if (!event) return;
-    if (!event->ShortText()) return;
-    if (!event->Title()) return;
-    char *epfile=NULL;
-    if (asprintf(&epfile,"%s/.eplists/lists/%s.episodes",epdir,event->Title())==-1) return;
+    if (!epdir) return false;
+    if (!texts) return false;
 
-    struct stat statbuf;
-    if (stat(epfile,&statbuf)==-1)
+    const cSchedules *schedules=NULL;
+    cSchedulesLock schedulesLock(true,60000); // wait up to 60 secs for lock!
+    schedules = cSchedules::Schedules(schedulesLock);
+    if (!schedules)
     {
-        free(epfile);
-        return;
+        esyslog("cannot get schedules now, trying later");
+        return false;
     }
+
+    time_t start=time(NULL);
+    time_t stop=start+86400;
+
+    for (cTimer *Timer = Timers.First(); Timer; Timer=Timers.Next(Timer))
+    {
+        if (!Timer->Channel()) continue;
+
+        cSchedule* schedule = (cSchedule *) schedules->GetSchedule(Timer->Channel());
+        if (!schedule) continue;
+
+        for (cEvent *p = schedule->Events()->First(); p; p = schedule->Events()->Next(p))
+        {
+            if (p->StartTime()>=start && p->StartTime()<=stop && p->TableID() && p->ShortText())
+            {
+                int season,episode;
+                if (FetchSeasonEpisode(epdir,p->Title(), p->ShortText(), season, episode))
+                {
+                    if ((season) || (episode))
+                    {
+                        char *description=NULL;
+                        if (p->Description()) description=strdup(p->Description());
+                        description = strcatrealloc(description,"\n");
+                        if (season)
+                        {
+                            cTEXTMapping *text=TEXTMapping("season");
+                            if (text)
+                            {
+                                char *value=NULL;
+                                if (asprintf(&value,"%i",season)!=-1)
+                                {
+                                    description = strcatrealloc(description,text->Value());
+                                    description = strcatrealloc(description,": ");
+                                    description = strcatrealloc(description,value);
+                                    description = strcatrealloc(description,"\n");
+                                    free(value);
+                                }
+                            }
+                        }
+                        if (episode)
+                        {
+                            cTEXTMapping *text=TEXTMapping("episode");
+                            if (text)
+                            {
+                                char *value=NULL;
+                                if (asprintf(&value,"%i",episode)!=-1)
+                                {
+                                    description = strcatrealloc(description,text->Value());
+                                    description = strcatrealloc(description,": ");
+                                    description = strcatrealloc(description,value);
+                                    description = strcatrealloc(description,"\n");
+                                    free(value);
+                                }
+                            }
+                        }
+                        p->SetDescription(description);
+                        p->SetTableID(0);
+                        free(description);
+                    }
+                }
+            }
+        }
+    }
+    return true;
+}
+
+bool cParse::FetchSeasonEpisode(const char *epdir, const char *title, const char *shorttext, int &season, int &episode)
+{
+    if (!epdir) return false;
+    if (!shorttext) return false;
+    if (!title) return false;
+
+    /*
+        char *epfile=NULL;
+        if (asprintf(&epfile,"%s/%s.episodes",epdir,title)==-1) return false;
+
+        struct stat statbuf;
+        if (stat(epfile,&statbuf)==-1)
+        {
+            free(epfile);
+            return false;
+        }
+    */
+    DIR *dir=opendir(epdir);
+    if (!dir) return false;
+    struct dirent dirent_buf,*dirent;
+    bool found=false;
+    for (;;)
+    {
+        if (readdir_r(dir,&dirent_buf,&dirent)!=0) break;
+        if (!dirent) break;
+        if (dirent->d_name[0]=='.') continue;
+        char *pt=strrchr(dirent->d_name,'.');
+        if (pt) *pt=0;
+        if (!strncasecmp(dirent->d_name,title,strlen(dirent->d_name)))
+        {
+            found=true;
+            break;
+        }
+    }
+    closedir(dir);
+    if (!found) return false;
+
+    char *epfile=NULL;
+    if (asprintf(&epfile,"%s/%s.episodes",epdir,dirent->d_name)==-1) return false;
 
     FILE *f=fopen(epfile,"r");
     if (!f)
     {
         free(epfile);
-        return;
+        return false;
     }
 
     char *line=NULL;
     size_t length;
+    found=false;
     while (getline(&line,&length,f)!=-1)
     {
         if (line[0]=='#') continue;
-        char title[256]="";
-        int season;
-        int episode;
-        if (sscanf(line,"%i\t%i\t%*i\t%255c",&season,&episode,title)==3)
+        char epshorttext[256]="";
+        if (sscanf(line,"%d\t%d\t%*d\t%255c",&season,&episode,epshorttext)==3)
         {
-            char *lf=strchr(title,'\n');
+            char *lf=strchr(epshorttext,'\n');
             if (lf) *lf=0;
-            if (!strncasecmp(event->ShortText(),title,strlen(title)))
+            if (!strncasecmp(shorttext,epshorttext,strlen(epshorttext)))
             {
-                xevent.SetSeason(season);
-                xevent.SetEpisode(episode);
+                found=true;
                 break;
             }
         }
@@ -502,7 +605,7 @@ void cParse::FetchSeasonEpisode(cEvent *event)
     fclose(f);
 
     free(epfile);
-    return;
+    return found;
 }
 
 bool cParse::PutEvent(cSchedule* schedule, cEvent *event, cXMLTVEvent *xevent, cEPGMapping *map)
@@ -655,10 +758,15 @@ bool cParse::PutEvent(cSchedule* schedule, cEvent *event, cXMLTVEvent *xevent, c
         }
     }
 
-    if (event->ShortText() && (strlen(event->ShortText())>0) && ((map->Flags() & USE_SEASON)==USE_SEASON))
+    if (epdir && xevent->ShortText() && (strlen(xevent->ShortText())>0) && ((map->Flags() & USE_SEASON)==USE_SEASON))
     {
         // Try to fetch season and episode from eplist
-        FetchSeasonEpisode(event);
+        int season,episode;
+        if (FetchSeasonEpisode(epdir,xevent->Title(),xevent->ShortText(),season,episode))
+        {
+            xevent->SetSeason(season);
+            xevent->SetEpisode(episode);
+        }
     }
 
     if ((map->Flags() & USE_LONGTEXT)==USE_LONGTEXT)
@@ -1032,7 +1140,7 @@ bool cParse::FetchEvent(xmlNodePtr enode)
     return (xevent.Title()!=NULL);
 }
 
-cTEXTMapping *cParse::TEXTMapping(const char *Name)
+cTEXTMapping *cParse::TEXTMapping_(const char *Name, cTEXTMappings *texts)
 {
     if (!texts->Count()) return NULL;
     for (cTEXTMapping *textmap=texts->First(); textmap; textmap=texts->Next(textmap))
@@ -1247,8 +1355,9 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
                         else
                         {
                             time_t start=xevent.StartTime();
-                            source->Elog("cannot find existing event in epg.data for xmltv-event %s@%s",
-                                         xevent.Title(),ctime_r(&start,(char *) &cbuf));
+                            source->Elog("no event in epg for %s@%s (%s)",
+                                         xevent.Title(),ctime_r(&start,(char *) &cbuf),
+                                         channel->Name());
                         }
                     }
                 }
@@ -1298,14 +1407,23 @@ cParse::cParse(cEPGSource *Source, cEPGMappings *Maps, cTEXTMappings *Texts)
     source->Dlog("vdr codeset is '%s'",CodeSet ? CodeSet : "US-ASCII//TRANSLIT");
     conv = new cCharSetConv("UTF-8",CodeSet ? CodeSet : "US-ASCII//TRANSLIT");
 
-    struct passwd *pw=getpwuid(getuid());
-    if (pw)
+    struct passwd pwd,*pwdbuf;
+    char buf[1024];
+    getpwuid_r(getuid(),&pwd,buf,sizeof(buf),&pwdbuf);
+    if (pwdbuf)
     {
-        epdir=strdup(pw->pw_dir);
-    }
-    else
-    {
-        epdir=NULL;
+        if (asprintf(&epdir,"%s/.eplists/lists",pwdbuf->pw_dir)!=-1)
+        {
+            if (access(epdir,R_OK))
+            {
+                free(epdir);
+                epdir=NULL;
+            }
+        }
+        else
+        {
+            epdir=NULL;
+        }
     }
 }
 
