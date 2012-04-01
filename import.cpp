@@ -247,6 +247,7 @@ bool cImport::WasChanged(cEvent* event)
     if (!event) return false;
     if (!event->Description()) return false;
     int len=strlen(event->Description());
+    if (len<1) return false;
     if ((uchar)(event->Description()[len-1])==0xA0) return true;
     return false;
 }

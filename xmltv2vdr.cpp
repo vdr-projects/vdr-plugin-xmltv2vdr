@@ -15,9 +15,10 @@
 
 // -------------------------------------------------------------
 
-cEPGHandler::cEPGHandler(const char *EpgFile, cEPGSources *Sources, cEPGMappings *Maps,
-                         cTEXTMappings *Texts)
+cEPGHandler::cEPGHandler(cPluginXmltv2vdr *Plugin, const char *EpgFile, cEPGSources *Sources,
+                         cEPGMappings *Maps, cTEXTMappings *Texts)
 {
+    baseplugin=Plugin;
     epall=false;
     epgfile=EpgFile;
     maps=Maps;
@@ -47,6 +48,7 @@ bool cEPGHandler::SetDescription(cEvent* Event, const char* Description)
     if (!Event) return false;
     if (!maps) return false;
     if (!import) return false;
+    if (!baseplugin) return false;
 
     bool special_epall_timer_handling=false;
     if (!maps->ProcessChannel(Event->ChannelID()))
@@ -55,6 +57,12 @@ bool cEPGHandler::SetDescription(cEvent* Event, const char* Description)
         if (!Event->HasTimer()) return false;
         if (!Event->ShortText()) return false;
         special_epall_timer_handling=true;
+    }
+
+    if (!baseplugin->IsIdle())
+    {
+        if (import->WasChanged(Event)) return true;
+        return false;
     }
 
     int Flags=0;
@@ -99,8 +107,9 @@ bool cEPGHandler::SetDescription(cEvent* Event, const char* Description)
                               (cSchedule *) Event->Schedule(),
                               Event,xevent,Flags,IMPORT_DESCRIPTION);
     delete xevent;
-    if (!ret) {
-      dsyslog("xmltv2vdr: failed to put event description!");
+    if (!ret)
+    {
+        dsyslog("xmltv2vdr: failed to put event description!");
     }
     return ret;
 }
@@ -118,6 +127,12 @@ bool cEPGHandler::SetShortText(cEvent* Event, const char* UNUSED(ShortText))
 
     if (!maps->ProcessChannel(Event->ChannelID())) return false;
 
+    if (!baseplugin->IsIdle())
+    {
+        if (import->WasChanged(Event)) return true;
+        return false;
+    }
+
     cEPGMapping *map=maps->GetMap(Event->ChannelID());
     if (!map) return false;
 
@@ -131,9 +146,10 @@ bool cEPGHandler::SetShortText(cEvent* Event, const char* UNUSED(ShortText))
                               (cSchedule *) Event->Schedule(),Event,xevent,
                               map->Flags(),IMPORT_SHORTTEXT);
     delete xevent;
-    if (!ret) {
-      dsyslog("xmltv2vdr: failed to put event shorttext!");
-    }    
+    if (!ret)
+    {
+        dsyslog("xmltv2vdr: failed to put event shorttext!");
+    }
     return ret;
 }
 
@@ -245,9 +261,16 @@ cPluginXmltv2vdr::~cPluginXmltv2vdr()
 #endif
 }
 
+bool cPluginXmltv2vdr::IsIdle()
+{
+    if (!epgexecutor.Active() && (!epgtimer->Active())) return true;
+    return false;
+}
+
 bool cPluginXmltv2vdr::EPGSourceMove(int From, int To)
 {
     if (From==To) return false;
+    if (!IsIdle()) return false;
     sqlite3 *db=NULL;
     char *sql=NULL;
     if (sqlite3_open_v2(epgfile,&db,SQLITE_OPEN_READWRITE,NULL)==SQLITE_OK)
@@ -326,7 +349,7 @@ bool cPluginXmltv2vdr::Start(void)
     cParse::InitLibXML();
 
     ReadInEPGSources();
-    epghandler = new cEPGHandler(epgfile,&epgsources,&epgmappings,&textmappings);
+    epghandler = new cEPGHandler(this,epgfile,&epgsources,&epgmappings,&textmappings);
     epgtimer = new cEPGTimer(epgfile,&epgsources,&epgmappings,&textmappings);
 
     if (sqlite3_threadsafe()==0) esyslog("xmltv2vdr: ERROR sqlite3 not threadsafe!");
@@ -406,7 +429,7 @@ void cPluginXmltv2vdr::MainThreadHook(void)
     time_t now=time(NULL);
     if (now>(last_maintime_t+60))
     {
-        if (!epgexecutor.Active() && (!epgtimer->Active()))
+        if (IsIdle())
         {
             if (epgsources.RunItNow()) epgexecutor.Start();
         }
@@ -416,7 +439,7 @@ void cPluginXmltv2vdr::MainThreadHook(void)
     {
         if (now>(last_epcheck_t+600))
         {
-            if (!epgtimer->Active() && (!epgexecutor.Active()))
+            if (IsIdle())
             {
                 epgtimer->Start();
             }

@@ -20,7 +20,7 @@
 #define UNUSED(x) x
 #endif
 
-static const char *VERSION        = "0.1.0";
+static const char *VERSION        = "0.1.1pre";
 static const char *DESCRIPTION    = trNOOP("Imports xmltv epg into vdr");
 
 #if VDRVERSNUM < 10726 && !EPGHANDLER
@@ -53,19 +53,21 @@ public:
 #endif
 
 class cEPGSources;
-
 class cImport;
+class cPluginXmltv2vdr;
 
 class cEPGHandler : public cEpgHandler
 {
 private:
+    cPluginXmltv2vdr *baseplugin;
     const char *epgfile;
     cEPGMappings *maps;
     cEPGSources *sources;
     cImport *import;
     bool epall;
 public:
-    cEPGHandler(const char *EpgFile, cEPGSources *Sources, cEPGMappings *Maps, cTEXTMappings *Texts);
+    cEPGHandler(cPluginXmltv2vdr *Plugin, const char *EpgFile, cEPGSources *Sources,
+                cEPGMappings *Maps, cTEXTMappings *Texts);
     void SetEPAll(bool Value)
     {
         epall=Value;
@@ -80,14 +82,14 @@ public:
 
 class cEPGTimer : public cThread
 {
-  private:
+private:
     const char *epgfile;
     cEPGSources *sources;
     cEPGMappings *maps;
     cImport *import;
-  public:
+public:
     cEPGTimer(const char *EpgFile, cEPGSources *Sources, cEPGMappings *Maps,
-                         cTEXTMappings *Texts);
+              cTEXTMappings *Texts);
     bool StillRunning()
     {
         return Running();
@@ -96,7 +98,7 @@ class cEPGTimer : public cThread
     {
         Cancel(3);
     }
-    virtual void Action();  
+    virtual void Action();
 };
 
 class cPluginXmltv2vdr : public cPlugin
@@ -138,10 +140,11 @@ public:
     {
         epgsources.ReadIn(confdir,epgfile,&epgmappings,&textmappings,srcorder,Reload);
     }
+    bool IsIdle();
     bool EPGSourceMove(int From, int To);
     int EPGSourceCount()
     {
-      if (!epgsources.Count()) return 0;
+        if (!epgsources.Count()) return 0;
         return epgsources.Count()-1;
     }
     cEPGSource *EPGSource(int Index)
