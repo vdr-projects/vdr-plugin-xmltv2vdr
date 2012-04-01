@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: vdr\n"
 "Report-Msgid-Bugs-To: <see README>\n"
-"POT-Creation-Date: 2012-01-13 14:04+0100\n"
+"POT-Creation-Date: 2012-04-01 18:24+0200\n"
 "PO-Revision-Date: 2010-12-23 23:59+0100\n"
 "Last-Translator: Jochen Dolze <vdr@dolze.de>\n"
 "Language-Team: <vdr@linuxtv.org>\n"
@@ -16,23 +16,11 @@ msgstr ""
 msgid "options"
 msgstr "Optionen"
 
-msgid "update"
-msgstr "Ausführung"
-
-msgid "on time"
-msgstr "Zeitpunkt"
-
-msgid "on start"
-msgstr "beim Start"
-
-msgid "update at"
-msgstr "Ausführung um"
+msgid "add season/episode on all timers"
+msgstr "Staffel/Episode an alle Timer anhängen"
 
 msgid "automatic wakeup"
 msgstr "automatisch Aufwachen"
-
-msgid "add season/episode on all timer channels"
-msgstr "Staffel/Episode an alle Timerkanäle anhängen"
 
 msgid "text mapping"
 msgstr "Textzuordnungen"
@@ -42,6 +30,9 @@ msgstr "EPG Quellen"
 
 msgid "no epgsources installed"
 msgstr "Keine EPG Quellen installiert"
+
+msgid "disabled"
+msgstr "inaktiv"
 
 msgid "epg source channels"
 msgstr "EPG Quellkanäle"
@@ -64,65 +55,29 @@ msgstr "editieren"
 msgid "texts"
 msgstr "Texte"
 
-msgid "country"
-msgstr "Land"
-
-msgid "year"
-msgstr "Jahr"
-
-msgid "originaltitle"
-msgstr "Originaltitel"
-
-msgid "director"
-msgstr "Regie"
-
-msgid "actor"
-msgstr "Darsteller"
-
-msgid "writer"
-msgstr "Drehbuch"
-
-msgid "adapter"
-msgstr "Adapter"
-
-msgid "producer"
-msgstr "Produzent"
-
-msgid "composer"
-msgstr "Musik"
-
-msgid "editor"
-msgstr "Schnitt"
-
-msgid "presenter"
-msgstr "Moderator"
-
-msgid "commentator"
-msgstr "Bericht"
-
-msgid "guest"
-msgstr "Gaststar"
-
-msgid "review"
-msgstr "Kritik"
-
-msgid "category"
-msgstr "Kategorie"
-
-msgid "season"
-msgstr "Staffel"
-
-msgid "episode"
-msgstr "Episode"
-
 msgid "country and date"
 msgstr "Ort und Jahr"
 
 msgid "original title"
 msgstr "Originaltitel"
 
+msgid "category"
+msgstr "Kategorie"
+
 msgid "credits"
 msgstr "Mitwirkende"
+
+msgid "video informations"
+msgstr "Video Informationen"
+
+msgid "audio informations"
+msgstr "Audio Informationen"
+
+msgid "review"
+msgstr "Kritik"
+
+msgid "starrating"
+msgstr "Wertung"
 
 msgid "season and episode"
 msgstr "Staffel und Episode"
@@ -147,6 +102,18 @@ msgstr "Info"
 
 msgid "Button$Debug"
 msgstr "Debug"
+
+msgid "update"
+msgstr "Ausführung"
+
+msgid "on time"
+msgstr "Zeitpunkt"
+
+msgid "on start"
+msgstr "beim Start"
+
+msgid "update at"
+msgstr "Ausführung um"
 
 msgid "days in advance"
 msgstr "Anzahl Tage"
@@ -214,9 +181,6 @@ msgstr "Video"
 msgid "audio"
 msgstr "Audio"
 
-msgid "vps"
-msgstr "VPS"
-
 msgid "epg source channel mappings"
 msgstr "EPG Quellkanalzuordnungen"
 
@@ -237,6 +201,63 @@ msgstr "Kanaleinstellungen zurücksetzen?"
 
 msgid "Button$Choose"
 msgstr "auswählen"
+
+msgid "country"
+msgstr "Land"
+
+msgid "year"
+msgstr "Jahr"
+
+msgid "originaltitle"
+msgstr "Originaltitel"
+
+msgid "actor"
+msgstr "Darsteller"
+
+msgid "adapter"
+msgstr "Adapter"
+
+msgid "commentator"
+msgstr "Bericht"
+
+msgid "composer"
+msgstr "Musik"
+
+msgid "director"
+msgstr "Regie"
+
+msgid "editor"
+msgstr "Schnitt"
+
+msgid "guest"
+msgstr "Gaststar"
+
+msgid "presenter"
+msgstr "Moderator"
+
+msgid "producer"
+msgstr "Produzent"
+
+msgid "writer"
+msgstr "Drehbuch"
+
+msgid "blacknwhite"
+msgstr "s/w"
+
+msgid "dolby"
+msgstr "DolbyDigital 2.0"
+
+msgid "dolbydigital"
+msgstr "DolbyDigital 5.1"
+
+msgid "bilingual"
+msgstr "Zweikanalton"
+
+msgid "season"
+msgstr "Staffel"
+
+msgid "episode"
+msgstr "Episode"
 
 msgid "xmltv2vdr plugin still working"
 msgstr "xmltv2vdr plugin ist noch aktiv"

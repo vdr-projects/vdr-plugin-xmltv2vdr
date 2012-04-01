@@ -8,6 +8,7 @@
 #include "setup.h"
 
 #include <vdr/osdbase.h>
+#include <vdr/i18n.h>
 #include <time.h>
 #include <pwd.h>
 
@@ -58,10 +59,8 @@ cMenuSetupXmltv2vdr::cMenuSetupXmltv2vdr(cPluginXmltv2vdr *Plugin)
 {
     baseplugin=Plugin;
     sourcesBegin=sourcesEnd=mappingBegin=mappingEnd=mappingEntry=0;
-    wakeup=(int) baseplugin->WakeUp;
-    upstart=(int) baseplugin->UpStart;
     epall=(int) baseplugin->EPAll();
-    exectime=baseplugin->ExecTime();
+    wakeup=(int) baseplugin->WakeUp();
     cs=NULL;
     cm=NULL;
     Output();
@@ -81,14 +80,6 @@ void cMenuSetupXmltv2vdr::Output(void)
     cOsdItem *first=NewTitle(tr("options"));
     Add(first,true);
 
-    Add(new cMenuEditBoolItem(tr("update"),&upstart,tr("on time"),tr("on start")),true);
-    updateEntry=Current();
-    if (!upstart)
-    {
-        Add(new cMenuEditTimeItem(tr("update at"),&exectime),true);
-        Add(new cMenuEditBoolItem(tr("automatic wakeup"),&wakeup),true);
-    }
-
     epEntry=0;
     struct passwd *pw=getpwuid(getuid());
     if (pw)
@@ -98,11 +89,12 @@ void cMenuSetupXmltv2vdr::Output(void)
         {
             if (!access(path,R_OK))
             {
-                Add(new cMenuEditBoolItem(tr("add season/episode on all timer channels"),&epall),true);
+                Add(new cMenuEditBoolItem(tr("add season/episode on all timers"),&epall),true);
             }
             free(path);
         }
     }
+    Add(new cMenuEditBoolItem(tr("automatic wakeup"),&wakeup),true);
 
     Add(new cOsdItem(tr("text mapping")),true);
     mappingEntry=Current();
@@ -124,7 +116,15 @@ void cMenuSetupXmltv2vdr::Output(void)
         cEPGSource *epgsrc=baseplugin->EPGSource(i);
         if (epgsrc)
         {
-            Add(new cOsdItem(epgsrc->Name()),true);
+            if (epgsrc->Disabled())
+            {
+                cString buffer = cString::sprintf("%s:\t%s",epgsrc->Name(),tr("disabled"));
+                Add(new cOsdItem(buffer),true);
+            }
+            else
+            {
+                Add(new cOsdItem(epgsrc->Name()),true);
+            }
         }
     }
     sourcesEnd=Current();
@@ -192,15 +192,32 @@ void cMenuSetupXmltv2vdr::generatesumchannellist()
 
 void cMenuSetupXmltv2vdr::Store(void)
 {
-    SetupStore("options.exectime",exectime);
-    SetupStore("options.wakeup",wakeup);
-    SetupStore("options.upstart",upstart);
-    SetupStore("options.epall",epall);
 
-    baseplugin->UpStart=upstart;
-    baseplugin->WakeUp=wakeup;
-    baseplugin->SetExecTime(exectime);
+    char *order=NULL;
+    for (int i=0; i<baseplugin->EPGSourceCount(); i++)
+    {
+        cEPGSource *epgsrc=baseplugin->EPGSource(i);
+        if (epgsrc && epgsrc->Name())
+        {
+            if (epgsrc->Disabled())
+            {
+                order=strcatrealloc(order,"-");
+            }
+            order=strcatrealloc(order,epgsrc->Name());
+            if (i<baseplugin->EPGSourceCount()-1) order=strcatrealloc(order,",");
+        }
+    }
+
+    if (order)
+    {
+        SetupStore("source.order",order);
+        free(order);
+    }
+
+    SetupStore("options.epall",epall);
+    SetupStore("options.wakeup",wakeup);
     baseplugin->SetEPAll((bool) epall);
+    baseplugin->SetWakeUp((bool) wakeup);
 }
 
 eOSState cMenuSetupXmltv2vdr::edit()
@@ -230,10 +247,6 @@ eOSState cMenuSetupXmltv2vdr::ProcessKey(eKeys Key)
     switch (state)
     {
     case osContinue:
-        if ((Key==kLeft) || (Key==kRight) || (Key==kLeft|k_Repeat) || (Key==kRight|k_Repeat))
-        {
-            if (Current()==updateEntry) Output();
-        }
         if ((Key==kLeft) || (Key==kRight) || (Key==kLeft|k_Repeat) || (Key==kRight|k_Repeat))
         {
             if ((epEntry) && (Current()==epEntry)) Output();
@@ -267,6 +280,58 @@ eOSState cMenuSetupXmltv2vdr::ProcessKey(eKeys Key)
         break;
 
     case osUnknown:
+        if (Key==k0)
+        {
+            // disable/enable
+            if ((Current()>=sourcesBegin) && (Current()<=sourcesEnd))
+            {
+                int srcid=Current()-sourcesBegin;
+                cEPGSource *src=baseplugin->EPGSource(srcid);
+                if (src)
+                {
+                    if (src->Disabled())
+                    {
+                        src->Enable();
+                    }
+                    else
+                    {
+                        src->Disable();
+                    }
+                    Output();
+                    Store();
+                }
+            }
+        }
+        if (Key==kRed)
+        {
+            // move up
+            if ((Current()>sourcesBegin) && (Current()<=sourcesEnd))
+            {
+                int From=Current()-sourcesBegin;
+                int To=From-1;
+                if (baseplugin->EPGSourceMove(From,To))
+                {
+                    CursorUp();
+                    Output();
+                    Store();
+                }
+            }
+        }
+        if (Key==kGreen)
+        {
+            // move down
+            if ((Current()>=sourcesBegin) && (Current()<sourcesEnd))
+            {
+                int From=Current()-sourcesBegin;
+                int To=From+1;
+                if (baseplugin->EPGSourceMove(From,To))
+                {
+                    CursorDown();
+                    Output();
+                    Store();
+                }
+            }
+        }
         if ((Key==kOk) || (Key==kBlue))
         {
             state=edit();
@@ -305,187 +370,38 @@ cMenuSetupXmltv2vdrTextMap::cMenuSetupXmltv2vdrTextMap(cPluginXmltv2vdr *Plugin)
 
     cTEXTMapping *textmap;
 
-    textmap=baseplugin->TEXTMapping("country");
-    if (textmap)
-    {
-        strn0cpy(country,textmap->Value(),sizeof(country)-1);
-    }
-    else
-    {
-        strcpy(country,tr("country"));
-    }
-
-    textmap=baseplugin->TEXTMapping("date");
-    if (textmap)
-    {
-        strn0cpy(date,textmap->Value(),sizeof(date)-1);
-    }
-    else
-    {
-        strcpy(date,tr("year"));
-    }
-
-    textmap=baseplugin->TEXTMapping("originaltitle");
-    if (textmap)
-    {
-        strn0cpy(originaltitle,textmap->Value(),sizeof(originaltitle)-1);
-    }
-    else
-    {
-        strcpy(originaltitle,tr("originaltitle"));
-    }
-
-    textmap=baseplugin->TEXTMapping("director");
-    if (textmap)
-    {
-        strn0cpy(director,textmap->Value(),sizeof(director)-1);
-    }
-    else
-    {
-        strcpy(director,tr("director"));
-    }
-
-    textmap=baseplugin->TEXTMapping("actor");
-    if (textmap)
-    {
-        strn0cpy(actor,textmap->Value(),sizeof(actor)-1);
-    }
-    else
-    {
-        strcpy(actor,tr("actor"));
-    }
-
-    textmap=baseplugin->TEXTMapping("writer");
-    if (textmap)
-    {
-        strn0cpy(writer,textmap->Value(),sizeof(writer)-1);
-    }
-    else
-    {
-        strcpy(writer,tr("writer"));
-    }
-
-    textmap=baseplugin->TEXTMapping("adapter");
-    if (textmap)
-    {
-        strn0cpy(adapter,textmap->Value(),sizeof(adapter)-1);
-    }
-    else
-    {
-        strcpy(adapter,tr("adapter"));
-    }
-
-    textmap=baseplugin->TEXTMapping("producer");
-    if (textmap)
-    {
-        strn0cpy(producer,textmap->Value(),sizeof(producer)-1);
-    }
-    else
-    {
-        strcpy(producer,tr("producer"));
-    }
-
-    textmap=baseplugin->TEXTMapping("composer");
-    if (textmap)
-    {
-        strn0cpy(composer,textmap->Value(),sizeof(composer)-1);
-    }
-    else
-    {
-        strcpy(composer,tr("composer"));
-    }
-
-    textmap=baseplugin->TEXTMapping("editor");
-    if (textmap)
-    {
-        strn0cpy(editor,textmap->Value(),sizeof(editor)-1);
-    }
-    else
-    {
-        strcpy(editor,tr("editor"));
-    }
-
-    textmap=baseplugin->TEXTMapping("presenter");
-    if (textmap)
-    {
-        strn0cpy(presenter,textmap->Value(),sizeof(presenter)-1);
-    }
-    else
-    {
-        strcpy(presenter,tr("presenter"));
-    }
-
-    textmap=baseplugin->TEXTMapping("commentator");
-    if (textmap)
-    {
-        strn0cpy(commentator,textmap->Value(),sizeof(commentator)-1);
-    }
-    else
-    {
-        strcpy(commentator,tr("commentator"));
-    }
-
-    textmap=baseplugin->TEXTMapping("guest");
-    if (textmap)
-    {
-        strn0cpy(guest,textmap->Value(),sizeof(guest)-1);
-    }
-    else
-    {
-        strcpy(guest,tr("guest"));
-    }
-
-    textmap=baseplugin->TEXTMapping("review");
-    if (textmap)
-    {
-        strn0cpy(review,textmap->Value(),sizeof(review)-1);
-    }
-    else
-    {
-        strcpy(review,tr("review"));
-    }
-
-    textmap=baseplugin->TEXTMapping("category");
-    if (textmap)
-    {
-        strn0cpy(category,textmap->Value(),sizeof(category)-1);
-    }
-    else
-    {
-        strcpy(category,tr("category"));
-    }
-
-    textmap=baseplugin->TEXTMapping("season");
-    if (textmap)
-    {
-        strn0cpy(season,textmap->Value(),sizeof(season)-1);
-    }
-    else
-    {
-        strcpy(season,tr("season"));
-    }
-
-    textmap=baseplugin->TEXTMapping("episode");
-    if (textmap)
-    {
-        strn0cpy(episode,textmap->Value(),sizeof(episode)-1);
-    }
-    else
-    {
-        strcpy(episode,tr("episode"));
-    }
+#define settval(dummy) textmap=baseplugin->TEXTMapping(#dummy); \
+   if (textmap) { \
+     strn0cpy(dummy,textmap->Value(),sizeof(dummy)-1); \
+   } else { \
+     strcpy(dummy,tr(#dummy)); \
+   }
 
     Add(NewTitle(tr("country and date")));
+    settval(country);
+    settval(year);
     Add(new cMenuEditStrItem("country",country,sizeof(country)));
-    Add(new cMenuEditStrItem("date",date,sizeof(date)));
+    Add(new cMenuEditStrItem("year",year,sizeof(year)));
 
     Add(NewTitle(tr("original title")));
+    settval(originaltitle);
     Add(new cMenuEditStrItem("originaltitle",originaltitle,sizeof(originaltitle)));
 
     Add(NewTitle(tr("category")));
+    settval(category);
     Add(new cMenuEditStrItem("category",category,sizeof(category)));
 
     Add(NewTitle(tr("credits")));
+    settval(director);
+    settval(actor);
+    settval(writer);
+    settval(adapter);
+    settval(producer);
+    settval(composer);
+    settval(editor);
+    settval(presenter);
+    settval(commentator);
+    settval(guest);
     Add(new cMenuEditStrItem("actor",actor,sizeof(actor)));
     Add(new cMenuEditStrItem("guest",guest,sizeof(guest)));
     Add(new cMenuEditStrItem("director",director,sizeof(director)));
@@ -497,10 +413,33 @@ cMenuSetupXmltv2vdrTextMap::cMenuSetupXmltv2vdrTextMap(cPluginXmltv2vdr *Plugin)
     Add(new cMenuEditStrItem("commentator",commentator,sizeof(commentator)));
     Add(new cMenuEditStrItem("presenter",presenter,sizeof(presenter)));
 
+    Add(NewTitle(tr("video informations")));
+    settval(video);
+    settval(blacknwhite);
+    Add(new cMenuEditStrItem("video",video,sizeof(video)));
+    Add(new cMenuEditStrItem("blackandwhite",blacknwhite,sizeof(blacknwhite)));
+
+    Add(NewTitle(tr("audio informations")));
+    settval(audio);
+    settval(dolby);
+    settval(dolbydigital);
+    settval(bilingual);
+    Add(new cMenuEditStrItem("audio",audio,sizeof(audio)));
+    Add(new cMenuEditStrItem("dolby",dolby,sizeof(dolby)));
+    Add(new cMenuEditStrItem("dolby digital",dolbydigital,sizeof(dolbydigital)));
+    Add(new cMenuEditStrItem("bilingual",bilingual,sizeof(bilingual)));
+
     Add(NewTitle(tr("review")));
+    settval(review);
     Add(new cMenuEditStrItem("review",review,sizeof(review)));
 
+    Add(NewTitle(tr("starrating")));
+    settval(starrating);
+    Add(new cMenuEditStrItem("starrating",starrating,sizeof(starrating)));
+
     Add(NewTitle(tr("season and episode")));
+    settval(season);
+    settval(episode);
     Add(new cMenuEditStrItem("season",season,sizeof(season)));
     Add(new cMenuEditStrItem("episode",episode,sizeof(episode)));
 
@@ -510,162 +449,41 @@ void cMenuSetupXmltv2vdrTextMap::Store()
 {
     if (!baseplugin) return;
     cTEXTMapping *textmap;
-    textmap=baseplugin->TEXTMapping("country");
-    if (textmap)
-    {
-        textmap->ChangeValue(country);
-    }
-    else
-    {
-        baseplugin->TEXTMappingAdd(new cTEXTMapping("country",country));
-    }
-    textmap=baseplugin->TEXTMapping("date");
-    if (textmap)
-    {
-        textmap->ChangeValue(date);
-    }
-    else
-    {
-        baseplugin->TEXTMappingAdd(new cTEXTMapping("date",date));
-    }
-    textmap=baseplugin->TEXTMapping("originaltitle");
-    if (textmap)
-    {
-        textmap->ChangeValue(originaltitle);
-    }
-    else
-    {
-        baseplugin->TEXTMappingAdd(new cTEXTMapping("originaltitle",originaltitle));
-    }
-    textmap=baseplugin->TEXTMapping("category");
-    if (textmap)
-    {
-        textmap->ChangeValue(category);
-    }
-    else
-    {
-        baseplugin->TEXTMappingAdd(new cTEXTMapping("category",category));
-    }
-    textmap=baseplugin->TEXTMapping("actor");
-    if (textmap)
-    {
-        textmap->ChangeValue(actor);
-    }
-    else
-    {
-        baseplugin->TEXTMappingAdd(new cTEXTMapping("actor",actor));
-    }
-    textmap=baseplugin->TEXTMapping("adapter");
-    if (textmap)
-    {
-        textmap->ChangeValue(adapter);
-    }
-    else
-    {
-        baseplugin->TEXTMappingAdd(new cTEXTMapping("adapter",adapter));
-    }
-    textmap=baseplugin->TEXTMapping("commentator");
-    if (textmap)
-    {
-        textmap->ChangeValue(commentator);
-    }
-    else
-    {
-        baseplugin->TEXTMappingAdd(new cTEXTMapping("commentator",commentator));
-    }
-    textmap=baseplugin->TEXTMapping("composer");
-    if (textmap)
-    {
-        textmap->ChangeValue(composer);
-    }
-    else
-    {
-        baseplugin->TEXTMappingAdd(new cTEXTMapping("composer",composer));
-    }
-    textmap=baseplugin->TEXTMapping("director");
-    if (textmap)
-    {
-        textmap->ChangeValue(director);
-    }
-    else
-    {
-        baseplugin->TEXTMappingAdd(new cTEXTMapping("director",director));
-    }
-    textmap=baseplugin->TEXTMapping("editor");
-    if (textmap)
-    {
-        textmap->ChangeValue(editor);
-    }
-    else
-    {
-        baseplugin->TEXTMappingAdd(new cTEXTMapping("editor",editor));
-    }
-    textmap=baseplugin->TEXTMapping("guest");
-    if (textmap)
-    {
-        textmap->ChangeValue(guest);
-    }
-    else
-    {
-        baseplugin->TEXTMappingAdd(new cTEXTMapping("guest",guest));
-    }
-    textmap=baseplugin->TEXTMapping("presenter");
-    if (textmap)
-    {
-        textmap->ChangeValue(presenter);
-    }
-    else
-    {
-        baseplugin->TEXTMappingAdd(new cTEXTMapping("presenter",presenter));
-    }
-    textmap=baseplugin->TEXTMapping("producer");
-    if (textmap)
-    {
-        textmap->ChangeValue(producer);
-    }
-    else
-    {
-        baseplugin->TEXTMappingAdd(new cTEXTMapping("producer",producer));
-    }
-    textmap=baseplugin->TEXTMapping("writer");
-    if (textmap)
-    {
-        textmap->ChangeValue(writer);
-    }
-    else
-    {
-        baseplugin->TEXTMappingAdd(new cTEXTMapping("writer",writer));
-    }
-    textmap=baseplugin->TEXTMapping("review");
-    if (textmap)
-    {
-        textmap->ChangeValue(review);
-    }
-    else
-    {
-        baseplugin->TEXTMappingAdd(new cTEXTMapping("review",review));
-    }
-    textmap=baseplugin->TEXTMapping("season");
-    if (textmap)
-    {
-        textmap->ChangeValue(season);
-    }
-    else
-    {
-        baseplugin->TEXTMappingAdd(new cTEXTMapping("season",season));
-    }
-    textmap=baseplugin->TEXTMapping("episode");
-    if (textmap)
-    {
-        textmap->ChangeValue(episode);
-    }
-    else
-    {
-        baseplugin->TEXTMappingAdd(new cTEXTMapping("episode",episode));
-    }
+
+#define savetval(dummy) textmap=baseplugin->TEXTMapping(#dummy); \
+   if (textmap) { \
+    textmap->ChangeValue(dummy); \
+   } else { \
+    baseplugin->TEXTMappingAdd(new cTEXTMapping(#dummy,dummy)); \
+   }
+
+    savetval(country);
+    savetval(year);
+    savetval(originaltitle);
+    savetval(category);
+    savetval(director);
+    savetval(actor);
+    savetval(writer);
+    savetval(adapter);
+    savetval(producer);
+    savetval(composer);
+    savetval(editor);
+    savetval(presenter);
+    savetval(commentator);
+    savetval(guest);
+    savetval(video);
+    savetval(blacknwhite);
+    savetval(audio);
+    savetval(dolby);
+    savetval(dolbydigital);
+    savetval(bilingual);
+    savetval(review);
+    savetval(starrating);
+    savetval(season);
+    savetval(episode);
 
     SetupStore("textmap.country",country);
-    SetupStore("textmap.date",date);
+    SetupStore("textmap.year",year);
     SetupStore("textmap.originaltitle",originaltitle);
     SetupStore("textmap.category",category);
     SetupStore("textmap.actor",actor);
@@ -678,7 +496,14 @@ void cMenuSetupXmltv2vdrTextMap::Store()
     SetupStore("textmap.presenter",presenter);
     SetupStore("textmap.producer",producer);
     SetupStore("textmap.writer",writer);
+    SetupStore("textmap.video",video);
+    SetupStore("textmap.blacknwhite",blacknwhite);
+    SetupStore("textmap.audio",audio);
+    SetupStore("textmap.dolby",dolby);
+    SetupStore("textmap.dolbydigital",dolbydigital);
+    SetupStore("textmap.bilingual",bilingual);
     SetupStore("textmap.review",review);
+    SetupStore("textmap.starrating",starrating);
     SetupStore("textmap.season",season);
     SetupStore("textmap.episode",episode);
 }
@@ -877,21 +702,53 @@ cMenuSetupXmltv2vdrChannelSource::cMenuSetupXmltv2vdrChannelSource(cPluginXmltv2
     menu=Menu;
     baseplugin=Plugin;
     sel=NULL;
+
+    day=0;
+    weekday=127;
+    start=0;
+    upstart=1;
+
     days=0;
     pin[0]=0;
+
+    updateEntry=0;
 
     epgsrc=baseplugin->EPGSource(Index);
     if (!epgsrc) return;
 
     SetSection(cString::sprintf("%s '%s' : %s",trVDR("Plugin"), baseplugin->Name(), epgsrc->Name()));
 
-    time_t day;
-    int weekday,start;
-    
+    upstart=epgsrc->ExecUpStart();
+    weekday=epgsrc->ExecWeekDay();
+    start=epgsrc->ExecTime();
+    days=epgsrc->DaysInAdvance();
+
+    output();
+}
+
+cMenuSetupXmltv2vdrChannelSource::~cMenuSetupXmltv2vdrChannelSource()
+{
+    if (menu)
+    {
+        menu->Output();
+        menu->ClearCS();
+    }
+    if (sel) delete [] sel;
+}
+
+void cMenuSetupXmltv2vdrChannelSource::output(void)
+{
+    Clear();
+
     Add(NewTitle(tr("options")));
-    Add(new cMenuEditDateItem(trVDR("Day"),&day,&weekday));
-    Add(new cMenuEditTimeItem(trVDR("Start"),&start));
-    days=epgsrc->DaysInAdvance();    
+
+    Add(new cMenuEditBoolItem(tr("update"),&upstart,tr("on time"),tr("on start")),true);
+    updateEntry=Current();
+    if (!upstart)
+    {
+        Add(new cMenuEditDateItem(trVDR("Day"),&day,&weekday));
+        Add(new cMenuEditTimeItem(tr("update at"),&start));
+    }
     Add(new cMenuEditIntItem(tr("days in advance"),&days,1,epgsrc->DaysMax()));
     if (epgsrc->NeedPin())
     {
@@ -922,64 +779,44 @@ cMenuSetupXmltv2vdrChannelSource::cMenuSetupXmltv2vdrChannelSource(cPluginXmltv2
         }
         Add(new cMenuEditBoolItem(channellist->Get(i)->Name(),&sel[i],"",tr("selected")));
     }
+    Display();
 }
 
-cMenuSetupXmltv2vdrChannelSource::~cMenuSetupXmltv2vdrChannelSource()
+eOSState cMenuSetupXmltv2vdrChannelSource::ProcessKey(eKeys Key)
 {
-    if (menu)
+    eOSState state = cOsdMenu::ProcessKey(Key);
+    if (HasSubMenu()) return osContinue;
+    switch (state)
     {
-        menu->Output();
-        menu->ClearCS();
+    case osContinue:
+        if ((Key==kLeft) || (Key==kRight) || (Key==kLeft|k_Repeat) || (Key==kRight|k_Repeat))
+        {
+            if (Current()==updateEntry) output();
+        }
+
+    case osUnknown:
+        if (Key==kOk)
+        {
+            Store();
+            state=osBack;
+        }
+
+    default:
+        break;
     }
-    if (sel) delete [] sel;
+    return state;
 }
 
 void cMenuSetupXmltv2vdrChannelSource::Store(void)
 {
     if ((!baseplugin) || (!sel) || (!epgsrc)) return;
 
+    epgsrc->ChangeExec(upstart,start,weekday);
     epgsrc->ChangeChannelSelection(sel);
     epgsrc->ChangeDaysInAdvance(days);
     if (epgsrc->NeedPin())
         epgsrc->ChangePin(pin);
     epgsrc->Store();
-
-    cEPGChannels *channellist=epgsrc->ChannelList();
-    if (channellist)
-    {
-        for (int i=0; i<channellist->Count(); i++)
-        {
-            if (channellist->Get(i)->InUse())
-            {
-                cEPGMapping *epgmap=baseplugin->EPGMapping(channellist->Get(i)->Name());
-                if (epgmap)
-                {
-                    if (epgmap->Days()>days)
-                    {
-                        char *name=NULL;
-                        if (asprintf(&name,"channel.%s",channellist->Get(i)->Name())==-1) return;
-
-                        char *value=NULL;
-                        if (asprintf(&value,"%i;%i;",days,epgmap->Flags())==-1)
-                        {
-                            free(name);
-                            return;
-                        }
-                        for (int i=0; i<epgmap->NumChannelIDs(); i++)
-                        {
-                            cString ChannelID = epgmap->ChannelIDs()[i].ToString();
-                            value=strcatrealloc(value,*ChannelID);
-                            if (i<epgmap->NumChannelIDs()-1) value=strcatrealloc(value,";");
-                        }
-                        epgmap->ChangeDays(days);
-                        SetupStore(name,value);
-                        free(name);
-                        free(value);
-                    }
-                }
-            }
-        }
-    }
 }
 
 // --------------------------------------------------------------------------------------------------------
@@ -990,7 +827,6 @@ cMenuSetupXmltv2vdrChannelMap::cMenuSetupXmltv2vdrChannelMap(cPluginXmltv2vdr *P
     menu=Menu;
     hasmaps=false;
     flags=0;
-    days=1;
     if (Index>menu->ChannelList()->Size()) return;
     channel=(*menu->ChannelList())[Index];
     if (!channel) return;
@@ -1012,8 +848,6 @@ cMenuSetupXmltv2vdrChannelMap::cMenuSetupXmltv2vdrChannelMap(cPluginXmltv2vdr *P
     SetTitle(title);
 
     flags=map->Flags();
-    days=map->Days();
-    daysmax=getdaysmax();
     c1=c2=c3=cm=0;
     SetHelp(NULL,NULL,tr("Button$Reset"),tr("Button$Copy"));
     output();
@@ -1060,12 +894,6 @@ int cMenuSetupXmltv2vdrChannelMap::getdaysmax()
     return ret;
 }
 
-cOsdItem *cMenuSetupXmltv2vdrChannelMap::optionN(const char *s, int num)
-{
-    cString buffer = cString::sprintf("%s:\t%i", s, num);
-    return new cOsdItem(buffer,osUnknown,false);
-}
-
 cOsdItem *cMenuSetupXmltv2vdrChannelMap::option(const char *s, bool yesno)
 {
     cString buffer = cString::sprintf("%s:\t%s", s, yesno ? trVDR("yes") : trVDR("no"));
@@ -1086,7 +914,6 @@ void cMenuSetupXmltv2vdrChannelMap::output(void)
     c1=Current();
     if ((flags & OPT_APPEND)!=OPT_APPEND)
     {
-        Add(optionN(tr("days in advance"),1),true);
         Add(new cMyMenuEditBitItem(tr("short text"),&flags,USE_SHORTTEXT),true);
         Add(new cMyMenuEditBitItem(tr("long text"),&flags,USE_LONGTEXT),true);
         c2=Current();
@@ -1097,7 +924,6 @@ void cMenuSetupXmltv2vdrChannelMap::output(void)
     }
     else
     {
-        Add(new cMenuEditIntItem(tr("days in advance"),&days,1,daysmax),true);
         Add(option(tr("short text"),true),true);
         Add(option(tr("long text"),true),true);
         Add(option(tr(" merge long texts"),false),true);
@@ -1116,10 +942,10 @@ void cMenuSetupXmltv2vdrChannelMap::output(void)
     }
 
     Add(new cMyMenuEditBitItem(tr("rating"),&flags,USE_RATING),true);
+    Add(new cMyMenuEditBitItem(tr("starrating"),&flags,USE_STARRATING),true);
     Add(new cMyMenuEditBitItem(tr("review"),&flags,USE_REVIEW),true);
     Add(new cMyMenuEditBitItem(tr("video"),&flags,USE_VIDEO),true);
     Add(new cMyMenuEditBitItem(tr("audio"),&flags,USE_AUDIO),true);
-    Add(new cMyMenuEditBitItem(tr("vps"),&flags,OPT_VPS),true);
 
     struct passwd *pw=getpwuid(getuid());
     if (pw)
@@ -1263,7 +1089,6 @@ eOSState cMenuSetupXmltv2vdrChannelMap::ProcessKey(eKeys Key)
                     const char *oldchannel=channel;
                     cEPGMapping *tmap=map;
                     flags=0;
-                    days=1;
                     for (int i=0; i<baseplugin->EPGMappingCount();i++)
                     {
                         channel=baseplugin->EPGMapping(i)->ChannelName();
@@ -1315,7 +1140,6 @@ void cMenuSetupXmltv2vdrChannelMap::epgmappingreplace(cEPGMapping *newmapping)
     else
     {
         map->ChangeFlags(newmapping->Flags());
-        map->ChangeDays(newmapping->Days());
         map->ReplaceChannels(newmapping->NumChannelIDs(),newmapping->ChannelIDs());
     }
 }
@@ -1327,11 +1151,12 @@ void cMenuSetupXmltv2vdrChannelMap::Store(void)
     if (asprintf(&name,"channel.%s",channel)==-1) return;
 
     char *value=NULL;
-    if (asprintf(&value,"%i;%i;",days,flags)==-1)
+    if (asprintf(&value,"0;%i;",flags)==-1)
     {
         free(name);
         return;
     }
+
     for (int i=0; i<map->NumChannelIDs(); i++)
     {
         cString ChannelID = map->ChannelIDs()[i].ToString();
@@ -1341,37 +1166,10 @@ void cMenuSetupXmltv2vdrChannelMap::Store(void)
 
     SetupStore(name,value);
     map->ChangeFlags(flags);
-    map->ChangeDays(days);
     epgmappingreplace(map);
 
     free(name);
     free(value);
-
-    if (!baseplugin) return;
-    for (int i=0; i<baseplugin->EPGSourceCount(); i++)
-    {
-        cEPGSource *epgsrc=baseplugin->EPGSource(i);
-        if (epgsrc)
-        {
-            cEPGChannels *channellist=epgsrc->ChannelList();
-            if (channellist)
-            {
-                for (int x=0; x<channellist->Count(); x++)
-                {
-                    if (!strcmp(channellist->Get(x)->Name(),channel))
-                    {
-                        if (epgsrc->DaysInAdvance()<days)
-                        {
-                            epgsrc->ChangeDaysInAdvance(days);
-                            epgsrc->Store();
-                        }
-                        break;
-                    }
-                }
-            }
-        }
-    }
-
 }
 
 // --------------------------------------------------------------------------------------------------------

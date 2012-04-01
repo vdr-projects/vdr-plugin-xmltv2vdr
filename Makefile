@@ -46,8 +46,8 @@ PACKAGE = vdr-$(ARCHIVE)
 
 ### Includes and Defines (add further entries here):
 
-PKG-LIBS += libxml-2.0
-PKG-INCLUDES += libxml-2.0
+PKG-LIBS += libxml-2.0 libpcrecpp sqlite3
+PKG-INCLUDES += libxml-2.0 libpcrecpp sqlite3
 
 INCLUDES += -I$(VDRDIR)/include
 
@@ -58,7 +58,7 @@ LIBS    += $(shell $(PKG-CONFIG) --libs $(PKG-LIBS))
 
 ### The object files (add further files here):
 
-OBJS = $(PLUGIN).o extpipe.o parse.o setup.o maps.o
+OBJS = $(PLUGIN).o extpipe.o parse.o source.o import.o event.o setup.o maps.o
 
 ### The main target:
 
@@ -117,6 +117,8 @@ dist: clean
 	@cp -a *.cpp *.h HISTORY COPYING Makefile README po $(TMPDIR)/$(ARCHIVE)
 	@mkdir -p $(TMPDIR)/$(ARCHIVE)/dist/epgdata2xmltv
 	@cp -a dist/epgdata2xmltv/*.cpp dist/epgdata2xmltv/*.h dist/epgdata2xmltv/Makefile dist/epgdata2xmltv/INSTALL dist/epgdata2xmltv/COPYING dist/epgdata2xmltv/epgdata2xmltv.dist dist/epgdata2xmltv/epgdata2xmltv.xsl $(TMPDIR)/$(ARCHIVE)/dist/epgdata2xmltv 
+	@mkdir -p $(TMPDIR)/$(ARCHIVE)/dist/patches
+	@cp -a dist/patches/* $(TMPDIR)/$(ARCHIVE)/dist/patches
 	@tar czf $(PACKAGE).tgz -C $(TMPDIR) --exclude debian --exclude CVS --exclude .svn $(ARCHIVE)
 	@-rm -rf $(TMPDIR)/$(ARCHIVE)
 	@echo Distribution package created as $(PACKAGE).tgz

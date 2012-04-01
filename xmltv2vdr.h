@@ -8,124 +8,86 @@
 #ifndef _XMLTV2VDR_H
 #define _XMLTV2VDR_H
 
-#define EPGSOURCES "/var/lib/epgsources"
-
 #include <vdr/plugin.h>
 #include "maps.h"
 #include "parse.h"
+#include "import.h"
+#include "source.h"
 
-static const char *VERSION        = "0.0.3pre";
+#if __GNUC__ > 3
+#define UNUSED(v) UNUSED_ ## v __attribute__((unused))
+#else
+#define UNUSED(x) x
+#endif
+
+static const char *VERSION        = "0.1.0";
 static const char *DESCRIPTION    = trNOOP("Imports xmltv epg into vdr");
 
-class cEPGChannel : public cListObject
+#if VDRVERSNUM < 10726 && !EPGHANDLER
+class cEpgHandler : public cListObject
 {
-private:
-    bool inuse;
-    const char *name;
 public:
-    cEPGChannel(const char *Name, bool InUse=false);
-    ~cEPGChannel();
-    virtual int Compare(const cListObject &ListObject) const;
-    bool InUse()
+    cEpgHandler(void) {}
+    virtual ~cEpgHandler() {}
+    virtual bool IgnoreChannel(const cChannel *UNUSED(Channel))
     {
-        return inuse;
+        return false;
     }
-    void SetUsage(bool InUse)
+    virtual bool SetShortText(cEvent *UNUSED(Event), const char *UNUSED(ShortText))
     {
-        inuse=InUse;
+        return false;
     }
-    const char *Name()
+    virtual bool SetDescription(cEvent *UNUSED(Event), const char *UNUSED(Description))
     {
-        return name;
+        return false;
+    }
+    virtual bool SetContents(cEvent *UNUSED(Event), uchar *UNUSED(Contents))
+    {
+        return false;
+    }
+    virtual bool SetParentalRating(cEvent *UNUSED(Event), int UNUSED(ParentalRating))
+    {
+        return false;
     }
 };
+#endif
 
-class cEPGChannels : public cList<cEPGChannel> {};
+class cEPGSources;
 
-class cEPGExecutor;
+class cImport;
 
-class cEPGSource : public cListObject
+class cEPGHandler : public cEpgHandler
 {
 private:
-    const char *name;
-    const char *confdir;
-    const char *pin;
-    int loglen;
-    cParse *parse;
-    bool ready2parse;
-    bool usepipe;
-    bool needpin;
-    bool running;
-    int daysinadvance;
-    int daysmax;
-    time_t lastexec;
-    void add2Log(const char prefix, const char *line);
-    bool ReadConfig();
-    int ReadOutput(char *&result, size_t &l);
-    cEPGChannels channels;
-public:
-    cEPGSource(const char *Name,const char *ConfDir,cEPGMappings *Maps,cTEXTMappings *Texts);
-    ~cEPGSource();
-    int Execute(cEPGExecutor &myExecutor);
-    void Store(void);
-    void ChangeChannelSelection(int *Selection);
-    char *Log;
-    cEPGChannels *ChannelList()
-    {
-        return &channels;
-    }
-    int DaysMax()
-    {
-        return daysmax;
-    }
-    int DaysInAdvance()
-    {
-        return daysinadvance;
-    }
-    bool NeedPin()
-    {
-        return needpin;
-    }
-    const char *Name()
-    {
-        return name;
-    }
-    const char *Pin()
-    {
-        return pin;
-    }
-    void ChangeDaysInAdvance(int NewDaysInAdvance)
-    {
-        daysinadvance=NewDaysInAdvance;
-    }
-    void ChangePin(const char *NewPin)
-    {
-        if (pin) free((void *) pin);
-        pin=strdup(NewPin);
-    }
-    time_t LastExecution()
-    {
-        return lastexec;
-    }
-    void Dlog(const char *format, ...);
-    void Elog(const char *format, ...);
-    void Ilog(const char *format, ...);
-    bool Active()
-    {
-      return running;
-    }
-};
-
-class cEPGSources : public cList<cEPGSource> {};
-
-class cEPGExecutor : public cThread
-{
-private:
-    cEPGSources *sources;    
-    cTEXTMappings *textmappings;
+    const char *epgfile;
+    cEPGMappings *maps;
+    cEPGSources *sources;
+    cImport *import;
     bool epall;
 public:
-    cEPGExecutor(cEPGSources *Sources);
+    cEPGHandler(const char *EpgFile, cEPGSources *Sources, cEPGMappings *Maps, cTEXTMappings *Texts);
+    void SetEPAll(bool Value)
+    {
+        epall=Value;
+    }
+    virtual ~cEPGHandler();
+    virtual bool IgnoreChannel(const cChannel *Channel);
+    virtual bool SetShortText(cEvent *Event, const char *ShortText);
+    virtual bool SetDescription(cEvent *Event, const char *Description);
+    virtual bool SetContents(cEvent *Event, uchar *Contents);
+    virtual bool SetParentalRating(cEvent *Event, int ParentalRating);
+};
+
+class cEPGTimer : public cThread
+{
+  private:
+    const char *epgfile;
+    cEPGSources *sources;
+    cEPGMappings *maps;
+    cImport *import;
+  public:
+    cEPGTimer(const char *EpgFile, cEPGSources *Sources, cEPGMappings *Maps,
+                         cTEXTMappings *Texts);
     bool StillRunning()
     {
         return Running();
@@ -134,45 +96,53 @@ public:
     {
         Cancel(3);
     }
-    void SetOptions(bool EPAll, cTEXTMappings *TextMappings) {      
-      epall=EPAll;
-      textmappings=TextMappings;
-    }
-    virtual void Action();
+    virtual void Action();  
 };
 
 class cPluginXmltv2vdr : public cPlugin
 {
 private:
+    cEPGHandler *epghandler;
+    cEPGTimer *epgtimer;
     cEPGExecutor epgexecutor;
     cEPGMappings epgmappings;
     cEPGSources epgsources;
     cTEXTMappings textmappings;
-    void removeepgsources();
-    void removeepgmappings();
-    void removetextmappings();
-    bool epgsourceexists(const char *name);
-    int exectime;
-    time_t exectime_t,last_exectime_t;
+    time_t last_housetime_t;
+    time_t last_maintime_t;
+    time_t last_epcheck_t;
     char *confdir;
+    char *epgfile;
+    char *srcorder;
     bool epall;
+    bool wakeup;
 public:
-    int ExecTime()
+    void SetEPAll(bool Value)
     {
-        return exectime;
+        epall=Value;
+        if (epghandler) epghandler->SetEPAll(Value);
     }
-    void SetExecTime(int ExecTime);
-    bool UpStart;
-    bool WakeUp;
-    void SetEPAll(bool Value) {
-      epall=Value;
-      epgexecutor.SetOptions(epall,&textmappings);
+    bool EPAll()
+    {
+        return epall;
     }
-    bool EPAll() { return epall; }
-    void ReadInEPGSources(bool Reload=false);
+    void SetWakeUp(bool Value)
+    {
+        wakeup=Value;
+    }
+    bool WakeUp()
+    {
+        return wakeup;
+    }
+    void ReadInEPGSources(bool Reload=false)
+    {
+        epgsources.ReadIn(confdir,epgfile,&epgmappings,&textmappings,srcorder,Reload);
+    }
+    bool EPGSourceMove(int From, int To);
     int EPGSourceCount()
     {
-        return epgsources.Count();
+      if (!epgsources.Count()) return 0;
+        return epgsources.Count()-1;
     }
     cEPGSource *EPGSource(int Index)
     {
@@ -186,12 +156,18 @@ public:
     {
         return epgmappings.Get(Index);
     }
-    cEPGMapping *EPGMapping(const char *ChannelName);
+    cEPGMapping *EPGMapping(const char *ChannelName)
+    {
+        return epgmappings.GetMap(ChannelName);
+    }
     void EPGMappingAdd(cEPGMapping *Map)
     {
         epgmappings.Add(Map);
     }
-    cTEXTMapping *TEXTMapping(const char *Name);
+    cTEXTMapping *TEXTMapping(const char *Name)
+    {
+        return textmappings.GetMap(Name);
+    }
     void TEXTMappingAdd(cTEXTMapping *TextMap)
     {
         textmappings.Add(TextMap);

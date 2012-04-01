@@ -1,0 +1,221 @@
+/*
+ * event.h: A plugin for the Video Disk Recorder
+ *
+ * See the README file for copyright information and how to reach the author.
+ *
+ */
+
+#ifndef _EVENT_H
+#define _EVENT_H
+
+#include <time.h>
+#include <vdr/epg.h>
+
+class cXMLTVStringList : public cVector<char *>
+{
+private:
+    char *buf;
+public:
+    cXMLTVStringList(int Allocated = 10): cVector<char *>(Allocated)
+    {
+        buf=NULL;
+    }
+    virtual ~cXMLTVStringList();
+    void Sort(void)
+    {
+        cVector<char *>::Sort(CompareStrings);
+    }
+    const char *toString();
+    virtual void Clear(void);
+};
+
+class cXMLTVEvent
+{
+private:
+    char *title;
+    char *shorttext;
+    char *description;
+    char *eitdescription;
+    char *country;
+    char *origtitle;
+    char *audio;
+    char *sql;
+    char *channelid;
+    char *source;
+    bool mixing;
+    int year;
+    time_t starttime;
+    int duration;
+    int season;
+    int episode;
+    tEventID eventid;
+    tEventID eiteventid;
+    cXMLTVStringList video;
+    cXMLTVStringList credits;
+    cXMLTVStringList category;
+    cXMLTVStringList review;
+    cXMLTVStringList rating;
+    cXMLTVStringList starrating;
+#if VDRVERSNUM >= 10711
+    uchar parentalRating;
+    uchar contents[MaxEventContents];
+#endif
+public:
+    cXMLTVEvent();
+    ~cXMLTVEvent();
+    void Clear();
+    void SetSource(const char *Source);
+    void SetChannelID(const char *ChannelID);
+    void SetTitle(const char *Title);
+    void SetOrigTitle(const char *OrigTitle);
+    void SetShortText(const char *ShortText);
+    void SetDescription(const char *Description);
+    void SetEITDescription(const char *EITDescription);
+    void SetCountry(const char *Country);
+    void SetAudio(const char *Audio);
+    void AddVideo(const char *VType, const char *VContent);
+    void AddCredits(const char *CreditType, const char *Credit, const char *Addendum=NULL);
+    void AddCategory(const char *Category);
+    void AddReview(const char *Review);
+    void AddRating(const char *System, const char *Rating);
+    void AddStarRating(const char *System, const char *Rating);
+    void SetCredits(const char *Credits);
+    void SetCategory(const char *Category);
+    void SetReview(const char *Review);
+    void SetRating(const char *Rating);
+    void SetStarRating(const char *StarRating);
+    void SetVideo(const char *Video);
+    const char *GetSQL(const char *Source, int SrcIdx, const char *ChannelID);
+    cXMLTVStringList *Credits()
+    {
+        return &credits;
+    }
+    cXMLTVStringList *Category()
+    {
+        return &category;
+    }
+    cXMLTVStringList *Review()
+    {
+        return &review;
+    }
+    cXMLTVStringList *Rating()
+    {
+        return &rating;
+    }
+    cXMLTVStringList *StarRating()
+    {
+        return &starrating;
+    }
+    cXMLTVStringList *Video()
+    {
+        return &video;
+    }
+    void SetSeason(int Season)
+    {
+        season=Season;
+    }
+    void SetEpisode(int Episode)
+    {
+        episode=Episode;
+    }
+    void SetYear(int Year)
+    {
+        year=Year;
+    }
+    void SetStartTime(time_t StartTime)
+    {
+        starttime=StartTime;
+    }
+    void SetDuration(int Duration)
+    {
+        duration=Duration;
+    }
+    void SetEventID(tEventID EventID)
+    {
+        eventid=EventID;
+    }
+    void SetEITEventID(tEventID EventID)
+    {
+        eiteventid=EventID;
+    }
+    void SetMixing(void)
+    {
+        mixing=true;
+    }
+    int Duration() const
+    {
+        return duration;
+    }
+    time_t StartTime() const
+    {
+        return starttime;
+    }
+    bool HasTitle(void)
+    {
+        return (title!=NULL);
+    }
+    const char *ChannelID(void) const
+    {
+        return channelid;
+    }
+    const char *Source(void) const
+    {
+        return source;
+    }
+    const char *Title(void) const
+    {
+        return title;
+    }
+    const char *ShortText(void) const
+    {
+        return shorttext;
+    }
+    const char *Description(void) const
+    {
+        return description;
+    }
+    const char *EITDescription(void) const
+    {
+        return eitdescription;
+    }
+    const char *Country(void) const
+    {
+        return country;
+    }
+    int Year() const
+    {
+        return year;
+    }
+    const char *OrigTitle(void) const
+    {
+        return origtitle;
+    }
+    const char *Audio(void) const
+    {
+        return audio;
+    }
+    tEventID EventID(void) const
+    {
+        return eventid;
+    }
+    tEventID EITEventID(void) const
+    {
+        return eiteventid;
+    }
+    int Season(void)
+    {
+        return season;
+    }
+    int Episode(void)
+    {
+        return episode;
+    }
+    bool Mixing(void)
+    {
+        return mixing;
+    }
+};
+
+
+
+#endif

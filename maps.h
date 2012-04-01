@@ -9,10 +9,11 @@
 #define _MAPS_H
 
 #include <vdr/channels.h>
+#include <vdr/tools.h>
 
 // Usage field definition
 
-// Bit  0- 5  DAYS in advance +1 -> Range 1-32
+// Bit  0- 5  UNUSED
 // Bit  6-23  USE_ flags
 // Bit 24-30  OPT_ flags
 // Bit 31     always zero
@@ -29,8 +30,8 @@
 #define USE_REVIEW             0x80
 #define USE_VIDEO              0x100
 #define USE_AUDIO              0x200
-
 #define USE_SEASON             0x400
+#define USE_STARRATING         0x800
 
 #define CREDITS_ACTORS         0x100000
 #define CREDITS_DIRECTORS      0x200000
@@ -38,7 +39,6 @@
 #define CREDITS_LIST           0x800000
 
 #define OPT_MERGELTEXT         0x10000000
-#define OPT_VPS                0x20000000
 #define OPT_APPEND             0x40000000
 
 class cTEXTMapping : public cListObject
@@ -60,7 +60,12 @@ public:
     }
 };
 
-class cTEXTMappings : public cList<cTEXTMapping> {};
+class cTEXTMappings : public cList<cTEXTMapping>
+{
+public:
+  cTEXTMapping *GetMap(const char *Name);
+    void Remove();
+};
 
 class cEPGMapping : public cListObject
 {
@@ -70,7 +75,6 @@ private:
     tChannelID *channelids;
     int numchannelids;
     int flags;
-    int days;
     void addchannels(const char *channels);
 public:
     cEPGMapping(const char *ChannelName, const char *Flags_and_Mappings);
@@ -80,10 +84,6 @@ public:
     {
         flags=NewFlags;
     }
-    void ChangeDays(int NewDays)
-    {
-        days=NewDays;
-    }
     void ReplaceChannels(int NumChannelIDs, tChannelID *ChannelIDs);
     void AddChannel(int ChannelNumber);
     void RemoveChannel(int ChannelNumber, bool MarkOnly=false);
@@ -92,10 +92,6 @@ public:
     int Flags()
     {
         return flags;
-    }
-    int Days()
-    {
-        return days;
     }
     const char *ChannelName()
     {
@@ -111,6 +107,14 @@ public:
     }
 };
 
-class cEPGMappings : public cList<cEPGMapping> {};
+class cEPGMappings : public cList<cEPGMapping>
+{
+public:
+    cEPGMapping *GetMap(const char *ChannelName);
+    cEPGMapping *GetMap(tChannelID ChannelID);
+    bool ProcessChannel(tChannelID ChannelID);
+    bool IgnoreChannel(const cChannel *Channel);
+    void Remove();
+};
 
 #endif

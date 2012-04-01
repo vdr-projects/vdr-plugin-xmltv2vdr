@@ -15,194 +15,13 @@
 #include <langinfo.h>
 #include <time.h>
 #include <pwd.h>
+#include <iconv.h>
 #include <vdr/timers.h>
+#include <vdr/tools.h>
+#include <sqlite3.h>
 
 #include "xmltv2vdr.h"
 #include "parse.h"
-
-extern char *strcatrealloc(char *dest, const char *src);
-#define TEXTMapping(a) TEXTMapping_(a,texts)
-
-void cXMLTVEvent::SetTitle(const char *Title)
-{
-    title = strcpyrealloc(title, Title);
-    if (title)
-    {
-        title = compactspace(title);
-    }
-}
-
-void cXMLTVEvent::SetOrigTitle(const char *OrigTitle)
-{
-    origtitle = strcpyrealloc(origtitle, OrigTitle);
-}
-
-void cXMLTVEvent::SetShortText(const char *ShortText)
-{
-    shorttext=strcpyrealloc(shorttext,ShortText);
-    if (shorttext) shorttext=compactspace(shorttext);
-}
-
-void cXMLTVEvent::SetDescription(const char *Description)
-{
-    description = strcpyrealloc(description, Description);
-    if (description)
-    {
-        description = compactspace(description);
-        if (description[strlen(description)-1]!='\n')
-            description=strcatrealloc(description,"\n");
-    }
-}
-
-bool cXMLTVEvent::RemoveLastCharFromDescription()
-{
-    if (!description) return false;
-    int len=strlen(description);
-    if (!len) return true;
-    description[len-1]=0;
-    return true;
-}
-
-bool cXMLTVEvent::Add2Description(const char *Value)
-{
-    description = strcatrealloc(description,Value);
-    return (description!=NULL);
-}
-
-
-bool cXMLTVEvent::Add2Description(const char *Name, const char *Value)
-{
-    description = strcatrealloc(description,Name);
-    description = strcatrealloc(description,": ");
-    description = strcatrealloc(description,Value);
-    description = strcatrealloc(description,"\n");
-    return (description!=NULL);
-}
-
-bool cXMLTVEvent::Add2Description(const char *Name, int Value)
-{
-    char *value=NULL;
-    if (asprintf(&value,"%i",Value)==-1) return false;
-    description = strcatrealloc(description,Name);
-    description = strcatrealloc(description,": ");
-    description = strcatrealloc(description,value);
-    description = strcatrealloc(description,"\n");
-    free(value);
-    return (description!=NULL);
-}
-
-void cXMLTVEvent::SetCountry(const char *Country)
-{
-    country=strcpyrealloc(country, Country);
-    if (country) country=compactspace(country);
-}
-
-void cXMLTVEvent::SetReview(const char *Review)
-{
-    review=strcpyrealloc(review, Review);
-    if (review) review=compactspace(review);
-}
-
-void cXMLTVEvent::SetRating(const char *System, const char *Rating)
-{
-    system=strcpyrealloc(system, System);
-    if (system) system=compactspace(system);
-
-    rating=strcpyrealloc(rating, Rating);
-    if (rating) rating=compactspace(rating);
-}
-
-void cXMLTVEvent::AddCategory(const char *Category)
-{
-    categories.Append(compactspace(strdup(Category)));
-    categories.Sort();
-}
-
-void cXMLTVEvent::AddCredits(const char *CreditType, const char *Credit, const char *Addendum)
-{
-    char *value=NULL;
-    if (Addendum)
-    {
-        if (asprintf(&value,"%s|%s (%s)",CreditType,Credit,Addendum)==-1) return;
-    }
-    else
-    {
-        if (asprintf(&value,"%s|%s",CreditType,Credit)==-1) return;
-    }
-    credits.Append(value);
-    credits.Sort();
-}
-
-void cXMLTVEvent::Clear()
-{
-    if (title)
-    {
-        free(title);
-        title=NULL;
-    }
-    if (shorttext)
-    {
-        free(shorttext);
-        shorttext=NULL;
-    }
-    if (description)
-    {
-        free(description);
-        description=NULL;
-    }
-    if (country)
-    {
-        free(country);
-        country=NULL;
-    }
-    if (system)
-    {
-        free(system);
-        system=NULL;
-    }
-    if (review)
-    {
-        free(review);
-        review=NULL;
-    }
-    if (rating)
-    {
-        free(rating);
-        rating=NULL;
-    }
-    if (origtitle)
-    {
-        free(origtitle);
-        origtitle=NULL;
-    }
-    year=0;
-    starttime = 0;
-    duration = 0;
-    vps= (time_t) 0;
-    eventid=0;
-    credits.Clear();
-    categories.Clear();
-    season=0;
-    episode=0;
-}
-
-cXMLTVEvent::cXMLTVEvent()
-{
-    title=NULL;
-    shorttext=NULL;
-    description=NULL;
-    country=NULL;
-    system=NULL;
-    review=NULL;
-    rating=NULL;
-    origtitle=NULL;
-    Clear();
-}
-
-cXMLTVEvent::~cXMLTVEvent()
-{
-    Clear();
-}
 
 // -------------------------------------------------------
 
@@ -277,283 +96,57 @@ time_t cParse::ConvertXMLTVTime2UnixTime(char *xmltvtime)
     return ret;
 }
 
-struct cParse::split cParse::split(char *in, char delim)
+void cParse::RemoveNonAlphaNumeric(char *String)
 {
-    struct split sp;
-    sp.count=1;
-    sp.pointers[0]=in;
-    while (*++in)
+    if (!String) return;
+    int len=strlen(String);
+    char *p=String;
+    int pos=0;
+
+    while (*p)
     {
-        if (*in==delim)
+        // 0x30 - 0x39
+        // 0x41 - 0x5A
+        // 0x61 - 0x7A
+        if ((*p<0x30) || (*p>0x7a) || (*p>0x39 && *p<0x41) || (*p>0x5A && *p< 0x61))
         {
-            *in=0;
-            sp.pointers[sp.count++]=in+1;
+            memmove(p,p+1,len-pos);
+            len--;
+            continue;
+        }
+        p++;
+        pos++;
+    }
+
+    // remove leading numbers
+    len=strlen(String);
+    p=String;
+    while (*p)
+    {
+        // 0x30 - 0x39
+        if ((*p>=0x30) && (*p<=0x39))
+        {
+            memmove(p,p+1,len);
+            len--;
+            continue;
+        }
+        else
+        {
+            break;
         }
     }
-    return sp;
+    return;
 }
 
-char *cParse::RemoveNonASCII(const char *src)
+bool cParse::FetchSeasonEpisode(iconv_t Conv, const char *EPDir, const char *Title,
+                                const char *ShortText, int &Season, int &Episode)
 {
-    if (!src) return NULL;
-    int len=strlen(src);
-    if (!len) return NULL;
-    char *dst=(char *) malloc(len+1);
-    if (!dst) return NULL;
-    char *tmp=dst;
-    bool lspc=false;
-    while (*src)
-    {
-        // 0x20,0x30-0x39,0x41-0x5A,0x61-0x7A
-        if ((*src==0x20) && (!lspc))
-        {
-            *tmp++=0x20;
-            lspc=true;
-        }
-        if (*src==':')
-        {
-            *tmp++=0x20;
-            lspc=true;
-        }
-        if ((*src>=0x30) && (*src<=0x39))
-        {
-            *tmp++=*src;
-            lspc=false;
-        }
-        if ((*src>=0x41) && (*src<=0x5A))
-        {
-            *tmp++=tolower(*src);
-            lspc=false;
-        }
-        if ((*src>=0x61) && (*src<=0x7A))
-        {
-            *tmp++=*src;
-            lspc=false;
-        }
-        src++;
-    }
-    *tmp=0;
-    return dst;
-}
+    if (!EPDir) return false;
+    if (!ShortText) return false;
+    if (!Title) return false;
+    if (Conv==(iconv_t) -1) return false;
 
-cEvent *cParse::SearchEvent(cSchedule* schedule, cXMLTVEvent *xevent)
-{
-    if (!xevent) return NULL;
-    if (!xevent->StartTime()) return NULL;
-    if (!xevent->Title()) return NULL;
-    cEvent *f=NULL;
-
-    time_t start=xevent->StartTime();
-    if (!xevent->EventID())
-    {
-        xevent->SetEventID(DoSum((u_long) start,xevent->Title(),strlen(xevent->Title())));
-    }
-
-    // try to find an event,
-    // 1st with our own EventID
-    if (xevent->EventID()) f=(cEvent *) schedule->GetEvent((tEventID) xevent->EventID());
-    if (f) return f;
-    // 2nd with StartTime
-    f=(cEvent *) schedule->GetEvent((tEventID) 0,start);
-    if (f)
-    {
-        if (!strcmp(f->Title(),xevent->Title()))
-        {
-            return f;
-        }
-    }
-    // 3rd with StartTime +/- WaitTime
-    int maxdiff=INT_MAX;
-    int eventTimeDiff=0;
-    if (xevent->Duration()) eventTimeDiff=xevent->Duration()/4;
-    if (eventTimeDiff<780) eventTimeDiff=780;
-
-    for (cEvent *p = schedule->Events()->First(); p; p = schedule->Events()->Next(p))
-    {
-        int diff=abs((int) difftime(p->StartTime(),start));
-        if (diff<=eventTimeDiff)
-        {
-            // found event with exact the same title
-            if (!strcmp(p->Title(),xevent->Title()))
-            {
-                if (diff<=maxdiff)
-                {
-                    f=p;
-                    maxdiff=diff;
-                }
-            }
-            else
-            {
-                if (f) continue; // we already have an event!
-                // cut both titles into pieces and check
-                // if we have at least one match with
-                // minimum length of 4 characters
-
-                // first remove all non ascii characters
-                // we just want the following codes
-                // 0x20,0x30-0x39,0x41-0x5A,0x61-0x7A
-                int wfound=0;
-                char *s1=RemoveNonASCII(p->Title());
-                char *s2=RemoveNonASCII(xevent->Title());
-                if (s1 && s2)
-                {
-                    if (!strcmp(s1,s2))
-                    {
-                        wfound++;
-                    }
-                    else
-                    {
-                        struct split w1 = split(s1,' ');
-                        struct split w2 = split(s2,' ');
-                        if ((w1.count) && (w2.count))
-                        {
-                            for (int i1=0; i1<w1.count; i1++)
-                            {
-                                for (int i2=0; i2<w2.count; i2++)
-                                {
-                                    if (!strcmp(w1.pointers[i1],w2.pointers[i2]))
-                                    {
-                                        if (strlen(w1.pointers[i1])>3) wfound++;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                if (s1) free(s1);
-                if (s2) free(s2);
-
-                if (wfound)
-                {
-                    if (diff<=maxdiff)
-                    {
-                        if (p->TableID()!=0)
-                            source->Dlog("found '%s' for '%s'",p->Title(),xevent->Title());
-                        f=p;
-                        maxdiff=diff;
-                    }
-                }
-            }
-        }
-    }
-    return f;
-}
-
-cEvent *cParse::GetEventBefore(cSchedule* schedule, time_t start)
-{
-    if (!schedule) return NULL;
-    if (!schedule->Events()) return NULL;
-    if (!schedule->Events()->Count()) return NULL;
-    cEvent *last=schedule->Events()->Last();
-    if ((last) && (last->StartTime()<start)) return last;
-    for (cEvent *p=schedule->Events()->First(); p; p=schedule->Events()->Next(p))
-    {
-        if (p->StartTime()>start)
-        {
-            return (cEvent *) p->Prev();
-        }
-    }
-    if (last) return last;
-    return NULL;
-}
-
-bool cParse::AddSeasonEpisode2TimerChannels(const char *epdir, cTEXTMappings *texts)
-{
-    if (!epdir) return false;
-    if (!texts) return false;
-
-    const cSchedules *schedules=NULL;
-    cSchedulesLock schedulesLock(true,60000); // wait up to 60 secs for lock!
-    schedules = cSchedules::Schedules(schedulesLock);
-    if (!schedules)
-    {
-        esyslog("cannot get schedules now, trying later");
-        return false;
-    }
-
-    time_t start=time(NULL);
-    time_t stop=start+86400;
-
-    for (cTimer *Timer = Timers.First(); Timer; Timer=Timers.Next(Timer))
-    {
-        if (!Timer->Channel()) continue;
-
-        cSchedule* schedule = (cSchedule *) schedules->GetSchedule(Timer->Channel());
-        if (!schedule) continue;
-
-        for (cEvent *p = schedule->Events()->First(); p; p = schedule->Events()->Next(p))
-        {
-            if (p->StartTime()>=start && p->StartTime()<=stop && p->TableID() && p->ShortText())
-            {
-                int season,episode;
-                if (FetchSeasonEpisode(epdir,p->Title(), p->ShortText(), season, episode))
-                {
-                    if ((season) || (episode))
-                    {
-                        char *description=NULL;
-                        if (p->Description()) description=strdup(p->Description());
-                        description = strcatrealloc(description,"\n");
-                        if (season)
-                        {
-                            cTEXTMapping *text=TEXTMapping("season");
-                            if (text)
-                            {
-                                char *value=NULL;
-                                if (asprintf(&value,"%i",season)!=-1)
-                                {
-                                    description = strcatrealloc(description,text->Value());
-                                    description = strcatrealloc(description,": ");
-                                    description = strcatrealloc(description,value);
-                                    description = strcatrealloc(description,"\n");
-                                    free(value);
-                                }
-                            }
-                        }
-                        if (episode)
-                        {
-                            cTEXTMapping *text=TEXTMapping("episode");
-                            if (text)
-                            {
-                                char *value=NULL;
-                                if (asprintf(&value,"%i",episode)!=-1)
-                                {
-                                    description = strcatrealloc(description,text->Value());
-                                    description = strcatrealloc(description,": ");
-                                    description = strcatrealloc(description,value);
-                                    description = strcatrealloc(description,"\n");
-                                    free(value);
-                                }
-                            }
-                        }
-                        p->SetDescription(description);
-                        p->SetTableID(0);
-                        free(description);
-                    }
-                }
-            }
-        }
-    }
-    return true;
-}
-
-bool cParse::FetchSeasonEpisode(const char *epdir, const char *title, const char *shorttext, int &season, int &episode)
-{
-    if (!epdir) return false;
-    if (!shorttext) return false;
-    if (!title) return false;
-
-    /*
-        char *epfile=NULL;
-        if (asprintf(&epfile,"%s/%s.episodes",epdir,title)==-1) return false;
-
-        struct stat statbuf;
-        if (stat(epfile,&statbuf)==-1)
-        {
-            free(epfile);
-            return false;
-        }
-    */
-    DIR *dir=opendir(epdir);
+    DIR *dir=opendir(EPDir);
     if (!dir) return false;
     struct dirent dirent_buf,*dirent;
     bool found=false;
@@ -564,7 +157,7 @@ bool cParse::FetchSeasonEpisode(const char *epdir, const char *title, const char
         if (dirent->d_name[0]=='.') continue;
         char *pt=strrchr(dirent->d_name,'.');
         if (pt) *pt=0;
-        if (!strncasecmp(dirent->d_name,title,strlen(dirent->d_name)))
+        if (!strncasecmp(dirent->d_name,Title,strlen(dirent->d_name)))
         {
             found=true;
             break;
@@ -574,7 +167,7 @@ bool cParse::FetchSeasonEpisode(const char *epdir, const char *title, const char
     if (!found) return false;
 
     char *epfile=NULL;
-    if (asprintf(&epfile,"%s/%s.episodes",epdir,dirent->d_name)==-1) return false;
+    if (asprintf(&epfile,"%s/%s.episodes",EPDir,dirent->d_name)==-1) return false;
 
     FILE *f=fopen(epfile,"r");
     if (!f)
@@ -583,6 +176,29 @@ bool cParse::FetchSeasonEpisode(const char *epdir, const char *title, const char
         return false;
     }
 
+    size_t slen=strlen(ShortText);
+    size_t dlen=4*slen;
+    char *dshorttext=(char *) calloc(dlen,1);
+    if (!dshorttext)
+    {
+        fclose(f);
+        free(epfile);
+        return false;
+    }
+    char *FromPtr=(char *) ShortText;
+    char *ToPtr=(char *) dshorttext;
+
+    if (iconv(Conv,&FromPtr,&slen,&ToPtr,&dlen)==(size_t) -1)
+    {
+        free(dshorttext);
+        fclose(f);
+        free(epfile);
+        return false;
+    }
+
+    RemoveNonAlphaNumeric(dshorttext);
+
+
     char *line=NULL;
     size_t length;
     found=false;
@@ -590,358 +206,37 @@ bool cParse::FetchSeasonEpisode(const char *epdir, const char *title, const char
     {
         if (line[0]=='#') continue;
         char epshorttext[256]="";
-        if (sscanf(line,"%d\t%d\t%*d\t%255c",&season,&episode,epshorttext)==3)
+        char depshorttext[1024]="";
+        if (sscanf(line,"%d\t%d\t%*d\t%255c",&Season,&Episode,epshorttext)==3)
         {
             char *lf=strchr(epshorttext,'\n');
             if (lf) *lf=0;
-            if (!strncasecmp(shorttext,epshorttext,strlen(epshorttext)))
+            slen=strlen(epshorttext);
+            dlen=sizeof(depshorttext);
+            FromPtr=(char *) epshorttext;
+            ToPtr=(char *) depshorttext;
+            if (iconv(Conv,&FromPtr,&slen,&ToPtr,&dlen)!=(size_t) -1)
             {
-                found=true;
-                break;
+                RemoveNonAlphaNumeric(depshorttext);
+                if (!strncasecmp(dshorttext,depshorttext,strlen(depshorttext)))
+                {
+                    found=true;
+                    break;
+                }
             }
         }
+    }
+
+    if (!found)
+    {
+        isyslog("xmltv2vdr: failed to find '%s' for '%s' in eplists",ShortText,Title);
     }
     if (line) free(line);
     fclose(f);
 
+    free(dshorttext);
     free(epfile);
     return found;
-}
-
-bool cParse::PutEvent(cSchedule* schedule, cEvent *event, cXMLTVEvent *xevent, cEPGMapping *map)
-{
-    if (!schedule) return false;
-    if (!xevent) return false;
-    if (!map) return false;
-
-    struct tm tm;
-    char from[80];
-    char till[80];
-    time_t start,end;
-    if (!event)
-    {
-        if ((map->Flags() & OPT_APPEND)==OPT_APPEND)
-        {
-            start=xevent->StartTime();
-            end=start+xevent->Duration();
-
-            /* checking the "space" for our new event */
-            cEvent *prev=GetEventBefore(schedule,start);
-            if (prev)
-            {
-                if (cEvent *next=(cEvent *) prev->Next())
-                {
-                    if (prev->EndTime()==next->StartTime())
-                    {
-                        localtime_r(&start,&tm);
-                        strftime(from,sizeof(from)-1,"%b %d %H:%M",&tm);
-                        localtime_r(&end,&tm);
-                        strftime(till,sizeof(till)-1,"%b %d %H:%M",&tm);
-                        source->Elog("cannot add '%s'@%s-%s",xevent->Title(),from,till);
-
-                        time_t pstart=prev->StartTime();
-                        time_t pstop=prev->EndTime();
-                        localtime_r(&pstart,&tm);
-                        strftime(from,sizeof(from)-1,"%b %d %H:%M",&tm);
-                        localtime_r(&pstop,&tm);
-                        strftime(till,sizeof(till)-1,"%b %d %H:%M",&tm);
-                        source->Elog("found '%s'@%s-%s",prev->Title(),from,till);
-
-                        time_t nstart=next->StartTime();
-                        time_t nstop=next->EndTime();
-                        localtime_r(&nstart,&tm);
-                        strftime(from,sizeof(from)-1,"%b %d %H:%M",&tm);
-                        localtime_r(&nstop,&tm);
-                        strftime(till,sizeof(till)-1,"%b %d %H:%M",&tm);
-                        source->Elog("found '%s'@%s-%s",next->Title(),from,till);
-                        return false;
-                    }
-
-                    if (end>next->StartTime())
-                    {
-                        int diff=(int) difftime(prev->EndTime(),start);
-                        if (diff>300)
-                        {
-
-                            localtime_r(&start,&tm);
-                            strftime(from,sizeof(from)-1,"%b %d %H:%M",&tm);
-                            localtime_r(&end,&tm);
-                            strftime(till,sizeof(till)-1,"%b %d %H:%M",&tm);
-                            source->Elog("cannot add '%s'@%s-%s",xevent->Title(),from,till);
-
-                            time_t nstart=next->StartTime();
-                            time_t nstop=next->EndTime();
-                            localtime_r(&nstart,&tm);
-                            strftime(from,sizeof(from)-1,"%b %d %H:%M",&tm);
-                            localtime_r(&nstop,&tm);
-                            strftime(till,sizeof(till)-1,"%b %d %H:%M",&tm);
-                            source->Elog("found '%s'@%s-%s",next->Title(),from,till);
-                            return false;
-                        }
-                        else
-                        {
-                            xevent->SetDuration(xevent->Duration()-diff);
-                        }
-                    }
-                }
-
-                if (prev->EndTime()>start)
-                {
-                    int diff=(int) difftime(prev->EndTime(),start);
-                    if (diff>300)
-                    {
-                        localtime_r(&start,&tm);
-                        strftime(from,sizeof(from)-1,"%b %d %H:%M",&tm);
-                        localtime_r(&end,&tm);
-                        strftime(till,sizeof(till)-1,"%b %d %H:%M",&tm);
-                        source->Elog("cannot add '%s'@%s-%s",xevent->Title(),from,till);
-
-                        time_t pstart=prev->StartTime();
-                        time_t pstop=prev->EndTime();
-                        localtime_r(&pstart,&tm);
-                        strftime(from,sizeof(from)-1,"%b %d %H:%M",&tm);
-                        localtime_r(&pstop,&tm);
-                        strftime(till,sizeof(till)-1,"%b %d %H:%M",&tm);
-                        source->Elog("found '%s'@%s-%s",prev->Title(),from,till);
-                        return false;
-                    }
-                    else
-                    {
-                        prev->SetDuration(prev->Duration()-diff);
-                    }
-                }
-
-                if (!xevent->Duration())
-                {
-                    if (!prev->Duration())
-                    {
-                        prev->SetDuration(start-prev->StartTime());
-                    }
-                }
-            }
-            /* add event */
-            event=new cEvent(xevent->EventID());
-            if (!event) return false;
-            event->SetStartTime(start);
-            event->SetDuration(xevent->Duration());
-            event->SetTitle(xevent->Title());
-            event->SetShortText(xevent->ShortText());
-            event->SetDescription(xevent->Description());
-            event->SetVersion(0);
-            schedule->AddEvent(event);
-            schedule->Sort();
-            localtime_r(&start,&tm);
-            strftime(from,sizeof(from)-1,"%b %d %H:%M",&tm);
-            localtime_r(&end,&tm);
-            strftime(till,sizeof(till)-1,"%b %d %H:%M",&tm);
-            source->Dlog("adding '%s'@%s-%s",xevent->Title(),from,till);
-        }
-        else
-        {
-            return true;
-        }
-    }
-
-    if ((map->Flags() & USE_SHORTTEXT)==USE_SHORTTEXT)
-    {
-        if (xevent->ShortText() && (strlen(xevent->ShortText())>0))
-        {
-            if (!strcmp(xevent->ShortText(),event->Title()))
-            {
-                source->Dlog("title and subtitle equal, clearing subtitle");
-                event->SetShortText("");
-            }
-            else
-            {
-                event->SetShortText(xevent->ShortText());
-            }
-        }
-    }
-
-    if (epdir && xevent->ShortText() && (strlen(xevent->ShortText())>0) && ((map->Flags() & USE_SEASON)==USE_SEASON))
-    {
-        // Try to fetch season and episode from eplist
-        int season,episode;
-        if (FetchSeasonEpisode(epdir,xevent->Title(),xevent->ShortText(),season,episode))
-        {
-            xevent->SetSeason(season);
-            xevent->SetEpisode(episode);
-        }
-    }
-
-    if ((map->Flags() & USE_LONGTEXT)==USE_LONGTEXT)
-    {
-        if (xevent->Description() && (strlen(xevent->Description())>0))
-        {
-            event->SetDescription(xevent->Description());
-        }
-        else
-        {
-            xevent->SetDescription(event->Description());
-        }
-    }
-    else
-    {
-        xevent->SetDescription(event->Description());
-    }
-    bool addExt=false;
-    if ((map->Flags() & USE_CREDITS)==USE_CREDITS)
-    {
-        cStringList *credits=xevent->Credits();
-        if (credits->Size())
-        {
-            cTEXTMapping *oldtext=NULL;
-            for (int i=0; i<credits->Size(); i++)
-            {
-                char *ctype=strdup((*credits)[i]);
-                if (ctype)
-                {
-                    char *cval=strchr(ctype,'|');
-                    if (cval)
-                    {
-                        *cval=0;
-                        cval++;
-                        bool add=true;
-                        if (((map->Flags() & CREDITS_ACTORS)!=CREDITS_ACTORS) &&
-                                (!strcasecmp(ctype,"actor"))) add=false;
-                        if (((map->Flags() & CREDITS_DIRECTORS)!=CREDITS_DIRECTORS) &&
-                                (!strcasecmp(ctype,"director"))) add=false;
-                        if (((map->Flags() & CREDITS_OTHERS)!=CREDITS_OTHERS) &&
-                                (add) && (strcasecmp(ctype,"actor")) &&
-                                (strcasecmp(ctype,"director"))) add=false;
-                        if (add)
-                        {
-                            cTEXTMapping *text=TEXTMapping(ctype);
-                            if ((map->Flags() & CREDITS_LIST)==CREDITS_LIST)
-                            {
-                                if (oldtext!=text)
-                                {
-                                    if (oldtext)
-                                    {
-                                        addExt=xevent->RemoveLastCharFromDescription();
-                                        addExt=xevent->RemoveLastCharFromDescription();
-                                        addExt=xevent->Add2Description("\n");
-                                    }
-                                    addExt=xevent->Add2Description(text->Value());
-                                    addExt=xevent->Add2Description(": ");
-                                }
-                                addExt=xevent->Add2Description(cval);
-                                addExt=xevent->Add2Description(", ");
-                            }
-                            else
-                            {
-                                if (text)
-                                {
-                                    addExt=xevent->Add2Description(text->Value(),cval);
-                                }
-                            }
-                            oldtext=text;
-                        }
-                    }
-                    free(ctype);
-                }
-            }
-            if ((oldtext) && ((map->Flags() & CREDITS_LIST)==CREDITS_LIST))
-            {
-                addExt=xevent->RemoveLastCharFromDescription();
-                addExt=xevent->RemoveLastCharFromDescription();
-                addExt=xevent->Add2Description("\n");
-            }
-        }
-    }
-
-    if ((map->Flags() & USE_COUNTRYDATE)==USE_COUNTRYDATE)
-    {
-        if (xevent->Country())
-        {
-            cTEXTMapping *text=TEXTMapping("country");
-            if (text) addExt=xevent->Add2Description(text->Value(),xevent->Country());
-        }
-
-        if (xevent->Year())
-        {
-            cTEXTMapping *text=TEXTMapping("date");
-            if (text) addExt=xevent->Add2Description(text->Value(),xevent->Year());
-        }
-    }
-    if ((map->Flags() & USE_SEASON)==USE_SEASON)
-    {
-        if (xevent->Season())
-        {
-            cTEXTMapping *text=TEXTMapping("season");
-            if (text) addExt=xevent->Add2Description(text->Value(),xevent->Season());
-        }
-
-        if (xevent->Episode())
-        {
-            cTEXTMapping *text=TEXTMapping("episode");
-            if (text) addExt=xevent->Add2Description(text->Value(),xevent->Episode());
-        }
-    }
-
-    if (((map->Flags() & USE_ORIGTITLE)==USE_ORIGTITLE) && (xevent->OrigTitle()))
-    {
-        cTEXTMapping *text=TEXTMapping("originaltitle");
-        if (text) addExt=xevent->Add2Description(text->Value(),xevent->OrigTitle());
-    }
-    if (((map->Flags() & USE_CATEGORIES)==USE_CATEGORIES) && (xevent->Categories()->Size()))
-    {
-        cTEXTMapping *text=TEXTMapping("category");
-        if (text)
-        {
-            cStringList *categories=xevent->Categories();
-            addExt=xevent->Add2Description(text->Value(),(*categories)[0]);
-            for (int i=1; i<categories->Size(); i++)
-            {
-                // prevent duplicates
-                if (strcasecmp((*categories)[i],(*categories)[i-1]))
-                    addExt=xevent->Add2Description(text->Value(),(*categories)[i]);
-            }
-        }
-    }
-    if (((map->Flags() & USE_RATING)==USE_RATING) && (xevent->Rating()) && (xevent->RatingSystem()))
-    {
-        addExt=xevent->Add2Description(xevent->RatingSystem(),xevent->Rating());
-    }
-    if (((map->Flags() & USE_REVIEW)==USE_REVIEW) && (xevent->Review()))
-    {
-        cTEXTMapping *text=TEXTMapping("review");
-        if (text) addExt=xevent->Add2Description(text->Value(),xevent->Review());
-    }
-    if (event->TableID()==0) return true;
-    if ((map->Flags() & OPT_APPEND)!=OPT_APPEND)
-    {
-        start=event->StartTime();
-        end=event->EndTime();
-        localtime_r(&start,&tm);
-        strftime(from,sizeof(from)-1,"%b %d %H:%M",&tm);
-        localtime_r(&end,&tm);
-        strftime(till,sizeof(till)-1,"%b %d %H:%M",&tm);
-        source->Dlog("changing '%s'@%s-%s",event->Title(),from,till);
-    }
-    if (addExt) event->SetDescription(xevent->Description());
-    event->SetTableID(0); // prevent EIT EPG to update this event
-    return true;
-}
-
-u_long cParse::DoSum(u_long sum, const char *buf, int nBytes)
-{
-    int nleft=nBytes;
-    u_short *w = (u_short*)buf;
-
-    while (nleft > 1)
-    {
-        sum += *w++;
-        nleft -= 2;
-    }
-
-    if (nleft == 1)
-    {
-        u_short answer = 0;
-        *(u_char*)(&answer) = *(u_char*)w;
-        sum += answer;
-    }
-    return sum;
 }
 
 bool cParse::FetchEvent(xmlNodePtr enode)
@@ -960,17 +255,17 @@ bool cParse::FetchEvent(xmlNodePtr enode)
                 {
                     if (lang && slang && !xmlStrncasecmp(lang, (const xmlChar *) slang,2))
                     {
-                        xevent.SetTitle(conv->Convert((const char *) content));
+                        xevent.SetTitle((const char *) content);
                     }
                     else
                     {
-                        if (!xevent.Title())
+                        if (!xevent.HasTitle())
                         {
-                            xevent.SetTitle(conv->Convert((const char *) content));
+                            xevent.SetTitle((const char *) content);
                         }
                         else
                         {
-                            xevent.SetOrigTitle(conv->Convert((const char *) content));
+                            xevent.SetOrigTitle((const char *) content);
                         }
                     }
                     xmlFree(content);
@@ -983,7 +278,7 @@ bool cParse::FetchEvent(xmlNodePtr enode)
                 xmlChar *content=xmlNodeListGetString(node->doc,node->xmlChildrenNode,1);
                 if (content)
                 {
-                    xevent.SetShortText(conv->Convert((const char *) content));
+                    xevent.SetShortText((const char *) content);
                     xmlFree(content);
                 }
             }
@@ -993,7 +288,7 @@ bool cParse::FetchEvent(xmlNodePtr enode)
                 xmlChar *content=xmlNodeListGetString(node->doc,node->xmlChildrenNode,1);
                 if (content)
                 {
-                    xevent.SetDescription(conv->Convert((const char *) content));
+                    xevent.SetDescription((const char *) content);
                     xmlFree(content);
                 }
             }
@@ -1009,15 +304,9 @@ bool cParse::FetchEvent(xmlNodePtr enode)
                             xmlChar *content=xmlNodeListGetString(vnode->doc,vnode->xmlChildrenNode,1);
                             if (content)
                             {
-                                const char *role=NULL;
                                 xmlChar *arole=xmlGetProp(node,(const xmlChar *) "actor role");
-                                if (arole)
-                                {
-                                    role=strdup(conv->Convert((const char *) arole));
-                                    xmlFree(arole);
-                                }
-                                xevent.AddCredits((const char *) vnode->name,conv->Convert((const char *) content),role);
-                                if (role) free((void *) role);
+                                xevent.AddCredits((const char *) vnode->name,(const char *) content,(const char *) arole);
+                                if (arole) xmlFree(arole);
                                 xmlFree(content);
                             }
                         }
@@ -1026,7 +315,7 @@ bool cParse::FetchEvent(xmlNodePtr enode)
                             xmlChar *content=xmlNodeListGetString(vnode->doc,vnode->xmlChildrenNode,1);
                             if (content)
                             {
-                                xevent.AddCredits((const char *) vnode->name,conv->Convert((const char *) content));
+                                xevent.AddCredits((const char *) vnode->name,(const char *) content);
                                 xmlFree(content);
                             }
                         }
@@ -1055,7 +344,7 @@ bool cParse::FetchEvent(xmlNodePtr enode)
                     }
                     else
                     {
-                        xevent.AddCategory(conv->Convert((const char *) content));
+                        xevent.AddCategory((const char *) content);
                     }
                     xmlFree(content);
                 }
@@ -1065,15 +354,69 @@ bool cParse::FetchEvent(xmlNodePtr enode)
                 xmlChar *content=xmlNodeListGetString(node->doc,node->xmlChildrenNode,1);
                 if (content)
                 {
-                    xevent.SetCountry(conv->Convert((const char *) content));
+                    xevent.SetCountry((const char *) content);
                     xmlFree(content);
                 }
             }
             else if ((!xmlStrcasecmp(node->name, (const xmlChar *) "video")))
             {
+                xmlNodePtr vnode=node->xmlChildrenNode;
+                while (vnode)
+                {
+                    if (vnode->type==XML_ELEMENT_NODE)
+                    {
+                        if ((!xmlStrcasecmp(vnode->name, (const xmlChar *) "colour")))
+                        {
+                            xmlChar *content=xmlNodeListGetString(vnode->doc,vnode->xmlChildrenNode,1);
+                            if (content)
+                            {
+                                xevent.AddVideo("colour",(const char *) content);
+                                xmlFree(content);
+                            }
+                        }
+                        if ((!xmlStrcasecmp(vnode->name, (const xmlChar *) "aspect")))
+                        {
+                            xmlChar *content=xmlNodeListGetString(vnode->doc,vnode->xmlChildrenNode,1);
+                            if (content)
+                            {
+                                xevent.AddVideo("aspect",(const char *) content);
+                                xmlFree(content);
+                            }
+                        }
+                        if ((!xmlStrcasecmp(vnode->name, (const xmlChar *) "quality")))
+                        {
+                            xmlChar *content=xmlNodeListGetString(vnode->doc,vnode->xmlChildrenNode,1);
+                            if (content)
+                            {
+                                xevent.AddVideo("quality",(const char *) content);
+                                xmlFree(content);
+                            }
+                        }
+
+                    }
+                    vnode=vnode->next;
+                }
             }
             else if ((!xmlStrcasecmp(node->name, (const xmlChar *) "audio")))
             {
+                xmlNodePtr vnode=node->xmlChildrenNode;
+                while (vnode)
+                {
+                    if (vnode->type==XML_ELEMENT_NODE)
+                    {
+                        if ((!xmlStrcasecmp(vnode->name, (const xmlChar *) "stereo")))
+                        {
+                            xmlChar *content=xmlNodeListGetString(vnode->doc,vnode->xmlChildrenNode,1);
+                            if (content)
+                            {
+                                content=(xmlChar*)strreplace((char *)content," ","");
+                                xevent.SetAudio((const char *) content);
+                                xmlFree(content);
+                            }
+                        }
+                    }
+                    vnode=vnode->next;
+                }
             }
             else if ((!xmlStrcasecmp(node->name, (const xmlChar *) "rating")))
             {
@@ -1090,11 +433,7 @@ bool cParse::FetchEvent(xmlNodePtr enode)
                                 xmlChar *content=xmlNodeListGetString(vnode->doc,vnode->xmlChildrenNode,1);
                                 if (content)
                                 {
-                                    const char *crating=strdup(conv->Convert((const char *) content));
-                                    const char *csystem=strdup(conv->Convert((const char *) system));
-                                    xevent.SetRating(csystem,crating);
-                                    if (crating) free((void *) crating);
-                                    if (csystem) free((void *) csystem);
+                                    xevent.AddRating((const char *) system,(const char *) content);
                                     xmlFree(content);
                                 }
                             }
@@ -1104,6 +443,28 @@ bool cParse::FetchEvent(xmlNodePtr enode)
                     xmlFree(system);
                 }
             }
+            else if ((!xmlStrcasecmp(node->name, (const xmlChar *) "star-rating")))
+            {
+                xmlChar *system=xmlGetProp(node,(const xmlChar *) "system");
+                xmlNodePtr vnode=node->xmlChildrenNode;
+                while (vnode)
+                {
+                    if (vnode->type==XML_ELEMENT_NODE)
+                    {
+                        if ((!xmlStrcasecmp(vnode->name, (const xmlChar *) "value")))
+                        {
+                            xmlChar *content=xmlNodeListGetString(vnode->doc,vnode->xmlChildrenNode,1);
+                            if (content)
+                            {
+                                xevent.AddStarRating((const char *) system,(const char *) content);
+                                xmlFree(content);
+                            }
+                        }
+                    }
+                    vnode=vnode->next;
+                }
+                if (system) xmlFree(system);
+            }
             else if ((!xmlStrcasecmp(node->name, (const xmlChar *) "review")))
             {
                 xmlChar *type=xmlGetProp(node,(const xmlChar *) "type");
@@ -1112,7 +473,7 @@ bool cParse::FetchEvent(xmlNodePtr enode)
                     xmlChar *content=xmlNodeListGetString(node->doc,node->xmlChildrenNode,1);
                     if (content)
                     {
-                        xevent.SetReview(conv->Convert((const char *) content));
+                        xevent.AddReview((const char *) content);
                         xmlFree(content);
                     }
                     xmlFree(type);
@@ -1137,27 +498,15 @@ bool cParse::FetchEvent(xmlNodePtr enode)
         }
         node=node->next;
     }
-    return (xevent.Title()!=NULL);
-}
 
-cTEXTMapping *cParse::TEXTMapping_(const char *Name, cTEXTMappings *texts)
-{
-    if (!texts->Count()) return NULL;
-    for (cTEXTMapping *textmap=texts->First(); textmap; textmap=texts->Next(textmap))
+    int season,episode;
+    if (FetchSeasonEpisode(conv,epdir,xevent.Title(),xevent.ShortText(),season,episode))
     {
-        if (!strcmp(textmap->Name(),Name)) return textmap;
+        xevent.SetSeason(season);
+        xevent.SetEpisode(episode);
     }
-    return NULL;
-}
 
-cEPGMapping *cParse::EPGMapping(const char *ChannelName)
-{
-    if (!maps->Count()) return NULL;
-    for (cEPGMapping *map=maps->First(); map; map=maps->Next(map))
-    {
-        if (!strcmp(map->ChannelName(),ChannelName)) return map;
-    }
-    return NULL;
+    return xevent.HasTitle();
 }
 
 int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
@@ -1181,30 +530,38 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
         return 141;
     }
 
-    const cSchedules *schedules=NULL;
-    int l=0;
-    while (l<300)
+    sqlite3 *db=NULL;
+    if (sqlite3_open(source->EPGFile(),&db)!=SQLITE_OK)
     {
-        cSchedulesLock schedulesLock(true,200); // wait up to 60 secs for lock!
-        schedules = cSchedules::Schedules(schedulesLock);
-        if (!myExecutor.StillRunning())
-        {
-            source->Ilog("request to stop from vdr");
-            return 0;
-        }
-        if (schedules) break;
-        l++;
+        source->Elog("failed to open or create %s",source->EPGFile());
+        xmlFreeDoc(xmltv);
+        return 141;
     }
 
-    if (!schedules)
+    char sql[]="CREATE TABLE IF NOT EXISTS epg (" \
+               "src nvarchar(100), channelid nvarchar(255), eventid int, eiteventid int, "\
+               "starttime datetime, duration int, title nvarchar(255),origtitle nvarchar(255), "\
+               "shorttext nvarchar(255), description text, eitdescription text, " \
+               "country nvarchar(255), year int, " \
+               "credits text, category text, review text, rating text, " \
+               "starrating text, video text, audio text, season int, episode int, mixing int," \
+               "srcidx int," \
+               "PRIMARY KEY(src, channelid, eventid)" \
+               ")";
+
+    char *errmsg;
+    if (sqlite3_exec(db,sql,NULL,NULL,&errmsg)!=SQLITE_OK)
     {
-        source->Elog("cannot get schedules now, trying later");
-        return 1;
+        source->Elog("createdb: %s",errmsg);
+        sqlite3_free(errmsg);
+        sqlite3_close(db);
+        xmlFreeDoc(xmltv);
+        return 141;
     }
 
-    time_t begin=time(NULL);
+    time_t begin=time(NULL)-7200;
     xmlNodePtr node=rootnode->xmlChildrenNode;
-    cEPGMapping *oldmap=NULL;
+
     int lerr=0;
     while (node)
     {
@@ -1227,7 +584,7 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
             node=node->next;
             continue;
         }
-        cEPGMapping *map=EPGMapping((const char *) channelid);
+        cEPGMapping *map=maps->GetMap((const char *) channelid);
         if (!map)
         {
             if (lerr!=PARSE_NOMAPPING)
@@ -1237,9 +594,7 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
             node=node->next;
             continue;
         }
-        int days=map->Days();
-        if ((map->Flags() & OPT_APPEND)!=OPT_APPEND) days=1; // only one day with merge
-        time_t end=begin+(86000*days)+3600; // 1 hour overlap
+
         xmlChar *start,*stop;
         time_t starttime=(time_t) 0;
         time_t stoptime=(time_t) 0;
@@ -1262,115 +617,53 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
         if (!starttime)
         {
             if (lerr!=PARSE_XMLTVERR)
-                source->Elog("xmltv2vdr: '%s' no starttime, check xmltv file");
+                source->Elog("no starttime, check xmltv file");
             lerr=PARSE_XMLTVERR;
             xmlFree(channelid);
             node=node->next;
             continue;
         }
 
-        if ((starttime<begin) || (starttime>end))
+        if (starttime<begin)
         {
             xmlFree(channelid);
             node=node->next;
             continue;
         }
         xevent.Clear();
-
-        if (oldmap!=map)
-        {
-            source->Dlog("processing '%s'",channelid);
-            source->Dlog("from %s",ctime_r(&begin,(char *) &cbuf));
-            source->Dlog("till %s",ctime_r(&end,(char *) &cbuf));
-        }
-        oldmap=map;
-        xmlFree(channelid);
-
-        if ((map->Flags() & OPT_VPS)==OPT_VPS)
-        {
-            xmlChar *vpsstart=xmlGetProp(node,(const xmlChar *) "vps-start");
-            if (vpsstart)
-            {
-                time_t vps=ConvertXMLTVTime2UnixTime((char *) vpsstart);
-                xevent.SetVps(vps);
-                xmlFree(vpsstart);
-            }
-        }
-
         xevent.SetStartTime(starttime);
         if (stoptime) xevent.SetDuration(stoptime-starttime);
+
+        if ((map->Flags() & OPT_APPEND)!=OPT_APPEND) xevent.SetMixing();
+
         if (!FetchEvent(node)) // sets xevent
         {
             source->Dlog("failed to fetch event");
             node=node->next;
+            xmlFree(channelid);
             continue;
         }
-        for (int i=0; i<map->NumChannelIDs(); i++)
-        {
-            bool addevents=false;
-            if ((map->Flags() & OPT_APPEND)==OPT_APPEND) addevents=true;
 
-            cChannel *channel=Channels.GetByChannelID(map->ChannelIDs()[i]);
-            if (!channel)
-            {
-                if (lerr!=PARSE_NOCHANNEL)
-                    source->Elog("channel %s not found in channels.conf",
-                                 *map->ChannelIDs()[i].ToString());
-                lerr=PARSE_NOCHANNEL;
-                continue;
-            }
-            cSchedule* schedule = (cSchedule *) schedules->GetSchedule(channel,addevents);
-            if (!schedule)
-            {
-                if (lerr!=PARSE_NOSCHEDULE)
-                    source->Elog("cannot get schedule for channel %s%s",
-                                 channel->Name(),addevents ? "" : " - try add option");
-                lerr=PARSE_NOSCHEDULE;
-                continue;
-            }
-            if (addevents)
-            {
-                cEvent *event=SearchEvent(schedule,&xevent);
-                if (!event)
-                    PutEvent(schedule,event,&xevent,map);
-            }
-            else
-            {
-                if (!schedule->Events()->Count())
-                {
-                    if (lerr!=PARSE_EMPTYSCHEDULE)
-                        source->Elog("cannot merge into empty epg (%s) - try add option",
-                                     channel->Name());
-                    lerr=PARSE_EMPTYSCHEDULE;
-                }
-                else
-                {
-                    cEvent *event=schedule->Events()->Last();
-                    if (event->StartTime()>xevent.StartTime())
-                    {
-                        if ((event=SearchEvent(schedule,&xevent)))
-                        {
-                            PutEvent(schedule,event,&xevent,map);
-                        }
-                        else
-                        {
-                            time_t start=xevent.StartTime();
-                            source->Elog("no event in epg for %s@%s (%s)",
-                                         xevent.Title(),ctime_r(&start,(char *) &cbuf),
-                                         channel->Name());
-                        }
-                    }
-                }
-            }
+        char *errmsg;
+        const char *sql=xevent.GetSQL(source->Name(),source->Index(),(const char *) channelid);
+        if (sqlite3_exec(db,sql,NULL,NULL,&errmsg)!=SQLITE_OK)
+        {
+            source->Elog("sqlite3: %s",errmsg);
+            sqlite3_free(errmsg);
+            xmlFree(channelid);
+            break;
         }
+        xmlFree(channelid);
+
         node=node->next;
         if (!myExecutor.StillRunning())
         {
-            xmlFreeDoc(xmltv);
             source->Ilog("request to stop from vdr");
-            return 0;
+            break;
         }
     }
+    sqlite3_close(db);
+
     xmlFreeDoc(xmltv);
     return 0;
 }
@@ -1385,27 +678,10 @@ void cParse::CleanupLibXML()
     xmlCleanupParser();
 }
 
-cParse::cParse(cEPGSource *Source, cEPGMappings *Maps, cTEXTMappings *Texts)
+cParse::cParse(cEPGSource *Source, cEPGMappings *Maps)
 {
     source=Source;
     maps=Maps;
-    texts=Texts;
-
-    char *CodeSet=NULL;
-    if (setlocale(LC_CTYPE,""))
-        CodeSet=nl_langinfo(CODESET);
-    else
-    {
-        char *LangEnv=getenv("LANG");
-        if (LangEnv)
-        {
-            CodeSet=strchr(LangEnv,'.');
-            if (CodeSet)
-                CodeSet++;
-        }
-    }
-    source->Dlog("vdr codeset is '%s'",CodeSet ? CodeSet : "US-ASCII//TRANSLIT");
-    conv = new cCharSetConv("UTF-8",CodeSet ? CodeSet : "US-ASCII//TRANSLIT");
 
     struct passwd pwd,*pwdbuf;
     char buf[1024];
@@ -1419,6 +695,10 @@ cParse::cParse(cEPGSource *Source, cEPGMappings *Maps, cTEXTMappings *Texts)
                 free(epdir);
                 epdir=NULL;
             }
+            else
+            {
+                conv=iconv_open("US-ASCII//TRANSLIT","UTF-8");
+            }
         }
         else
         {
@@ -1429,6 +709,9 @@ cParse::cParse(cEPGSource *Source, cEPGMappings *Maps, cTEXTMappings *Texts)
 
 cParse::~cParse()
 {
-    if (epdir) free(epdir);
-    delete conv;
+    if (epdir)
+    {
+        free(epdir);
+        iconv_close(conv);
+    }
 }

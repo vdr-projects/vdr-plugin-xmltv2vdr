@@ -28,30 +28,115 @@ void cTEXTMapping::ChangeValue(const char *Value)
 
 // --------------------------------------------------------------------------------------------------------
 
-cEPGMapping::cEPGMapping(const char *ChannelName, const char *Flags_Days_and_Channels)
+void cTEXTMappings::Remove()
+{
+    cTEXTMapping *maps;
+    while ((maps=Last())!=NULL)
+    {
+        Del(maps);
+    }
+}
+
+cTEXTMapping* cTEXTMappings::GetMap(const char* Name)
+{
+    if (!Name) return NULL;
+    if (!Count()) return NULL;
+    for (int i=0; i<Count();i++)
+    {
+        if (!strcmp(Get(i)->Name(),Name)) return Get(i);
+    }
+    return NULL;
+}
+
+
+// --------------------------------------------------------------------------------------------------------
+
+bool cEPGMappings::ProcessChannel(const tChannelID ChannelID)
+{
+    if (!Count()) return false;
+    for (int i=0; i<Count();i++)
+    {
+        for (int x=0; x<Get(i)->NumChannelIDs(); x++)
+        {
+            if (Get(i)->ChannelIDs()[x]==ChannelID) return true;
+        }
+    }
+    return false;
+}
+
+bool cEPGMappings::IgnoreChannel(const cChannel *Channel)
+{
+    if (!Channel) return false;
+    if (!Count()) return false;
+    tChannelID cid=Channel->GetChannelID();
+    for (int i=0; i<Count();i++)
+    {
+        if ((Get(i)->Flags() & OPT_APPEND)==OPT_APPEND)
+        {
+            for (int x=0; x<Get(i)->NumChannelIDs(); x++)
+            {
+                if (Get(i)->ChannelIDs()[x]==cid) return true;
+            }
+        }
+    }
+    return false;
+}
+
+void cEPGMappings::Remove()
+{
+    cEPGMapping *maps;
+    while ((maps=Last())!=NULL)
+    {
+        Del(maps);
+    }
+}
+
+cEPGMapping* cEPGMappings::GetMap(const char* ChannelName)
+{
+    if (!ChannelName) return NULL;
+    if (!Count()) return NULL;
+    for (int i=0; i<Count();i++)
+    {
+        if (!strcmp(Get(i)->ChannelName(),ChannelName)) return Get(i);
+    }
+    return NULL;
+}
+
+cEPGMapping *cEPGMappings::GetMap(tChannelID ChannelID)
+{
+    if (!Count()) return NULL;
+    for (int i=0; i<Count();i++)
+    {
+        for (int x=0; x<Get(i)->NumChannelIDs(); x++)
+        {
+            if (Get(i)->ChannelIDs()[x]==ChannelID) return Get(i);
+        }
+    }
+    return NULL;
+}
+
+// --------------------------------------------------------------------------------------------------------
+
+cEPGMapping::cEPGMapping(const char *ChannelName, const char *Flags_and_Channels)
 {
     channelname=strdup(ChannelName);
 
     dsyslog("xmltv2vdr: added mapping for '%s'",channelname);
 
     flags=USE_SHORTTEXT;
-    days=1;
     channelids=NULL;
     numchannelids=0;
 
-    if (Flags_Days_and_Channels)
+    if (Flags_and_Channels)
     {
-        char *flags_days_p=(char *) strdup(Flags_Days_and_Channels);
-        if (!flags_days_p) return;
+        char *flags_unused_p=(char *) strdup(Flags_and_Channels);
+        if (!flags_unused_p) return;
 
-        char *flags_p=strchr(flags_days_p,';');
+        char *flags_p=strchr(flags_unused_p,';');
         if (flags_p)
         {
             *flags_p=0;
             flags_p++;
-            days=atoi(flags_days_p);
-            if (days<1) days=1;
-            if (days>365) days=365;
 
             char *channels_p=strchr(flags_p,';');
             if (channels_p)
@@ -62,7 +147,7 @@ cEPGMapping::cEPGMapping(const char *ChannelName, const char *Flags_Days_and_Cha
                 addchannels(channels_p);
             }
         }
-        free(flags_days_p);
+        free(flags_unused_p);
     }
 }
 
@@ -86,7 +171,6 @@ cEPGMapping::cEPGMapping(cEPGMapping&copy)
         numchannelids=copy.numchannelids;
     }
     flags=copy.flags;
-    days=copy.days;
 }
 
 int cEPGMapping::compare(const void *a, const void *b)
@@ -129,7 +213,7 @@ void cEPGMapping::addchannels(const char *channels)
         tChannelID ChannelID=tChannelID::FromString(token);
         if (!(ChannelID==tChannelID::InvalidID))
         {
-            channelids=(tChannelID *) realloc(channelids,(numchannelids+1)*sizeof(tChannelID));
+            channelids=(tChannelID *) realloc(channelids,(numchannelids+1)*sizeof(struct tChannelID));
             if (!channelids)
             {
                 free(tmp);
@@ -159,7 +243,7 @@ void cEPGMapping::AddChannel(int ChannelNumber)
         }
         if (!found)
         {
-            channelids=(tChannelID *) realloc(channelids,(numchannelids+1)*sizeof(tChannelID));
+            channelids=(tChannelID *) realloc(channelids,(numchannelids+1)*sizeof(struct tChannelID));
             if (!channelids) return;
             channelids[numchannelids]=chan->GetChannelID();
             numchannelids++;
@@ -214,7 +298,8 @@ void cEPGMapping::RemoveChannel(tChannelID ChannelID, bool MarkOnly)
     if (found)
     {
         channelids[i]=tChannelID::InvalidID;
-        if (!MarkOnly) {
+        if (!MarkOnly)
+        {
             qsort(channelids,numchannelids,sizeof(tChannelID),compare);
             numchannelids--;
         }
@@ -240,7 +325,8 @@ void cEPGMapping::RemoveChannel(int ChannelNumber, bool MarkOnly)
     if (found)
     {
         channelids[i]=tChannelID::InvalidID;
-        if (!MarkOnly) {
+        if (!MarkOnly)
+        {
             qsort(channelids,numchannelids,sizeof(tChannelID),compare);
             numchannelids--;
         }

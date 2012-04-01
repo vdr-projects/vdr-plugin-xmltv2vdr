@@ -37,14 +37,11 @@ private:
     int mappingBegin,mappingEnd;
     int sourcesBegin,sourcesEnd;
     int mappingEntry;
-    int updateEntry;
     int epEntry;
     eOSState edit(void);
     void generatesumchannellist();
-    int exectime;
-    int wakeup;
-    int upstart;
     int epall;
+    int wakeup;
 public:
     void Output(void);
     static cOsdItem *NewTitle(const char *s);
@@ -72,7 +69,7 @@ protected:
 private:
     cPluginXmltv2vdr *baseplugin;
     char country[255];
-    char date[255];
+    char year[255];
     char originaltitle[255];
     char director[255];
     char actor[255];
@@ -88,6 +85,13 @@ private:
     char category[255];
     char season[255];
     char episode[255];
+    char starrating[255];
+    char audio[255];
+    char video[255];
+    char blacknwhite[255];
+    char dolby[255];
+    char dolbydigital[255];
+    char bilingual[255];
 public:
     cMenuSetupXmltv2vdrTextMap(cPluginXmltv2vdr *Plugin);
 };
@@ -101,11 +105,17 @@ private:
     cPluginXmltv2vdr *baseplugin;
     cEPGSource *epgsrc;
     int *sel;
+    time_t day;
+    int weekday,start;
+    int upstart;
     int days;
     char pin[255];
+    int updateEntry;
+    void output(void);
 public:
     cMenuSetupXmltv2vdrChannelSource(cPluginXmltv2vdr *Plugin, cMenuSetupXmltv2vdr *Menu, int Index);
     ~cMenuSetupXmltv2vdrChannelSource();
+    virtual eOSState ProcessKey(eKeys Key);
     void ClearMenu()
     {
         menu=NULL;
@@ -122,13 +132,10 @@ private:
     cEPGMapping *map;
     bool hasmaps;
     uint flags;
-    int days;
-    int daysmax;
     void output(void);
     cString title;
     const char *channel;
     int getdaysmax();
-    cOsdItem *optionN(const char *s, int num);
     cOsdItem *option(const char *s, bool yesno);
     void epgmappingreplace(cEPGMapping *newmapping);
     int c1,c2,c3,cm;
