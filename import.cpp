@@ -722,7 +722,8 @@ bool cImport::PutEvent(cEPGSource *source, sqlite3 *db, cSchedule* schedule,
         strftime(from,sizeof(from)-1,"%b %d %H:%M",&tm);
         localtime_r(&end,&tm);
         strftime(till,sizeof(till)-1,"%b %d %H:%M",&tm);
-        source->Dlog("changing %s'%s'@%s-%s",xevent->EITDescription() ? "old " : "",
+        source->Dlog("changing %s%s'%s'@%s-%s",xevent->EITDescription() ? "old " : "",
+                     (Option==IMPORT_SHORTTEXT) ? "shorttext " : "description ",
                      event->Title(),from,till);
     }
     return true;

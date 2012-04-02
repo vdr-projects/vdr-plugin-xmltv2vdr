@@ -9,6 +9,7 @@
 #include <vdr/videodir.h>
 #include <unistd.h>
 #include <getopt.h>
+#include <pthread.h>
 
 #include "setup.h"
 #include "xmltv2vdr.h"
@@ -156,7 +157,7 @@ bool cEPGHandler::SetShortText(cEvent* Event, const char* UNUSED(ShortText))
 // -------------------------------------------------------------
 
 cEPGTimer::cEPGTimer(const char *EpgFile, cEPGSources *Sources, cEPGMappings *Maps,
-                     cTEXTMappings *Texts) : cThread("xmltv2vdr timer thread")
+                     cTEXTMappings *Texts) : cThread("xmltv2vdr timer")
 {
     epgfile=EpgFile;
     sources=Sources;
@@ -212,7 +213,7 @@ void cEPGTimer::Action()
 
 // -------------------------------------------------------------
 
-cPluginXmltv2vdr::cPluginXmltv2vdr(void) : epgexecutor(&epgsources)
+cPluginXmltv2vdr::cPluginXmltv2vdr(void) : epgexecutor(this, &epgsources)
 {
     // Initialize any member variables here.
     // DON'T DO ANYTHING ELSE THAT MAY HAVE SIDE EFFECTS, REQUIRE GLOBAL
@@ -265,6 +266,13 @@ bool cPluginXmltv2vdr::IsIdle()
 {
     if (!epgexecutor.Active() && (!epgtimer->Active())) return true;
     return false;
+}
+
+void cPluginXmltv2vdr::Wait4TimerThread()
+{
+    if (!epgtimer->Active()) return;
+    dsyslog("xmltv2vdr: wait for timer thread");
+    pthread_join(epgtimer->ThreadId(),NULL);
 }
 
 bool cPluginXmltv2vdr::EPGSourceMove(int From, int To)
@@ -390,32 +398,35 @@ void cPluginXmltv2vdr::Housekeeping(void)
     time_t now=time(NULL);
     if (now>(last_housetime_t+3600))
     {
-        struct stat statbuf;
-        if (stat(epgfile,&statbuf)!=-1)
+        if (IsIdle())
         {
-            if (statbuf.st_size)
+            struct stat statbuf;
+            if (stat(epgfile,&statbuf)!=-1)
             {
-                sqlite3 *db=NULL;
-                if (sqlite3_open_v2(epgfile,&db,SQLITE_OPEN_READWRITE,NULL)==SQLITE_OK)
+                if (statbuf.st_size)
                 {
-                    char *sql;
-                    if (asprintf(&sql,"delete from epg where ((starttime+duration) < %li)",now)!=-1)
+                    sqlite3 *db=NULL;
+                    if (sqlite3_open_v2(epgfile,&db,SQLITE_OPEN_READWRITE,NULL)==SQLITE_OK)
                     {
-                        char *errmsg;
-                        if (sqlite3_exec(db,sql,NULL,NULL,&errmsg)!=SQLITE_OK)
+                        char *sql;
+                        if (asprintf(&sql,"delete from epg where ((starttime+duration) < %li)",now)!=-1)
                         {
-                            esyslog("xmltv2vdr: %s",errmsg);
-                            sqlite3_free(errmsg);
+                            char *errmsg;
+                            if (sqlite3_exec(db,sql,NULL,NULL,&errmsg)!=SQLITE_OK)
+                            {
+                                esyslog("xmltv2vdr: %s",errmsg);
+                                sqlite3_free(errmsg);
+                            }
+                            else
+                            {
+                                isyslog("xmltv2vdr: removed %i old entries from db",sqlite3_changes(db));
+                                sqlite3_exec(db,"VACCUM;",NULL,NULL,NULL);
+                            }
+                            free(sql);
                         }
-                        else
-                        {
-                            isyslog("xmltv2vdr: removed %i old entries from db",sqlite3_changes(db));
-                            sqlite3_exec(db,"VACCUM;",NULL,NULL,NULL);
-                        }
-                        free(sql);
                     }
+                    sqlite3_close(db);
                 }
-                sqlite3_close(db);
             }
         }
         last_housetime_t=now;
@@ -429,7 +440,7 @@ void cPluginXmltv2vdr::MainThreadHook(void)
     time_t now=time(NULL);
     if (now>(last_maintime_t+60))
     {
-        if (IsIdle())
+        if (!epgexecutor.Active())
         {
             if (epgsources.RunItNow()) epgexecutor.Start();
         }

@@ -180,12 +180,15 @@ public:
     void Remove();
 };
 
+class cPluginXmltv2vdr;
+
 class cEPGExecutor : public cThread
 {
 private:
     cEPGSources *sources;
+    cPluginXmltv2vdr *baseplugin;
 public:
-    cEPGExecutor(cEPGSources *Sources);
+    cEPGExecutor(cPluginXmltv2vdr *Plugin, cEPGSources *Sources);
     bool StillRunning()
     {
         return Running();

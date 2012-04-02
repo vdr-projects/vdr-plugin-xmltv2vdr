@@ -10,6 +10,7 @@
 #include <string.h>
 #include <sys/ioctl.h>
 
+#include "xmltv2vdr.h"
 #include "source.h"
 #include "extpipe.h"
 
@@ -32,19 +33,24 @@ int cEPGChannel::Compare(const cListObject &ListObject) const
 
 // -------------------------------------------------------------
 
-cEPGExecutor::cEPGExecutor(cEPGSources *Sources) : cThread("xmltv2vdr importer")
+cEPGExecutor::cEPGExecutor(cPluginXmltv2vdr *Plugin,cEPGSources *Sources) : cThread("xmltv2vdr importer")
 {
+    baseplugin=Plugin;
     sources=Sources;
 }
 
 void cEPGExecutor::Action()
 {
     if (!sources) return;
+    if (!baseplugin) return;
 
     for (cEPGSource *epgs=sources->First(); epgs; epgs=sources->Next(epgs))
     {
         if (epgs->RunItNow())
         {
+            // if timer thread is runnung, wait till it's stopped
+            baseplugin->Wait4TimerThread();
+
             int retries=0;
             while (retries<=2)
             {
@@ -895,8 +901,8 @@ void cEPGSources::ReadIn(const char *ConfDir, const char *EpgFile, cEPGMappings 
     if (!Exists(EITSOURCE))
     {
         Add(new cEPGSource(EITSOURCE,ConfDir,EpgFile,EPGMappings,TextMappings));
-    }    
-    
+    }
+
     if (!SourceOrder) return;
     char *buf=strdup(SourceOrder);
     if (!buf) return;

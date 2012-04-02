@@ -140,6 +140,7 @@ public:
     {
         epgsources.ReadIn(confdir,epgfile,&epgmappings,&textmappings,srcorder,Reload);
     }
+    void Wait4TimerThread();
     bool IsIdle();
     bool EPGSourceMove(int From, int To);
     int EPGSourceCount()
