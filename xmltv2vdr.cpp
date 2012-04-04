@@ -197,13 +197,11 @@ void cEPGTimer::Action()
             if (!xevent) continue;
         }
 
-        int Flags=USE_SEASON;
-
         cSchedule* schedule = (cSchedule *) schedules->GetSchedule(chan,false);
         if (schedule)
         {
             import->PutEvent(sources->GetSource(EITSOURCE),NULL,schedule,
-                             (cEvent *) event,xevent,Flags,IMPORT_DESCRIPTION);
+                             (cEvent *) event,xevent,USE_SEASON,IMPORT_DESCRIPTION);
         }
         delete xevent;
     }
@@ -349,6 +347,7 @@ bool cPluginXmltv2vdr::Initialize(void)
 bool cPluginXmltv2vdr::Start(void)
 {
     // Start any background activities the plugin shall perform.
+    if (confdir) free(confdir);
     confdir=strdup(ConfigDirectory(PLUGIN_NAME_I18N)); // creates internally the confdir!
     if (!epgfile)
     {

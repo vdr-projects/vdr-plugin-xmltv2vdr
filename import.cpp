@@ -1075,25 +1075,25 @@ int cImport::Process(cEPGExecutor &myExecutor)
     time_t endoneday=begin+86400;
 #endif
     const cSchedules *schedules=NULL;
-    cSchedulesLock *schedulesLock;
+    cSchedulesLock *schedulesLock=NULL;
     int l=0;
     while (l<300)
     {
+        if (schedulesLock) delete schedulesLock;
         schedulesLock = new cSchedulesLock(true,200); // wait up to 60 secs for lock!
         schedules = cSchedules::Schedules(*schedulesLock);
+        if (schedules) break;
         if (!myExecutor.StillRunning())
         {
             delete schedulesLock;
             source->Ilog("request to stop from vdr");
             return 0;
         }
-        if (schedules) break;
-        delete schedulesLock;
         l++;
     }
 
     sqlite3 *db=NULL;
-    if (sqlite3_open_v2(source->EPGFile(),&db,SQLITE_OPEN_READWRITE,NULL))
+    if (sqlite3_open_v2(source->EPGFile(),&db,SQLITE_OPEN_READWRITE,NULL)!=SQLITE_OK)
     {
         source->Elog("failed to open %s",source->EPGFile());
         delete schedulesLock;

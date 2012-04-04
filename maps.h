@@ -78,8 +78,8 @@ private:
     void addchannels(const char *channels);
 public:
     cEPGMapping(const char *ChannelName, const char *Flags_and_Mappings);
-    ~cEPGMapping();
     cEPGMapping(cEPGMapping&copy);
+    ~cEPGMapping();
     void ChangeFlags(int NewFlags)
     {
         flags=NewFlags;

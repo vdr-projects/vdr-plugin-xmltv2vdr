@@ -213,12 +213,13 @@ void cEPGMapping::addchannels(const char *channels)
         tChannelID ChannelID=tChannelID::FromString(token);
         if (!(ChannelID==tChannelID::InvalidID))
         {
-            channelids=(tChannelID *) realloc(channelids,(numchannelids+1)*sizeof(struct tChannelID));
-            if (!channelids)
+            tChannelID *tmp_channelids=(tChannelID *) realloc(channelids,(numchannelids+1)*sizeof(struct tChannelID));
+            if (!tmp_channelids)
             {
                 free(tmp);
                 return;
             }
+            channelids=tmp_channelids;
             channelids[numchannelids]=ChannelID;
             numchannelids++;
         }
@@ -243,11 +244,14 @@ void cEPGMapping::AddChannel(int ChannelNumber)
         }
         if (!found)
         {
-            channelids=(tChannelID *) realloc(channelids,(numchannelids+1)*sizeof(struct tChannelID));
-            if (!channelids) return;
-            channelids[numchannelids]=chan->GetChannelID();
-            numchannelids++;
-            qsort(channelids,numchannelids,sizeof(tChannelID),compare);
+            tChannelID *tmp_channelids=(tChannelID *) realloc(channelids,(numchannelids+1)*sizeof(struct tChannelID));
+            if (tmp_channelids)
+            {
+                channelids=tmp_channelids;
+                channelids[numchannelids]=chan->GetChannelID();
+                numchannelids++;
+                qsort(channelids,numchannelids,sizeof(tChannelID),compare);
+            }
         }
     }
 }
@@ -263,11 +267,14 @@ void cEPGMapping::ReplaceChannels(int NumChannelIDs, tChannelID *ChannelIDs)
 
     for (int i=0; i<NumChannelIDs; i++)
     {
-        channelids=(tChannelID *) realloc(channelids,(numchannelids+1)*sizeof(tChannelID));
-        if (!channelids) return;
-        channelids[numchannelids]=ChannelIDs[i];
-        numchannelids++;
-        qsort(channelids,numchannelids,sizeof(tChannelID),compare);
+        tChannelID *tmp_channelids=(tChannelID *) realloc(channelids,(numchannelids+1)*sizeof(tChannelID));
+        if (tmp_channelids)
+        {
+            channelids=tmp_channelids;
+            channelids[numchannelids]=ChannelIDs[i];
+            numchannelids++;
+            qsort(channelids,numchannelids,sizeof(tChannelID),compare);
+        }
     }
 }
 

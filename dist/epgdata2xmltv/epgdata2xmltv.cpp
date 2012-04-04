@@ -115,7 +115,7 @@ int cepgdata2xmltv::DownloadData(const char *url)
     curl_easy_setopt(curl_handle, CURLOPT_FOLLOWLOCATION, 0);  // don't follow redirects
     curl_easy_setopt(curl_handle, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);  // Send all data to this function
     curl_easy_setopt(curl_handle, CURLOPT_WRITEDATA, (void *) &data);  // Pass our 'data' struct to the callback function
-    curl_easy_setopt(curl_handle, CURLOPT_MAXFILESIZE, 45971520);  // Set maximum file size to get (bytes)
+    curl_easy_setopt(curl_handle, CURLOPT_MAXFILESIZE, 85971520);  // Set maximum file size to get (bytes)
     curl_easy_setopt(curl_handle, CURLOPT_NOPROGRESS, 1);  // No progress meter
     curl_easy_setopt(curl_handle, CURLOPT_NOSIGNAL, 1);  // No signaling
     curl_easy_setopt(curl_handle, CURLOPT_TIMEOUT, 240);  // Set timeout to 240 seconds
@@ -247,8 +247,19 @@ int cepgdata2xmltv::Process(int argc, char *argv[])
     }
     char *line=NULL,*lptr=NULL;
     size_t size;
-    getline(&line,&size,f);
-    getline(&line,&size,f);
+    if (getline(&line,&size,f)==(ssize_t) -1) 
+    {
+        fclose(f);
+        esyslog("failed to read epgdata2xmltv config");
+        return 1;
+    }
+    if (getline(&line,&size,f)==(ssize_t) -1)
+    {
+        fclose(f);
+        if (line) free(line);
+        esyslog("failed to read epgdata2xmltv config");
+        return 1;
+    }
     char *sc=strchr(line,';');
     if (sc)
     {

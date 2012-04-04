@@ -207,7 +207,7 @@ bool cParse::FetchSeasonEpisode(iconv_t Conv, const char *EPDir, const char *Tit
         if (line[0]=='#') continue;
         char epshorttext[256]="";
         char depshorttext[1024]="";
-        if (sscanf(line,"%d\t%d\t%*d\t%255c",&Season,&Episode,epshorttext)==3)
+        if (sscanf(line,"%3d\t%3d\t%*3d\t%255c",&Season,&Episode,epshorttext)==3)
         {
             char *lf=strchr(epshorttext,'\n');
             if (lf) *lf=0;

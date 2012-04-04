@@ -247,11 +247,11 @@ eOSState cMenuSetupXmltv2vdr::ProcessKey(eKeys Key)
     switch (state)
     {
     case osContinue:
-        if ((Key==kLeft) || (Key==kRight) || (Key==kLeft|k_Repeat) || (Key==kRight|k_Repeat))
+        if ((Key==kLeft) || (Key==kRight) || (Key==(kLeft|k_Repeat)) || (Key==(kRight|k_Repeat)))
         {
             if ((epEntry) && (Current()==epEntry)) Output();
         }
-        if ((Key==kDown) || (Key==kUp) || (Key==kDown|k_Repeat) || (Key==kUp|k_Repeat))
+        if ((Key==kDown) || (Key==kUp) || (Key==(kDown|k_Repeat)) || (Key==(kUp|k_Repeat)))
         {
             if ((Current()>=sourcesBegin) && (Current()<=sourcesEnd))
             {
@@ -789,7 +789,7 @@ eOSState cMenuSetupXmltv2vdrChannelSource::ProcessKey(eKeys Key)
     switch (state)
     {
     case osContinue:
-        if ((Key==kLeft) || (Key==kRight) || (Key==kLeft|k_Repeat) || (Key==kRight|k_Repeat))
+        if ((Key==kLeft) || (Key==kRight) || (Key==(kLeft|k_Repeat)) || (Key==(kRight|k_Repeat)))
         {
             if (Current()==updateEntry) output();
         }

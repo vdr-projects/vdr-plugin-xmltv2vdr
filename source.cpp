@@ -324,7 +324,7 @@ bool cEPGSource::ReadConfig()
         }
         if (linenr==2)
         {
-            sscanf(line,"%d;%d;%d;%d",&daysinadvance,&exec_upstart,&exec_weekday,&exec_time);
+            sscanf(line,"%2d;%1d;%3d;%10d",&daysinadvance,&exec_upstart,&exec_weekday,&exec_time);
             Dlog("daysinadvance=%i",daysinadvance);
             Dlog("upstart=%i",exec_upstart);
             if (!exec_upstart)
@@ -519,11 +519,22 @@ int cEPGSource::Execute(cEPGExecutor &myExecutor)
                 {
                     n=1;
                 }
-                r_out=(char *) realloc(r_out, l_out+n+1);
-                int l=read(p.Out(),r_out+l_out,n);
-                if (l>0)
+                char *tmp=(char *) realloc(r_out, l_out+n+1);
+                if (tmp)
                 {
-                    l_out+=l;
+                    r_out=tmp;
+                    int l=read(p.Out(),r_out+l_out,n);
+                    if (l>0)
+                    {
+                        l_out+=l;
+                    }
+                }
+                else
+                {
+                    free(r_out);
+                    r_out=NULL;
+                    l_out=0;
+                    break;
                 }
             }
             if (fds[1].revents & POLLIN)
@@ -533,11 +544,22 @@ int cEPGSource::Execute(cEPGExecutor &myExecutor)
                 {
                     n=1;
                 }
-                r_err=(char *) realloc(r_err, l_err+n+1);
-                int l=read(p.Err(),r_err+l_err,n);
-                if (l>0)
+                char *tmp=(char *) realloc(r_err, l_err+n+1);
+                if (tmp)
                 {
-                    l_err+=l;
+                    r_err=tmp;
+                    int l=read(p.Err(),r_err+l_err,n);
+                    if (l>0)
+                    {
+                        l_err+=l;
+                    }
+                }
+                else
+                {
+                    free(r_err);
+                    r_err=NULL;
+                    l_err=0;
+                    break;
                 }
             }
             if (fds[0].revents & POLLHUP)
