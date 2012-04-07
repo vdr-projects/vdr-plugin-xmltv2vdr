@@ -178,7 +178,7 @@ private:
     };
     int level;
     cEPGSource *src;
-    char lastexec_str[30];
+    char nextrun_str[30];
     void output(void);
     int width;
     time_t lastrefresh;

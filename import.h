@@ -59,17 +59,18 @@ private:
     cEvent *SearchVDREvent(cSchedule* schedule, cXMLTVEvent *event);
     bool FetchXMLTVEvent(sqlite3_stmt *stmt, cXMLTVEvent *xevent);
     char *RemoveNonASCII(const char *src);
-    cXMLTVEvent *PrepareAndReturn(sqlite3 *db, char *sql, sqlite3_stmt *stmt);    
+    cXMLTVEvent *PrepareAndReturn(sqlite3 *db, char *sql, sqlite3_stmt *stmt);
 public:
     cImport(cEPGSource *Source, cEPGMappings *Maps, cTEXTMappings *Texts);
     ~cImport();
     int Process(cEPGExecutor &myExecutor);
-    bool WasChanged(cEvent *event);
+    bool WasChanged(cEvent *Event);
     bool PutEvent(cEPGSource *source, sqlite3 *db, cSchedule* schedule, cEvent *event,
                   cXMLTVEvent *xevent, int Flags, int Option=IMPORT_ALL);
-    cXMLTVEvent *SearchXMLTVEvent(const char *EPGFile, const char *ChannelID, const cEvent *event);
-    void UpdateXMLTVEvent(const char *EPGFile, sqlite3 *db, const char *Source, tEventID EventID,
-                          tEventID EITEventID, const char *EITDescription=NULL);
+    cXMLTVEvent *SearchXMLTVEvent(const char *EPGFile, const char *ChannelID, const cEvent *Event);
+    void UpdateXMLTVEvent(cEPGSource *Source, const char *EPGFile, sqlite3 *Db, const cEvent *Event,
+                          const char *SourceName, tEventID EventID, tEventID EITEventID,
+                          const char *EITDescription=NULL);
     cXMLTVEvent *AddXMLTVEvent(const char *EPGFile, const char *ChannelID, const cEvent *Event,
                                const char *EITDescription);
 };

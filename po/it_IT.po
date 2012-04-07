@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: vdr\n"
 "Report-Msgid-Bugs-To: <see README>\n"
-"POT-Creation-Date: 2012-04-01 18:24+0200\n"
+"POT-Creation-Date: 2012-04-06 17:02+0200\n"
 "PO-Revision-Date: 2011-03-05 15:45+0100\n"
 "Last-Translator: Diego Pierotto <vdr-italian@tiscali.it>\n"
 "Language-Team:  <vdr@linuxtv.org>\n"
@@ -88,7 +88,7 @@ msgstr ""
 msgid "overview"
 msgstr ""
 
-msgid "last execution"
+msgid "next execution"
 msgstr ""
 
 msgid "active"
@@ -267,4 +267,3 @@ msgstr "Plugin XMLTV2VDR ancora in esecuzione"
 
 msgid "Imports xmltv epg into vdr"
 msgstr "Importa EPG di XMLTV in VDR"
-

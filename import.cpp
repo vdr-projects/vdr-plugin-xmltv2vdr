@@ -242,13 +242,13 @@ char *cImport::AddEOT2Description(char *description)
     return description;
 }
 
-bool cImport::WasChanged(cEvent* event)
+bool cImport::WasChanged(cEvent* Event)
 {
-    if (!event) return false;
-    if (!event->Description()) return false;
-    int len=strlen(event->Description());
+    if (!Event) return false;
+    if (!Event->Description()) return false;
+    int len=strlen(Event->Description());
     if (len<1) return false;
-    if ((uchar)(event->Description()[len-1])==0xA0) return true;
+    if ((uchar)(Event->Description()[len-1])==0xA0) return true;
     return false;
 }
 
@@ -259,12 +259,17 @@ bool cImport::PutEvent(cEPGSource *source, sqlite3 *db, cSchedule* schedule,
     if (!schedule) return false;
     if (!xevent) return false;
 
+#define CHANGED_NOTHING     0
+#define CHANGED_SHORTTEXT   1
+#define CHANGED_DESCRIPTION 2
+#define CHANGED_ALL         3
+
     struct tm tm;
     char from[80];
     char till[80];
     time_t start,end;
 
-    bool changed=false;
+    int changed=CHANGED_NOTHING;
     bool append=false;
     if ((Flags & OPT_APPEND)==OPT_APPEND) append=true;
 
@@ -398,7 +403,6 @@ bool cImport::PutEvent(cEPGSource *source, sqlite3 *db, cSchedule* schedule,
             {
                 source->Dlog("title and subtitle equal, clearing subtitle");
                 event->SetShortText("");
-                changed=true;
             }
             else
             {
@@ -406,7 +410,7 @@ bool cImport::PutEvent(cEPGSource *source, sqlite3 *db, cSchedule* schedule,
                 if (!event->ShortText() || strcmp(event->ShortText(),dp))
                 {
                     event->SetShortText(dp);
-                    changed=true;
+                    changed|=CHANGED_SHORTTEXT; // shorttext really changed
                 }
             }
         }
@@ -431,8 +435,8 @@ bool cImport::PutEvent(cEPGSource *source, sqlite3 *db, cSchedule* schedule,
         if (!description && event->Description() && (strlen(event->Description())>0))
         {
             if (WasChanged(event)) return true;
-            UpdateXMLTVEvent(source->EPGFile(),db,source->Name(),xevent->EventID(),event->EventID(),
-                             event->Description());
+            UpdateXMLTVEvent(source,source->EPGFile(),db,event,source->Name(),xevent->EventID(),
+                             event->EventID(),event->Description());
             description=strdup(event->Description());
         }
 
@@ -706,7 +710,7 @@ bool cImport::PutEvent(cEPGSource *source, sqlite3 *db, cSchedule* schedule,
             if (!event->Description() || strcmp(event->Description(),dp))
             {
                 event->SetDescription(dp);
-                changed=true;
+                changed|=CHANGED_DESCRIPTION;
             }
             free(description);
         }
@@ -722,9 +726,18 @@ bool cImport::PutEvent(cEPGSource *source, sqlite3 *db, cSchedule* schedule,
         strftime(from,sizeof(from)-1,"%b %d %H:%M",&tm);
         localtime_r(&end,&tm);
         strftime(till,sizeof(till)-1,"%b %d %H:%M",&tm);
-        source->Dlog("changing %s%s'%s'@%s-%s",xevent->EITDescription() ? "old " : "",
-                     (Option==IMPORT_SHORTTEXT) ? "shorttext " : "description ",
-                     event->Title(),from,till);
+        switch (changed)
+        {
+        case CHANGED_SHORTTEXT:
+            source->Dlog("changing shorttext of '%s'@%s-%s",event->Title(),from,till);
+            break;
+        case CHANGED_DESCRIPTION:
+            source->Dlog("changing description of '%s'@%s-%s",event->Title(),from,till);
+            break;
+        case CHANGED_ALL:
+            source->Dlog("changing stext+descr of '%s'@%s-%s",event->Title(),from,till);
+            break;
+        }
     }
     return true;
 }
@@ -920,15 +933,17 @@ cXMLTVEvent *cImport::AddXMLTVEvent(const char *EPGFile, const char *ChannelID, 
     return xevent;
 }
 
-void cImport::UpdateXMLTVEvent(const char *EPGFile, sqlite3 *db, const char *Source, tEventID EventID,
-                               tEventID EITEventID, const char *EITDescription)
+void cImport::UpdateXMLTVEvent(cEPGSource *Source, const char *EPGFile, sqlite3 *Db, const cEvent *Event,
+                               const char *SourceName, tEventID EventID, tEventID EITEventID,
+                               const char *EITDescription)
 {
+    if (!Source) return;
     bool closedb=false;
-    if (!db)
+    if (!Db)
     {
-        if (sqlite3_open_v2(EPGFile,&db,SQLITE_OPEN_READWRITE,NULL)!=SQLITE_OK)
+        if (sqlite3_open_v2(EPGFile,&Db,SQLITE_OPEN_READWRITE,NULL)!=SQLITE_OK)
         {
-            esyslog("epghandler: failed to open %s",EPGFile);
+            Source->Elog("failed to open %s",EPGFile);
             return;
         }
         closedb=true;
@@ -940,8 +955,8 @@ void cImport::UpdateXMLTVEvent(const char *EPGFile, sqlite3 *db, const char *Sou
         char *eitdescription=strdup(EITDescription);
         if (!eitdescription)
         {
-            esyslog("epghandler: out of memory");
-            if (closedb) sqlite3_close(db);
+            Source->Elog("out of memory");
+            if (closedb) sqlite3_close(Db);
             return;
         }
 
@@ -956,45 +971,60 @@ void cImport::UpdateXMLTVEvent(const char *EPGFile, sqlite3 *db, const char *Sou
         }
 
         if (asprintf(&sql,"update epg set eiteventid=%li, eitdescription='%s' where eventid=%li and src='%s'",
-                     (long int) EITEventID,eitdescription,(long int) EventID,Source)==-1)
+                     (long int) EITEventID,eitdescription,(long int) EventID,SourceName)==-1)
         {
             free(eitdescription);
-            esyslog("epghandler: out of memory");
-            if (closedb) sqlite3_close(db);
+            Source->Elog("out of memory");
+            if (closedb) sqlite3_close(Db);
             return;
         }
         free(eitdescription);
+
+        if (Event)
+        {
+            struct tm tm;
+            char from[80];
+            char till[80];
+            time_t start,end;
+            start=Event->StartTime();
+            end=Event->EndTime();
+            localtime_r(&start,&tm);
+            strftime(from,sizeof(from)-1,"%b %d %H:%M",&tm);
+            localtime_r(&end,&tm);
+            strftime(till,sizeof(till)-1,"%b %d %H:%M",&tm);
+            Source->Dlog("updating description of '%s'@%s-%s in db",Event->Title(),from,till);
+        }
     }
     else
     {
         if (asprintf(&sql,"update epg set eiteventid=%li where eventid=%li and src='%s'",
-                     (long int) EITEventID,(long int) EventID,Source)==-1)
+                     (long int) EITEventID,(long int) EventID,SourceName)==-1)
         {
-            esyslog("epghandler: out of memory");
-            if (closedb) sqlite3_close(db);
+            Source->Elog("out of memory");
+            if (closedb) sqlite3_close(Db);
             return;
         }
     }
 
     char *errmsg;
-    if (sqlite3_exec(db,sql,NULL,NULL,&errmsg)!=SQLITE_OK)
+    if (sqlite3_exec(Db,sql,NULL,NULL,&errmsg)!=SQLITE_OK)
     {
-        esyslog("epghandler: %s -> %s",sql,errmsg);
+        Source->Elog("%s -> %s",sql,errmsg);
         free(sql);
         sqlite3_free(errmsg);
-        if (closedb) sqlite3_close(db);
+        if (closedb) sqlite3_close(Db);
         return;
     }
 
     free(sql);
-    if (closedb) sqlite3_close(db);
+    if (closedb) sqlite3_close(Db);
     return;
 }
 
-cXMLTVEvent *cImport::SearchXMLTVEvent(const char *EPGFile, const char *ChannelID, const cEvent *event)
+cXMLTVEvent *cImport::SearchXMLTVEvent(const char *EPGFile, const char *ChannelID, const cEvent *Event)
 {
 
-    if (!event) return NULL;
+    if (!Event) return NULL;
     if (!EPGFile) return NULL;
 
     cXMLTVEvent *xevent=NULL;
@@ -1011,7 +1041,7 @@ cXMLTVEvent *cImport::SearchXMLTVEvent(const char *EPGFile, const char *ChannelI
     if (asprintf(&sql,"select channelid,eventid,starttime,duration,title,origtitle,shorttext,description," \
                  "country,year,credits,category,review,rating,starrating,video,audio,season,episode," \
                  "mixing,src,eiteventid,eitdescription from epg where eiteventid=%li and channelid='%s' " \
-                 "order by srcidx asc limit 1",(long int) event->EventID(),ChannelID)==-1)
+                 "order by srcidx asc limit 1",(long int) Event->EventID(),ChannelID)==-1)
     {
         sqlite3_close(db);
         esyslog("epghandler: out of memory");
@@ -1026,10 +1056,16 @@ cXMLTVEvent *cImport::SearchXMLTVEvent(const char *EPGFile, const char *ChannelI
     }
 
     int eventTimeDiff=0;
-    if (event->Duration()) eventTimeDiff=event->Duration()/4;
+    if (Event->Duration()) eventTimeDiff=Event->Duration()/4;
     if (eventTimeDiff<780) eventTimeDiff=780;
 
-    char *sqltitle=strdup(event->Title());
+    char *sqltitle=strdup(Event->Title());
+    if (!sqltitle)
+    {
+        sqlite3_close(db);
+        esyslog("epghandler: out of memory");
+        return NULL;
+    }
 
     string st=sqltitle;
 
@@ -1037,16 +1073,20 @@ cXMLTVEvent *cImport::SearchXMLTVEvent(const char *EPGFile, const char *ChannelI
     reps=pcrecpp::RE("'").GlobalReplace("''",&st);
     if (reps)
     {
-        sqltitle=(char *) realloc(sqltitle,st.size()+1);
-        strcpy(sqltitle,st.c_str());
+        char *tmp_sqltitle=(char *) realloc(sqltitle,st.size()+1);
+        if (tmp_sqltitle)
+        {
+            sqltitle=tmp_sqltitle;
+            strcpy(sqltitle,st.c_str());
+        }
     }
 
     if (asprintf(&sql,"select channelid,eventid,starttime,duration,title,origtitle,shorttext,description," \
                  "country,year,credits,category,review,rating,starrating,video,audio,season,episode," \
                  "mixing,src,eiteventid,eitdescription,abs(starttime-%li) as diff from epg where " \
                  " (starttime>=%li and starttime<=%li) and title='%s' and channelid='%s' " \
-                 " order by diff,srcidx asc limit 1",event->StartTime(),event->StartTime()-eventTimeDiff,
-                 event->StartTime()+eventTimeDiff,sqltitle,ChannelID)==-1)
+                 " order by diff,srcidx asc limit 1",Event->StartTime(),Event->StartTime()-eventTimeDiff,
+                 Event->StartTime()+eventTimeDiff,sqltitle,ChannelID)==-1)
     {
         free(sqltitle);
         sqlite3_close(db);

@@ -515,23 +515,23 @@ void cMenuSetupXmltv2vdrLog::output(void)
     int cur=Current();
     Clear();
     Add(NewTitle(tr("overview")));
-    time_t lastexec=src->LastExecution();
-    if (lastexec)
+    time_t nextrun=src->NextRunTime();    
+    if (nextrun)
     {
         struct tm tm;
-        localtime_r(&lastexec,&tm);
-        strftime(lastexec_str,sizeof(lastexec_str)-1,"%d %b %H:%M:%S",&tm);
+        localtime_r(&nextrun,&tm);
+        strftime(nextrun_str,sizeof(nextrun_str)-1,"%d %b %H:%M:%S",&tm);
     }
     cString last;
     if (src->Active())
     {
-        last=cString::sprintf("%s:\t%s",tr("last execution"),
+        last=cString::sprintf("%s:\t%s",tr("next execution"),
                               tr("active"));
     }
     else
     {
-        last=cString::sprintf("%s:\t%s",tr("last execution"),
-                              lastexec ?  lastexec_str : "-");
+        last=cString::sprintf("%s:\t%s",tr("next execution"),
+                              nextrun ?  nextrun_str : "-");
     }
     Add(new cOsdItem(last,osUnknown,true));
 
@@ -616,6 +616,8 @@ cMenuSetupXmltv2vdrLog::cMenuSetupXmltv2vdrLog(cPluginXmltv2vdr *Plugin, cEPGSou
     width=0;
     lastrefresh=(time_t) 0;
     font=NULL;
+    nextrun_str[0]=0;
+    
     cSkinDisplayMenu *disp=DisplayMenu();
     if (disp)
     {

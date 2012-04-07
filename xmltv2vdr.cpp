@@ -98,13 +98,15 @@ bool cEPGHandler::SetDescription(cEvent* Event, const char* Description)
     if (xevent->EITDescription() && Description &&
             strcasecmp(xevent->EITDescription(),Description)) update=true;
 
+    cEPGSource *source=sources->GetSource(xevent->Source());
+
     if (update)
     {
-        import->UpdateXMLTVEvent(epgfile,NULL,xevent->Source(),
+        import->UpdateXMLTVEvent(source,epgfile,NULL,Event,xevent->Source(),
                                  xevent->EventID(),Event->EventID(),Description);
     }
 
-    bool ret=import->PutEvent(sources->GetSource(xevent->Source()),NULL,
+    bool ret=import->PutEvent(source,NULL,
                               (cSchedule *) Event->Schedule(),
                               Event,xevent,Flags,IMPORT_DESCRIPTION);
     delete xevent;
@@ -140,11 +142,12 @@ bool cEPGHandler::SetShortText(cEvent* Event, const char* UNUSED(ShortText))
     cXMLTVEvent *xevent=import->SearchXMLTVEvent(epgfile,map->ChannelName(),Event);
     if (!xevent) return false;
 
-    if (!xevent->EITEventID()) import->UpdateXMLTVEvent(epgfile,NULL,xevent->Source(),
+    cEPGSource *source=sources->GetSource(xevent->Source());
+
+    if (!xevent->EITEventID()) import->UpdateXMLTVEvent(source,epgfile,NULL,Event,xevent->Source(),
                 xevent->EventID(),Event->EventID());
 
-    bool ret=import->PutEvent(sources->GetSource(xevent->Source()),NULL,
-                              (cSchedule *) Event->Schedule(),Event,xevent,
+    bool ret=import->PutEvent(source,NULL,(cSchedule *) Event->Schedule(),Event,xevent,
                               map->Flags(),IMPORT_SHORTTEXT);
     delete xevent;
     if (!ret)
@@ -181,9 +184,10 @@ void cEPGTimer::Action()
 
     for (cTimer *Timer = Timers.First(); Timer; Timer = Timers.Next(Timer))
     {
-        const cEvent *event=Timer->Event();
+        cEvent *event=(cEvent *) Timer->Event();
         if (!event) continue;
         if (!event->ShortText()) continue; // no short text -> no episode
+        if (!strlen(event->ShortText())) continue; // empty short text -> no episode
         if (maps->ProcessChannel(event->ChannelID())) continue; // already processed by xmltv2vdr
 
         cChannel *chan=Channels.GetByChannelID(event->ChannelID());
@@ -201,7 +205,7 @@ void cEPGTimer::Action()
         if (schedule)
         {
             import->PutEvent(sources->GetSource(EITSOURCE),NULL,schedule,
-                             (cEvent *) event,xevent,USE_SEASON,IMPORT_DESCRIPTION);
+                             event,xevent,USE_SEASON,IMPORT_DESCRIPTION);
         }
         delete xevent;
     }
@@ -307,8 +311,9 @@ bool cPluginXmltv2vdr::EPGSourceMove(int From, int To)
 const char *cPluginXmltv2vdr::CommandLineHelp(void)
 {
     // Return a string that describes all known command line options.
-    return "  -E FILE,   --epgfile=FILE write the EPG data into the given FILE(default is\n"
-           "                            'epg.db' in the video directory)\n";
+    return "  -E FILE,   --epgfile=FILE write the EPG data into the given FILE (default is\n"
+           "                            'epg.db' in the video directory) - best performance\n"
+           "                            if located on a ramdisk\n";
 }
 
 bool cPluginXmltv2vdr::ProcessArgs(int argc, char *argv[])
@@ -418,8 +423,12 @@ void cPluginXmltv2vdr::Housekeeping(void)
                             }
                             else
                             {
-                                isyslog("xmltv2vdr: removed %i old entries from db",sqlite3_changes(db));
-                                sqlite3_exec(db,"VACCUM;",NULL,NULL,NULL);
+                                int changes=sqlite3_changes(db);
+                                if (changes)
+                                {
+                                    isyslog("xmltv2vdr: removed %i old entries from db",changes);
+                                    sqlite3_exec(db,"VACCUM;",NULL,NULL,NULL);
+                                }
                             }
                             free(sql);
                         }
@@ -428,7 +437,7 @@ void cPluginXmltv2vdr::Housekeeping(void)
                 }
             }
         }
-        last_housetime_t=now;
+        last_housetime_t=(now / 3600)*3600;
     }
 }
 
@@ -437,23 +446,23 @@ void cPluginXmltv2vdr::MainThreadHook(void)
     // Perform actions in the context of the main program thread.
     // WARNING: Use with great care - see PLUGINS.html!
     time_t now=time(NULL);
-    if (now>(last_maintime_t+60))
+    if (now>=(last_maintime_t+60))
     {
         if (!epgexecutor.Active())
         {
             if (epgsources.RunItNow()) epgexecutor.Start();
         }
-        last_maintime_t=now;
+        last_maintime_t=(now/60)*60;
     }
     if (epall)
     {
-        if (now>(last_epcheck_t+600))
+        if (now>=(last_epcheck_t+600))
         {
             if (IsIdle())
             {
                 epgtimer->Start();
             }
-            last_epcheck_t=now;
+            last_epcheck_t=(now/600)*600;
         }
     }
 }

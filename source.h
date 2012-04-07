@@ -79,7 +79,7 @@ public:
     int Execute(cEPGExecutor &myExecutor);
     int Import(cEPGExecutor &myExecutor);
     bool RunItNow();
-    time_t NextRunTime();
+    time_t NextRunTime(time_t Now=(time_t) 0);
     void Store(void);
     void ChangeChannelSelection(int *Selection);
     char *Log;

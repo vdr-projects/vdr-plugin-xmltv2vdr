@@ -147,20 +147,28 @@ cEPGSource::~cEPGSource()
     if (import) delete import;
 }
 
-time_t cEPGSource::NextRunTime()
+time_t cEPGSource::NextRunTime(time_t Now)
 {
     if (disabled) return 0; // never!
     if (exec_upstart) return 0; // only once!
 
-    time_t t,now=time(NULL);
-    t=cTimer::SetTime(now,cTimer::TimeToInt(exec_time));
+    time_t t;
+    if (!Now)
+    {
+        Now=(time(NULL)/60)*60;
+    }
+    t=cTimer::SetTime(Now,cTimer::TimeToInt(exec_time));
 
     while ((exec_weekday & (1<<cTimer::GetWDay(t)))==0)
     {
         t=cTimer::IncDay(t,1);
     }
 
-    if (t<now) t=cTimer::IncDay(t,1);
+    if (t<Now)
+    {
+        t=cTimer::IncDay(t,1);
+        lastexec=(time_t) 0;
+    }
     return t;
 }
 
@@ -178,10 +186,10 @@ bool cEPGSource::RunItNow()
     }
     else
     {
-        time_t t=time(NULL);
-        time_t nrt=NextRunTime();
+        time_t t=(time(NULL)/60)*60;
+        time_t nrt=NextRunTime(t);
         if (!nrt) return false;
-        if ((t>nrt) && t<(nrt+5)) return true;
+        if (t==nrt) return true;
         return false;
     }
 }

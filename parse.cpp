@@ -99,10 +99,19 @@ time_t cParse::ConvertXMLTVTime2UnixTime(char *xmltvtime)
 void cParse::RemoveNonAlphaNumeric(char *String)
 {
     if (!String) return;
-    int len=strlen(String);
-    char *p=String;
-    int pos=0;
 
+    // remove " Teil "
+    int len=strlen(String);
+    char *p=strstr(String," Teil ");
+    if (p)
+    {
+        memmove(p,p+6,len-6);
+    }
+
+    // remove non alphanumeric characters
+    len=strlen(String);
+    p=String;
+    int pos=0;
     while (*p)
     {
         // 0x30 - 0x39
@@ -135,6 +144,7 @@ void cParse::RemoveNonAlphaNumeric(char *String)
             break;
         }
     }
+
     return;
 }
 
@@ -143,6 +153,8 @@ bool cParse::FetchSeasonEpisode(iconv_t Conv, const char *EPDir, const char *Tit
 {
     if (!EPDir) return false;
     if (!ShortText) return false;
+    size_t slen=strlen(ShortText);
+    if (!slen) return false;
     if (!Title) return false;
     if (Conv==(iconv_t) -1) return false;
 
@@ -176,7 +188,6 @@ bool cParse::FetchSeasonEpisode(iconv_t Conv, const char *EPDir, const char *Tit
         return false;
     }
 
-    size_t slen=strlen(ShortText);
     size_t dlen=4*slen;
     char *dshorttext=(char *) calloc(dlen,1);
     if (!dshorttext)
@@ -197,7 +208,13 @@ bool cParse::FetchSeasonEpisode(iconv_t Conv, const char *EPDir, const char *Tit
     }
 
     RemoveNonAlphaNumeric(dshorttext);
-
+    if (!strlen(dshorttext))
+    {
+        free(dshorttext);
+        fclose(f);
+        free(epfile);
+        return false;
+    }
 
     char *line=NULL;
     size_t length;
