@@ -14,6 +14,29 @@
 #include "setup.h"
 #include "xmltv2vdr.h"
 
+int ioprio_set(int which, int who, int ioprio)
+{
+#if defined(__i386__)
+#define __NR_ioprio_set  289
+#elif defined(__ppc__)
+#define __NR_ioprio_set  273
+#elif defined(__x86_64__)
+#define __NR_ioprio_set  251
+#elif defined(__ia64__)
+#define __NR_ioprio_set  1274
+#else
+#define __NR_ioprio_set  0
+#endif
+    if (__NR_ioprio_set)
+    {
+        return syscall(__NR_ioprio_set, which, who, ioprio);
+    }
+    else
+    {
+        return 0; // just do nothing
+    }
+}
+
 // -------------------------------------------------------------
 
 cEPGHandler::cEPGHandler(cPluginXmltv2vdr *Plugin, const char *EpgFile, cEPGSources *Sources,
@@ -84,6 +107,11 @@ bool cEPGHandler::SetDescription(cEvent* Event, const char* Description)
         ChannelID=map->ChannelName();
     }
 
+    if (ioprio_set(1,getpid(),7 | 3 << 13)==-1)
+    {
+        esyslog("xmltv2vdr: failed to set ioprio to 3,7");
+    }
+
     cXMLTVEvent *xevent=import->SearchXMLTVEvent(epgfile,ChannelID,Event);
     if (!xevent)
     {
@@ -139,6 +167,11 @@ bool cEPGHandler::SetShortText(cEvent* Event, const char* UNUSED(ShortText))
     cEPGMapping *map=maps->GetMap(Event->ChannelID());
     if (!map) return false;
 
+    if (ioprio_set(1,getpid(),7 | 3 << 13)==-1)
+    {
+        esyslog("xmltv2vdr: failed to set ioprio to 3,7");
+    }
+
     cXMLTVEvent *xevent=import->SearchXMLTVEvent(epgfile,map->ChannelName(),Event);
     if (!xevent) return false;
 
@@ -173,6 +206,11 @@ void cEPGTimer::Action()
     struct stat statbuf;
     if (stat(epgfile,&statbuf)==-1) return; // no database? -> exit immediately
     if (!statbuf.st_size) return; // no database? -> exit immediately
+    SetPriority(19);
+    if (ioprio_set(1,getpid(),7 | 3 << 13)==-1)
+    {
+        esyslog("xmltv2vdr: failed to set ioprio to 3,7");
+    }
 
     cSchedulesLock *schedulesLock = new cSchedulesLock(true,2000); // wait up to 2 secs for lock!
     const cSchedules *schedules = cSchedules::Schedules(*schedulesLock);

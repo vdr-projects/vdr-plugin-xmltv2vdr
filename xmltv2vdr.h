@@ -23,6 +23,8 @@
 static const char *VERSION        = "0.1.1pre";
 static const char *DESCRIPTION    = trNOOP("Imports xmltv epg into vdr");
 
+int ioprio_set(int which, int who, int ioprio);
+
 #if VDRVERSNUM < 10726 && !EPGHANDLER
 class cEpgHandler : public cListObject
 {

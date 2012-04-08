@@ -44,6 +44,12 @@ void cEPGExecutor::Action()
     if (!sources) return;
     if (!baseplugin) return;
 
+    SetPriority(19);
+    if (ioprio_set(1,getpid(),7 | 3 << 13)==-1)
+    {
+        esyslog("xmltv2vdr: failed to set ioprio to 3,7");
+    }
+
     for (cEPGSource *epgs=sources->First(); epgs; epgs=sources->Next(epgs))
     {
         if (epgs->RunItNow())
