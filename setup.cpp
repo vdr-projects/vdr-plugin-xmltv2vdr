@@ -515,7 +515,7 @@ void cMenuSetupXmltv2vdrLog::output(void)
     int cur=Current();
     Clear();
     Add(NewTitle(tr("overview")));
-    time_t nextrun=src->NextRunTime();    
+    time_t nextrun=src->NextRunTime();
     if (nextrun)
     {
         struct tm tm;
@@ -617,7 +617,7 @@ cMenuSetupXmltv2vdrLog::cMenuSetupXmltv2vdrLog(cPluginXmltv2vdr *Plugin, cEPGSou
     lastrefresh=(time_t) 0;
     font=NULL;
     nextrun_str[0]=0;
-    
+
     cSkinDisplayMenu *disp=DisplayMenu();
     if (disp)
     {
@@ -944,6 +944,9 @@ void cMenuSetupXmltv2vdrChannelMap::output(void)
     }
 
     Add(new cMyMenuEditBitItem(tr("rating"),&flags,USE_RATING),true);
+#if VDRVERSNUM >= 10711 || EPGHANDLER
+    Add(new cMyMenuEditBitItem(tr(" rating in description"),&flags,OPT_RATING_TEXT),true);
+#endif
     Add(new cMyMenuEditBitItem(tr("starrating"),&flags,USE_STARRATING),true);
     Add(new cMyMenuEditBitItem(tr("review"),&flags,USE_REVIEW),true);
     Add(new cMyMenuEditBitItem(tr("video"),&flags,USE_VIDEO),true);

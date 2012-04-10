@@ -206,6 +206,8 @@ void cEPGTimer::Action()
     struct stat statbuf;
     if (stat(epgfile,&statbuf)==-1) return; // no database? -> exit immediately
     if (!statbuf.st_size) return; // no database? -> exit immediately
+    if (Timers.BeingEdited()) return;
+    Timers.IncBeingEdited();
     SetPriority(19);
     if (ioprio_set(1,getpid(),7 | 3 << 13)==-1)
     {
@@ -217,6 +219,7 @@ void cEPGTimer::Action()
     if (!schedules)
     {
         delete schedulesLock;
+        Timers.DecBeingEdited();
         return;
     }
 
@@ -247,6 +250,7 @@ void cEPGTimer::Action()
         }
         delete xevent;
     }
+    Timers.DecBeingEdited();
     delete schedulesLock;
     cSchedules::Cleanup(true);
 }

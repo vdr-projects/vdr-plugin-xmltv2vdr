@@ -11,10 +11,9 @@
 #include <vdr/channels.h>
 #include <vdr/tools.h>
 
-// Usage field definition
+// Flags field definition
 
-// Bit  0- 5  UNUSED
-// Bit  6-23  USE_ flags
+// Bit  0-23  USE_ flags
 // Bit 24-30  OPT_ flags
 // Bit 31     always zero
 
@@ -37,6 +36,9 @@
 #define CREDITS_DIRECTORS      0x200000
 #define CREDITS_OTHERS         0x400000
 #define CREDITS_LIST           0x800000
+
+#define OPT_RATING_TEXT        0x1000000
+#define OPT_CATEGORIES_TEXT    0x2000000
 
 #define OPT_MERGELTEXT         0x10000000
 #define OPT_APPEND             0x40000000
@@ -63,7 +65,7 @@ public:
 class cTEXTMappings : public cList<cTEXTMapping>
 {
 public:
-  cTEXTMapping *GetMap(const char *Name);
+    cTEXTMapping *GetMap(const char *Name);
     void Remove();
 };
 

@@ -631,6 +631,7 @@ bool cImport::PutEvent(cEPGSource *source, sqlite3 *db, cSchedule* schedule,
         if (((Flags & USE_RATING)==USE_RATING) && (xevent->Rating()->Size()))
         {
             cXMLTVStringList *rating=xevent->Rating();
+            int rv=0;
             for (int i=0; i<rating->Size(); i++)
             {
                 char *rtype=strdup((*rating)[i]);
@@ -641,15 +642,32 @@ bool cImport::PutEvent(cEPGSource *source, sqlite3 *db, cSchedule* schedule,
                     {
                         *rval=0;
                         rval++;
-
+#if VDRVERSNUM < 10711 && !EPGHANDLER
                         description=Add2Description(description,rtype);
                         description=Add2Description(description,": ");
                         description=Add2Description(description,rval);
                         description=Add2Description(description,"\n");
+#else
+                        if ((Flags & OPT_RATING_TEXT)==OPT_RATING_TEXT)
+                        {
+                            description=Add2Description(description,rtype);
+                            description=Add2Description(description,": ");
+                            description=Add2Description(description,rval);
+                            description=Add2Description(description,"\n");
+                        }
+                        int r=atoi(rval);
+                        if (r>rv) rv=r;
+#endif
                     }
                     free(rtype);
                 }
             }
+#if VDRVERSNUM >= 10711 || EPGHANDLER
+            if ((rv>0) && (rv<=18))
+            {
+                event->SetParentalRating(rv);
+            }
+#endif
         }
 
         if (((Flags & USE_STARRATING)==USE_STARRATING) && (xevent->StarRating()->Size()))
