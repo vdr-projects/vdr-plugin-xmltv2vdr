@@ -56,10 +56,8 @@ private:
     cXMLTVStringList review;
     cXMLTVStringList rating;
     cXMLTVStringList starrating;
-#if VDRVERSNUM >= 10711
-    uchar parentalRating;
+    int parentalRating;
     uchar contents[MaxEventContents];
-#endif
 public:
     cXMLTVEvent();
     ~cXMLTVEvent();
@@ -141,6 +139,10 @@ public:
     void SetMixing(void)
     {
         mixing=true;
+    }
+    int ParentalRating() const
+    {
+        return parentalRating;
     }
     int Duration() const
     {

@@ -58,6 +58,23 @@ class cEPGSources;
 class cImport;
 class cPluginXmltv2vdr;
 
+class cEPGHandlerState
+{
+  private:
+    cXMLTVEvent *xevent;
+    cEPGSource *source;
+    int flags;
+  public:
+    cEPGHandlerState();
+    ~cEPGHandlerState();
+    void Clear();
+    void Set(cEPGSource *Source, cXMLTVEvent *xEvent, int Flags);
+    bool isSame(tEventID EventID);
+    cXMLTVEvent *xEvent() { return xevent; }
+    cEPGSource *Source() { return source; }
+    int Flags() { return flags; }
+};
+
 class cEPGHandler : public cEpgHandler
 {
 private:
@@ -67,6 +84,7 @@ private:
     cEPGSources *sources;
     cImport *import;
     bool epall;
+    cEPGHandlerState last;
 public:
     cEPGHandler(cPluginXmltv2vdr *Plugin, const char *EpgFile, cEPGSources *Sources,
                 cEPGMappings *Maps, cTEXTMappings *Texts);

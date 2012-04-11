@@ -159,6 +159,13 @@ void cXMLTVEvent::SetRating(const char *Rating)
     while (tok)
     {
         rating.Append(strdup(tok));
+        char *rval=strchr(tok,'|');
+        if (rval)
+        {
+            rval++;
+            int r=atoi(rval);
+            if ((r>0 && r<=18) && (r>parentalRating)) parentalRating=r;
+        }
         tok=strtok_r(NULL,delim,&sp);
     }
     rating.Sort();
@@ -214,6 +221,8 @@ void cXMLTVEvent::AddRating(const char *System, const char *Rating)
 {
     char *value=NULL;
     if (asprintf(&value,"%s|%s",System,Rating)==-1) return;
+    int r=atoi(Rating);
+    if ((r>0 && r<=18) && (r>parentalRating)) parentalRating=r;
     rating.Append(value);
     rating.Sort();
 }
@@ -379,6 +388,8 @@ void cXMLTVEvent::Clear()
     starrating.Clear();
     season=0;
     episode=0;
+    parentalRating=0;
+    memset(&contents,0,sizeof(contents));
     mixing=false;
 }
 

@@ -630,42 +630,36 @@ bool cImport::PutEvent(cEPGSource *source, sqlite3 *db, cSchedule* schedule,
 
         if (((Flags & USE_RATING)==USE_RATING) && (xevent->Rating()->Size()))
         {
-            cXMLTVStringList *rating=xevent->Rating();
-            int rv=0;
-            for (int i=0; i<rating->Size(); i++)
-            {
-                char *rtype=strdup((*rating)[i]);
-                if (rtype)
-                {
-                    char *rval=strchr(rtype,'|');
-                    if (rval)
-                    {
-                        *rval=0;
-                        rval++;
 #if VDRVERSNUM < 10711 && !EPGHANDLER
-                        description=Add2Description(description,rtype);
-                        description=Add2Description(description,": ");
-                        description=Add2Description(description,rval);
-                        description=Add2Description(description,"\n");
-#else
-                        if ((Flags & OPT_RATING_TEXT)==OPT_RATING_TEXT)
+            Flags|=OPT_RATING_TEXT; // always add to text if we dont have the internal tag!
+#endif
+            if ((Flags & OPT_RATING_TEXT)==OPT_RATING_TEXT)
+            {
+                cXMLTVStringList *rating=xevent->Rating();
+                for (int i=0; i<rating->Size(); i++)
+                {
+                    char *rtype=strdup((*rating)[i]);
+                    if (rtype)
+                    {
+                        char *rval=strchr(rtype,'|');
+                        if (rval)
                         {
+                            *rval=0;
+                            rval++;
+
                             description=Add2Description(description,rtype);
                             description=Add2Description(description,": ");
                             description=Add2Description(description,rval);
                             description=Add2Description(description,"\n");
                         }
-                        int r=atoi(rval);
-                        if (r>rv) rv=r;
-#endif
+                        free(rtype);
                     }
-                    free(rtype);
                 }
             }
 #if VDRVERSNUM >= 10711 || EPGHANDLER
-            if ((rv>0) && (rv<=18))
+            if (xevent->ParentalRating())
             {
-                event->SetParentalRating(rv);
+                event->SetParentalRating(xevent->ParentalRating());
             }
 #endif
         }

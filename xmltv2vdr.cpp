@@ -39,6 +39,50 @@ int ioprio_set(int which, int who, int ioprio)
 
 // -------------------------------------------------------------
 
+cEPGHandlerState::cEPGHandlerState()
+{
+    xevent=NULL;
+    Clear();
+}
+
+cEPGHandlerState::~cEPGHandlerState()
+{
+    Clear();
+}
+
+void cEPGHandlerState::Clear()
+{
+    if (xevent)
+    {
+        delete xevent;
+        xevent=NULL;
+    }
+    source=NULL;
+    flags=0;
+}
+
+
+void cEPGHandlerState::Set(cEPGSource* Source, cXMLTVEvent* xEvent, int Flags)
+{
+    Clear();
+    source=Source;
+    xevent=xEvent;
+    flags=Flags;
+    if (ioprio_set(1,getpid(),7 | 3 << 13)==-1)
+    {
+        esyslog("xmltv2vdr: failed to set ioprio to 3,7");
+    }
+}
+
+bool cEPGHandlerState::isSame(tEventID EventID)
+{
+    if (!xevent) return false;
+    if (xevent->EITEventID()==EventID) return true;
+    return false;
+}
+
+// -------------------------------------------------------------
+
 cEPGHandler::cEPGHandler(cPluginXmltv2vdr *Plugin, const char *EpgFile, cEPGSources *Sources,
                          cEPGMappings *Maps, cTEXTMappings *Texts)
 {
@@ -74,70 +118,77 @@ bool cEPGHandler::SetDescription(cEvent* Event, const char* Description)
     if (!import) return false;
     if (!baseplugin) return false;
 
-    bool special_epall_timer_handling=false;
-    if (!maps->ProcessChannel(Event->ChannelID()))
+    if (!last.isSame(Event->EventID()))
     {
-        if (!epall) return false;
-        if (!Event->HasTimer()) return false;
-        if (!Event->ShortText()) return false;
-        special_epall_timer_handling=true;
-    }
+        last.Clear();
+        bool special_epall_timer_handling=false;
+        if (!maps->ProcessChannel(Event->ChannelID()))
+        {
+            if (!epall) return false;
+            if (!Event->HasTimer()) return false;
+            if (!Event->ShortText()) return false;
+            special_epall_timer_handling=true;
+        }
 
-    if (!baseplugin->IsIdle())
-    {
-        if (import->WasChanged(Event)) return true;
-        return false;
-    }
+        if (!baseplugin->IsIdle())
+        {
+            if (import->WasChanged(Event)) return true;
+            return false;
+        }
 
-    int Flags=0;
-    const char *ChannelID;
+        int Flags=0;
+        const char *ChannelID;
 
-    if (special_epall_timer_handling)
-    {
-        cChannel *chan=Channels.GetByChannelID(Event->ChannelID());
-        if (!chan) return false;
-        Flags=USE_SEASON;
-        ChannelID=chan->Name();
+        if (special_epall_timer_handling)
+        {
+            cChannel *chan=Channels.GetByChannelID(Event->ChannelID());
+            if (!chan) return false;
+            Flags=USE_SEASON;
+            ChannelID=chan->Name();
+        }
+        else
+        {
+            cEPGMapping *map=maps->GetMap(Event->ChannelID());
+            if (!map) return false;
+            Flags=map->Flags();
+            ChannelID=map->ChannelName();
+        }
+
+        cXMLTVEvent *xevent=import->SearchXMLTVEvent(epgfile,ChannelID,Event);
+        if (!xevent)
+        {
+            if (!epall) return false;
+            xevent=import->AddXMLTVEvent(epgfile,ChannelID,Event,Description);
+            if (!xevent) return false;
+        }
+        cEPGSource *source=sources->GetSource(xevent->Source());
+        last.Set(source,xevent,Flags);
     }
     else
     {
-        cEPGMapping *map=maps->GetMap(Event->ChannelID());
-        if (!map) return false;
-        Flags=map->Flags();
-        ChannelID=map->ChannelName();
-    }
-
-    if (ioprio_set(1,getpid(),7 | 3 << 13)==-1)
-    {
-        esyslog("xmltv2vdr: failed to set ioprio to 3,7");
-    }
-
-    cXMLTVEvent *xevent=import->SearchXMLTVEvent(epgfile,ChannelID,Event);
-    if (!xevent)
-    {
-        if (!epall) return false;
-        xevent=import->AddXMLTVEvent(epgfile,ChannelID,Event,Description);
-        if (!xevent) return false;
+        if (!baseplugin->IsIdle())
+        {
+            if (import->WasChanged(Event)) return true;
+            return false;
+        }
     }
 
     bool update=false;
-    if (!xevent->EITEventID()) update=true;
-    if (!xevent->EITDescription() && Description) update=true;
-    if (xevent->EITDescription() && Description &&
-            strcasecmp(xevent->EITDescription(),Description)) update=true;
 
-    cEPGSource *source=sources->GetSource(xevent->Source());
+    if (!last.xEvent()->EITEventID()) update=true;
+    if (!last.xEvent()->EITDescription() && Description) update=true;
+    if (last.xEvent()->EITDescription() && Description &&
+            strcasecmp(last.xEvent()->EITDescription(),Description)) update=true;
 
     if (update)
     {
-        import->UpdateXMLTVEvent(source,epgfile,NULL,Event,xevent->Source(),
-                                 xevent->EventID(),Event->EventID(),Description);
+        import->UpdateXMLTVEvent(last.Source(),epgfile,NULL,Event,last.xEvent()->Source(),
+                                 last.xEvent()->EventID(),Event->EventID(),Description);
     }
 
-    bool ret=import->PutEvent(source,NULL,
+    bool ret=import->PutEvent(last.Source(),NULL,
                               (cSchedule *) Event->Schedule(),
-                              Event,xevent,Flags,IMPORT_DESCRIPTION);
-    delete xevent;
+                              Event,last.xEvent(),last.Flags(),IMPORT_DESCRIPTION);
     if (!ret)
     {
         dsyslog("xmltv2vdr: failed to put event description!");
@@ -145,9 +196,48 @@ bool cEPGHandler::SetDescription(cEvent* Event, const char* Description)
     return ret;
 }
 
-bool cEPGHandler::SetParentalRating(cEvent* UNUSED(Event), int UNUSED(ParentalRating))
+bool cEPGHandler::SetParentalRating(cEvent* Event, int ParentalRating)
 {
-    return false;
+    if (!Event) return false;
+    if (!maps) return false;
+    if (!import) return false;
+
+    if (!last.isSame(Event->EventID()))
+    {
+        last.Clear();
+
+        if (!maps->ProcessChannel(Event->ChannelID())) return false;
+
+        if (!baseplugin->IsIdle())
+        {
+            if (import->WasChanged(Event)) return true;
+            return false;
+        }
+
+        cEPGMapping *map=maps->GetMap(Event->ChannelID());
+        if (!map) return false;
+
+        cXMLTVEvent *xevent=import->SearchXMLTVEvent(epgfile,map->ChannelName(),Event);
+        if (!xevent) return false;
+
+        cEPGSource *source=sources->GetSource(xevent->Source());
+
+        if (!xevent->EITEventID()) import->UpdateXMLTVEvent(source,epgfile,NULL,Event,xevent->Source(),
+                    xevent->EventID(),Event->EventID());
+        last.Set(source,xevent,map->Flags());
+    }
+    else
+    {
+        if (!baseplugin->IsIdle())
+        {
+            if (import->WasChanged(Event)) return true;
+            return false;
+        }
+    }
+
+    if (ParentalRating>last.xEvent()->ParentalRating()) return false; // use dvb value
+    Event->SetParentalRating(last.xEvent()->ParentalRating());
+    return true;
 }
 
 bool cEPGHandler::SetShortText(cEvent* Event, const char* UNUSED(ShortText))
@@ -156,33 +246,41 @@ bool cEPGHandler::SetShortText(cEvent* Event, const char* UNUSED(ShortText))
     if (!maps) return false;
     if (!import) return false;
 
-    if (!maps->ProcessChannel(Event->ChannelID())) return false;
-
-    if (!baseplugin->IsIdle())
+    if (!last.isSame(Event->EventID()))
     {
-        if (import->WasChanged(Event)) return true;
-        return false;
+        last.Clear();
+
+        if (!maps->ProcessChannel(Event->ChannelID())) return false;
+
+        if (!baseplugin->IsIdle())
+        {
+            if (import->WasChanged(Event)) return true;
+            return false;
+        }
+
+        cEPGMapping *map=maps->GetMap(Event->ChannelID());
+        if (!map) return false;
+
+        cXMLTVEvent *xevent=import->SearchXMLTVEvent(epgfile,map->ChannelName(),Event);
+        if (!xevent) return false;
+
+        cEPGSource *source=sources->GetSource(xevent->Source());
+
+        if (!xevent->EITEventID()) import->UpdateXMLTVEvent(source,epgfile,NULL,Event,xevent->Source(),
+                    xevent->EventID(),Event->EventID());
+        last.Set(source,xevent,map->Flags());
+    }
+    else
+    {
+        if (!baseplugin->IsIdle())
+        {
+            if (import->WasChanged(Event)) return true;
+            return false;
+        }
     }
 
-    cEPGMapping *map=maps->GetMap(Event->ChannelID());
-    if (!map) return false;
-
-    if (ioprio_set(1,getpid(),7 | 3 << 13)==-1)
-    {
-        esyslog("xmltv2vdr: failed to set ioprio to 3,7");
-    }
-
-    cXMLTVEvent *xevent=import->SearchXMLTVEvent(epgfile,map->ChannelName(),Event);
-    if (!xevent) return false;
-
-    cEPGSource *source=sources->GetSource(xevent->Source());
-
-    if (!xevent->EITEventID()) import->UpdateXMLTVEvent(source,epgfile,NULL,Event,xevent->Source(),
-                xevent->EventID(),Event->EventID());
-
-    bool ret=import->PutEvent(source,NULL,(cSchedule *) Event->Schedule(),Event,xevent,
-                              map->Flags(),IMPORT_SHORTTEXT);
-    delete xevent;
+    bool ret=import->PutEvent(last.Source(),NULL,(cSchedule *) Event->Schedule(),Event,last.xEvent(),
+                              last.Flags(),IMPORT_SHORTTEXT);
     if (!ret)
     {
         dsyslog("xmltv2vdr: failed to put event shorttext!");
