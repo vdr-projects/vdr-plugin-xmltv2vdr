@@ -91,6 +91,7 @@ cEPGHandler::cEPGHandler(cPluginXmltv2vdr *Plugin, const char *EpgFile, cEPGSour
     epgfile=EpgFile;
     maps=Maps;
     sources=Sources;
+    db=NULL;
     import = new cImport(NULL,Maps,Texts);
 }
 
@@ -130,7 +131,7 @@ bool cEPGHandler::SetDescription(cEvent* Event, const char* Description)
             special_epall_timer_handling=true;
         }
 
-        if (!baseplugin->IsIdle())
+        if (!baseplugin->IsIdle(false))
         {
             if (import->WasChanged(Event)) return true;
             return false;
@@ -154,7 +155,7 @@ bool cEPGHandler::SetDescription(cEvent* Event, const char* Description)
             ChannelID=map->ChannelName();
         }
 
-        cXMLTVEvent *xevent=import->SearchXMLTVEvent(epgfile,ChannelID,Event);
+        cXMLTVEvent *xevent=import->SearchXMLTVEvent(&db,ChannelID,Event);
         if (!xevent)
         {
             if (!epall) return false;
@@ -166,7 +167,7 @@ bool cEPGHandler::SetDescription(cEvent* Event, const char* Description)
     }
     else
     {
-        if (!baseplugin->IsIdle())
+        if (!baseplugin->IsIdle(false))
         {
             if (import->WasChanged(Event)) return true;
             return false;
@@ -182,7 +183,7 @@ bool cEPGHandler::SetDescription(cEvent* Event, const char* Description)
 
     if (update)
     {
-        import->UpdateXMLTVEvent(last.Source(),epgfile,NULL,Event,last.xEvent()->Source(),
+        import->UpdateXMLTVEvent(last.Source(),db,Event,last.xEvent()->Source(),
                                  last.xEvent()->EventID(),Event->EventID(),Description);
     }
 
@@ -208,7 +209,7 @@ bool cEPGHandler::SetParentalRating(cEvent* Event, int ParentalRating)
 
         if (!maps->ProcessChannel(Event->ChannelID())) return false;
 
-        if (!baseplugin->IsIdle())
+        if (!baseplugin->IsIdle(false))
         {
             if (import->WasChanged(Event)) return true;
             return false;
@@ -217,18 +218,18 @@ bool cEPGHandler::SetParentalRating(cEvent* Event, int ParentalRating)
         cEPGMapping *map=maps->GetMap(Event->ChannelID());
         if (!map) return false;
 
-        cXMLTVEvent *xevent=import->SearchXMLTVEvent(epgfile,map->ChannelName(),Event);
+        cXMLTVEvent *xevent=import->SearchXMLTVEvent(&db,map->ChannelName(),Event);
         if (!xevent) return false;
 
         cEPGSource *source=sources->GetSource(xevent->Source());
 
-        if (!xevent->EITEventID()) import->UpdateXMLTVEvent(source,epgfile,NULL,Event,xevent->Source(),
+        if (!xevent->EITEventID()) import->UpdateXMLTVEvent(source,db,Event,xevent->Source(),
                     xevent->EventID(),Event->EventID());
         last.Set(source,xevent,map->Flags());
     }
     else
     {
-        if (!baseplugin->IsIdle())
+        if (!baseplugin->IsIdle(false))
         {
             if (import->WasChanged(Event)) return true;
             return false;
@@ -236,7 +237,11 @@ bool cEPGHandler::SetParentalRating(cEvent* Event, int ParentalRating)
     }
 
     if (ParentalRating>last.xEvent()->ParentalRating()) return false; // use dvb value
-    Event->SetParentalRating(last.xEvent()->ParentalRating());
+    if (Event->ParentalRating()!=last.xEvent()->ParentalRating())
+    {
+        last.Source()->Tlog("changing rating of '%s'",Event->Title());
+        Event->SetParentalRating(last.xEvent()->ParentalRating());
+    }
     return true;
 }
 
@@ -252,7 +257,7 @@ bool cEPGHandler::SetShortText(cEvent* Event, const char* UNUSED(ShortText))
 
         if (!maps->ProcessChannel(Event->ChannelID())) return false;
 
-        if (!baseplugin->IsIdle())
+        if (!baseplugin->IsIdle(false))
         {
             if (import->WasChanged(Event)) return true;
             return false;
@@ -261,25 +266,25 @@ bool cEPGHandler::SetShortText(cEvent* Event, const char* UNUSED(ShortText))
         cEPGMapping *map=maps->GetMap(Event->ChannelID());
         if (!map) return false;
 
-        cXMLTVEvent *xevent=import->SearchXMLTVEvent(epgfile,map->ChannelName(),Event);
+        cXMLTVEvent *xevent=import->SearchXMLTVEvent(&db,map->ChannelName(),Event);
         if (!xevent) return false;
 
         cEPGSource *source=sources->GetSource(xevent->Source());
 
-        if (!xevent->EITEventID()) import->UpdateXMLTVEvent(source,epgfile,NULL,Event,xevent->Source(),
+        if (!xevent->EITEventID()) import->UpdateXMLTVEvent(source,db,Event,xevent->Source(),
                     xevent->EventID(),Event->EventID());
         last.Set(source,xevent,map->Flags());
     }
     else
     {
-        if (!baseplugin->IsIdle())
+        if (!baseplugin->IsIdle(false))
         {
             if (import->WasChanged(Event)) return true;
             return false;
         }
     }
 
-    bool ret=import->PutEvent(last.Source(),NULL,(cSchedule *) Event->Schedule(),Event,last.xEvent(),
+    bool ret=import->PutEvent(last.Source(),db,(cSchedule *) Event->Schedule(),Event,last.xEvent(),
                               last.Flags(),IMPORT_SHORTTEXT);
     if (!ret)
     {
@@ -287,6 +292,17 @@ bool cEPGHandler::SetShortText(cEvent* Event, const char* UNUSED(ShortText))
     }
     return ret;
 }
+
+bool cEPGHandler::SortSchedule(cSchedule* UNUSED(Schedule))
+{
+    if (db)
+    {
+        import->Commit(db);
+        sqlite3_close(db);
+    }
+    return false; // we dont sort!
+}
+
 
 // -------------------------------------------------------------
 
@@ -321,6 +337,7 @@ void cEPGTimer::Action()
         return;
     }
 
+    sqlite3 *db=NULL;
     for (cTimer *Timer = Timers.First(); Timer; Timer = Timers.Next(Timer))
     {
         cEvent *event=(cEvent *) Timer->Event();
@@ -333,7 +350,7 @@ void cEPGTimer::Action()
         if (!chan) continue;
         const char *ChannelID=chan->Name();
 
-        cXMLTVEvent *xevent=import->SearchXMLTVEvent(epgfile,ChannelID,event);
+        cXMLTVEvent *xevent=import->SearchXMLTVEvent(&db,ChannelID,event);
         if (!xevent)
         {
             xevent=import->AddXMLTVEvent(epgfile,ChannelID,event,event->Description());
@@ -347,6 +364,11 @@ void cEPGTimer::Action()
                              event,xevent,USE_SEASON,IMPORT_DESCRIPTION);
         }
         delete xevent;
+    }
+    if (db)
+    {
+        import->Commit(db);
+        sqlite3_close(db);
     }
     Timers.DecBeingEdited();
     delete schedulesLock;
@@ -404,9 +426,16 @@ cPluginXmltv2vdr::~cPluginXmltv2vdr()
 #endif
 }
 
-bool cPluginXmltv2vdr::IsIdle()
+bool cPluginXmltv2vdr::IsIdle(bool IncludeHandler)
 {
-    if (!epgexecutor.Active() && (!epgtimer->Active())) return true;
+    if (IncludeHandler)
+    {
+        if (!epgexecutor.Active() && (!epgtimer->Active()) && (!epghandler->Active())) return true;
+    }
+    else
+    {
+        if (!epgexecutor.Active() && (!epgtimer->Active())) return true;
+    }
     return false;
 }
 

@@ -8,6 +8,7 @@
 #ifndef _XMLTV2VDR_H
 #define _XMLTV2VDR_H
 
+#include <sqlite3.h>
 #include <vdr/plugin.h>
 #include "maps.h"
 #include "parse.h"
@@ -51,6 +52,10 @@ public:
     {
         return false;
     }
+    virtual bool SortSchedule(cSchedule *Schedule)
+    {
+        return false;
+    }
 };
 #endif
 
@@ -60,19 +65,28 @@ class cPluginXmltv2vdr;
 
 class cEPGHandlerState
 {
-  private:
+private:
     cXMLTVEvent *xevent;
     cEPGSource *source;
     int flags;
-  public:
+public:
     cEPGHandlerState();
     ~cEPGHandlerState();
     void Clear();
     void Set(cEPGSource *Source, cXMLTVEvent *xEvent, int Flags);
     bool isSame(tEventID EventID);
-    cXMLTVEvent *xEvent() { return xevent; }
-    cEPGSource *Source() { return source; }
-    int Flags() { return flags; }
+    cXMLTVEvent *xEvent()
+    {
+        return xevent;
+    }
+    cEPGSource *Source()
+    {
+        return source;
+    }
+    int Flags()
+    {
+        return flags;
+    }
 };
 
 class cEPGHandler : public cEpgHandler
@@ -84,6 +98,8 @@ private:
     cEPGSources *sources;
     cImport *import;
     bool epall;
+    sqlite3 *db;
+    void closedb(void);
     cEPGHandlerState last;
 public:
     cEPGHandler(cPluginXmltv2vdr *Plugin, const char *EpgFile, cEPGSources *Sources,
@@ -92,12 +108,14 @@ public:
     {
         epall=Value;
     }
+    bool Active() { return (db!=NULL); }
     virtual ~cEPGHandler();
     virtual bool IgnoreChannel(const cChannel *Channel);
     virtual bool SetShortText(cEvent *Event, const char *ShortText);
     virtual bool SetDescription(cEvent *Event, const char *Description);
     virtual bool SetContents(cEvent *Event, uchar *Contents);
     virtual bool SetParentalRating(cEvent *Event, int ParentalRating);
+    virtual bool SortSchedule(cSchedule *Schedule);
 };
 
 class cEPGTimer : public cThread
@@ -161,7 +179,7 @@ public:
         epgsources.ReadIn(confdir,epgfile,&epgmappings,&textmappings,srcorder,Reload);
     }
     void Wait4TimerThread();
-    bool IsIdle();
+    bool IsIdle(bool IncludeHandler=true);
     bool EPGSourceMove(int From, int To);
     int EPGSourceCount()
     {

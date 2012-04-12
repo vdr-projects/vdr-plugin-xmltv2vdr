@@ -158,6 +158,7 @@ public:
     {
         return lastexec;
     }
+    void Tlog(const char *format, ...);    
     void Dlog(const char *format, ...);
     void Elog(const char *format, ...);
     void Ilog(const char *format, ...);

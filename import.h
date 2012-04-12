@@ -48,11 +48,12 @@ private:
     cEPGSource *source;
     cTEXTMappings *texts;
     cCharSetConv *conv;
+    bool pendingtransaction;
     const char *epgfile;
     char *RemoveLastCharFromDescription(char *description);
-    char *Add2Description(char *description, const char *Value);
-    char *Add2Description(char *description, const char *Name, const char *Value);
-    char *Add2Description(char *description, const char *Name, int Value);
+    char *Add2Description(char *description, const char *value);
+    char *Add2Description(char *description, const char *name, const char *value);
+    char *Add2Description(char *description, const char *name, int value);
     char *AddEOT2Description(char *description);
     struct split split(char *in, char delim);
     cEvent *GetEventBefore(cSchedule* schedule, time_t start);
@@ -64,11 +65,12 @@ public:
     cImport(cEPGSource *Source, cEPGMappings *Maps, cTEXTMappings *Texts);
     ~cImport();
     int Process(cEPGExecutor &myExecutor);
+    void Commit(sqlite3 *Db);
     bool WasChanged(cEvent *Event);
     bool PutEvent(cEPGSource *source, sqlite3 *db, cSchedule* schedule, cEvent *event,
                   cXMLTVEvent *xevent, int Flags, int Option=IMPORT_ALL);
-    cXMLTVEvent *SearchXMLTVEvent(const char *EPGFile, const char *ChannelID, const cEvent *Event);
-    void UpdateXMLTVEvent(cEPGSource *Source, const char *EPGFile, sqlite3 *Db, const cEvent *Event,
+    cXMLTVEvent *SearchXMLTVEvent(sqlite3 **Db, const char *ChannelID, const cEvent *Event);
+    void UpdateXMLTVEvent(cEPGSource *Source, sqlite3 *Db, const cEvent *Event,
                           const char *SourceName, tEventID EventID, tEventID EITEventID,
                           const char *EITDescription=NULL);
     cXMLTVEvent *AddXMLTVEvent(const char *EPGFile, const char *ChannelID, const cEvent *Event,

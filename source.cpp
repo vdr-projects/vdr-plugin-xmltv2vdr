@@ -781,6 +781,20 @@ void cEPGSource::Elog(const char *format, ...)
     free(ptr);
 }
 
+void cEPGSource::Tlog(const char *format, ...)
+{
+    va_list ap;
+    char fmt[255];
+    if (snprintf(fmt,sizeof(fmt),"xmltv2vdr: '%s' %s",name,format)==-1) return;
+    va_start(ap, format);
+    char *ptr;
+    if (vasprintf(&ptr,fmt,ap)==-1) return;
+    va_end(ap);
+    //tsyslog(ptr);
+    add2Log('D',ptr+14+strlen(name));
+    free(ptr);
+}
+
 void cEPGSource::Dlog(const char *format, ...)
 {
     va_list ap;

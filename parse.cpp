@@ -564,7 +564,13 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
                "starrating text, video text, audio text, season int, episode int, mixing int," \
                "srcidx int," \
                "PRIMARY KEY(src, channelid, eventid)" \
-               ")";
+               ");" \
+               "CREATE UNIQUE INDEX IF NOT EXISTS idx1 on epg (eventid, src); " \
+               "CREATE UNIQUE INDEX IF NOT EXISTS idx2 on epg (eventid, channelid); " \
+               "CREATE UNIQUE INDEX IF NOT EXISTS idx3 on epg (eventid, channelid, src); " \
+               "CREATE UNIQUE INDEX IF NOT EXISTS idx4 on epg (starttime, title, channelid); " \
+               "CREATE INDEX IF NOT EXISTS idx5 on epg (starttime, src); " \
+               "BEGIN";
 
     char *errmsg;
     if (sqlite3_exec(db,sql,NULL,NULL,&errmsg)!=SQLITE_OK)
@@ -655,13 +661,12 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
 
         if (!FetchEvent(node)) // sets xevent
         {
-            source->Dlog("failed to fetch event");
+            source->Tlog("failed to fetch event");
             node=node->next;
             xmlFree(channelid);
             continue;
         }
 
-        char *errmsg;
         const char *sql=xevent.GetSQL(source->Name(),source->Index(),(const char *) channelid);
         if (sqlite3_exec(db,sql,NULL,NULL,&errmsg)!=SQLITE_OK)
         {
@@ -679,6 +684,13 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
             break;
         }
     }
+    
+    if (sqlite3_exec(db,"COMMIT",NULL,NULL,&errmsg)!=SQLITE_OK)
+    {
+        source->Elog("sqlite3: %s",errmsg);
+        sqlite3_free(errmsg);
+    }
+    
     sqlite3_close(db);
 
     xmlFreeDoc(xmltv);
