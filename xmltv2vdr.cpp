@@ -88,11 +88,10 @@ cEPGHandler::cEPGHandler(cPluginXmltv2vdr *Plugin, const char *EpgFile, cEPGSour
 {
     baseplugin=Plugin;
     epall=false;
-    epgfile=EpgFile;
     maps=Maps;
     sources=Sources;
     db=NULL;
-    import = new cImport(NULL,Maps,Texts);
+    import = new cImport(EpgFile,Maps,Texts);
 }
 
 cEPGHandler::~cEPGHandler()
@@ -159,7 +158,7 @@ bool cEPGHandler::SetDescription(cEvent* Event, const char* Description)
         if (!xevent)
         {
             if (!epall) return false;
-            xevent=import->AddXMLTVEvent(epgfile,ChannelID,Event,Description);
+            xevent=import->AddXMLTVEvent(db,ChannelID,Event,Description);
             if (!xevent) return false;
         }
         cEPGSource *source=sources->GetSource(xevent->Source());
@@ -183,11 +182,11 @@ bool cEPGHandler::SetDescription(cEvent* Event, const char* Description)
 
     if (update)
     {
-        import->UpdateXMLTVEvent(last.Source(),db,Event,last.xEvent()->Source(),
-                                 last.xEvent()->EventID(),Event->EventID(),Description);
+        import->UpdateXMLTVEvent(last.Source(),db,Event,last.xEvent()->EventID(),
+                                 Event->EventID(),Description);
     }
 
-    bool ret=import->PutEvent(last.Source(),NULL,
+    bool ret=import->PutEvent(last.Source(),db,
                               (cSchedule *) Event->Schedule(),
                               Event,last.xEvent(),last.Flags(),IMPORT_DESCRIPTION);
     if (!ret)
@@ -223,8 +222,8 @@ bool cEPGHandler::SetParentalRating(cEvent* Event, int ParentalRating)
 
         cEPGSource *source=sources->GetSource(xevent->Source());
 
-        if (!xevent->EITEventID()) import->UpdateXMLTVEvent(source,db,Event,xevent->Source(),
-                    xevent->EventID(),Event->EventID());
+        if (!xevent->EITEventID()) import->UpdateXMLTVEvent(source,db,Event,xevent->EventID(),
+                    Event->EventID());
         last.Set(source,xevent,map->Flags());
     }
     else
@@ -271,8 +270,8 @@ bool cEPGHandler::SetShortText(cEvent* Event, const char* UNUSED(ShortText))
 
         cEPGSource *source=sources->GetSource(xevent->Source());
 
-        if (!xevent->EITEventID()) import->UpdateXMLTVEvent(source,db,Event,xevent->Source(),
-                    xevent->EventID(),Event->EventID());
+        if (!xevent->EITEventID()) import->UpdateXMLTVEvent(source,db,Event,xevent->EventID(),
+                    Event->EventID());
         last.Set(source,xevent,map->Flags());
     }
     else
@@ -297,8 +296,9 @@ bool cEPGHandler::SortSchedule(cSchedule* UNUSED(Schedule))
 {
     if (db)
     {
-        import->Commit(db);
+        import->Commit(NULL,db);
         sqlite3_close(db);
+        db=NULL;
     }
     return false; // we dont sort!
 }
@@ -312,7 +312,7 @@ cEPGTimer::cEPGTimer(const char *EpgFile, cEPGSources *Sources, cEPGMappings *Ma
     epgfile=EpgFile;
     sources=Sources;
     maps=Maps;
-    import = new cImport(NULL,Maps,Texts);
+    import = new cImport(EpgFile,Maps,Texts);
 }
 
 void cEPGTimer::Action()
@@ -338,6 +338,7 @@ void cEPGTimer::Action()
     }
 
     sqlite3 *db=NULL;
+    cEPGSource *source=sources->GetSource(EITSOURCE);
     for (cTimer *Timer = Timers.First(); Timer; Timer = Timers.Next(Timer))
     {
         cEvent *event=(cEvent *) Timer->Event();
@@ -353,21 +354,21 @@ void cEPGTimer::Action()
         cXMLTVEvent *xevent=import->SearchXMLTVEvent(&db,ChannelID,event);
         if (!xevent)
         {
-            xevent=import->AddXMLTVEvent(epgfile,ChannelID,event,event->Description());
+            xevent=import->AddXMLTVEvent(db,ChannelID,event,event->Description());
             if (!xevent) continue;
         }
 
         cSchedule* schedule = (cSchedule *) schedules->GetSchedule(chan,false);
         if (schedule)
         {
-            import->PutEvent(sources->GetSource(EITSOURCE),NULL,schedule,
+            import->PutEvent(source,db,schedule,
                              event,xevent,USE_SEASON,IMPORT_DESCRIPTION);
         }
         delete xevent;
     }
     if (db)
     {
-        import->Commit(db);
+        import->Commit(source,db);
         sqlite3_close(db);
     }
     Timers.DecBeingEdited();

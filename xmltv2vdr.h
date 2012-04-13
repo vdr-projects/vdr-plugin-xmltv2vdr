@@ -93,7 +93,7 @@ class cEPGHandler : public cEpgHandler
 {
 private:
     cPluginXmltv2vdr *baseplugin;
-    const char *epgfile;
+    //const char *epgfile;
     cEPGMappings *maps;
     cEPGSources *sources;
     cImport *import;

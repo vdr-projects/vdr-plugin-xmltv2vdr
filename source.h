@@ -50,8 +50,8 @@ class cEPGSource : public cListObject
 private:
     const char *name;
     const char *confdir;
-    const char *epgfile;
     const char *pin;
+    const char *epgfile;
     int loglen;
     cParse *parse;
     cImport *import;
@@ -126,10 +126,6 @@ public:
     bool NeedPin()
     {
         return needpin;
-    }
-    const char *EPGFile()
-    {
-        return epgfile;
     }
     const char *Name()
     {

@@ -548,9 +548,9 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
     }
 
     sqlite3 *db=NULL;
-    if (sqlite3_open(source->EPGFile(),&db)!=SQLITE_OK)
+    if (sqlite3_open(epgfile,&db)!=SQLITE_OK)
     {
-        source->Elog("failed to open or create %s",source->EPGFile());
+        source->Elog("failed to open or create %s",epgfile);
         xmlFreeDoc(xmltv);
         return 141;
     }
@@ -568,7 +568,7 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
                "CREATE UNIQUE INDEX IF NOT EXISTS idx1 on epg (eventid, src); " \
                "CREATE UNIQUE INDEX IF NOT EXISTS idx2 on epg (eventid, channelid); " \
                "CREATE UNIQUE INDEX IF NOT EXISTS idx3 on epg (eventid, channelid, src); " \
-               "CREATE UNIQUE INDEX IF NOT EXISTS idx4 on epg (starttime, title, channelid); " \
+               "CREATE INDEX IF NOT EXISTS idx4 on epg (starttime, title, channelid); " \
                "CREATE INDEX IF NOT EXISTS idx5 on epg (starttime, src); " \
                "BEGIN";
 
@@ -685,7 +685,7 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
         }
     }
     
-    if (sqlite3_exec(db,"COMMIT",NULL,NULL,&errmsg)!=SQLITE_OK)
+    if (sqlite3_exec(db,"COMMIT; ANALYZE epg;",NULL,NULL,&errmsg)!=SQLITE_OK)
     {
         source->Elog("sqlite3: %s",errmsg);
         sqlite3_free(errmsg);
@@ -707,10 +707,11 @@ void cParse::CleanupLibXML()
     xmlCleanupParser();
 }
 
-cParse::cParse(cEPGSource *Source, cEPGMappings *Maps)
+cParse::cParse(const char *EPGFile, cEPGSource *Source, cEPGMappings *Maps)
 {
     source=Source;
     maps=Maps;
+    epgfile=EPGFile;
 
     struct passwd pwd,*pwdbuf;
     char buf[1024];

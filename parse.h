@@ -31,13 +31,14 @@ class cParse
 private:
     iconv_t conv;
     char *epdir;
+    const char *epgfile;
     cEPGSource *source;
     cEPGMappings *maps;
     cXMLTVEvent xevent;
     time_t ConvertXMLTVTime2UnixTime(char *xmltvtime);
     bool FetchEvent(xmlNodePtr node);
 public:
-    cParse(cEPGSource *Source, cEPGMappings *Maps);
+    cParse(const char *EPGFile, cEPGSource *Source, cEPGMappings *Maps);
     ~cParse();
     int Process(cEPGExecutor &myExecutor, char *buffer, int bufsize);
     static void RemoveNonAlphaNumeric(char *String);

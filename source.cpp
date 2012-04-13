@@ -127,8 +127,8 @@ cEPGSource::cEPGSource(const char *Name, const char *ConfDir, const char *EPGFil
     if (strcmp(Name,EITSOURCE))
     {
         ready2parse=ReadConfig();
-        parse=new cParse(this, Maps);
-        import=new cImport(this,Maps,Texts);
+        parse=new cParse(EPGFile,this, Maps);
+        import=new cImport(EPGFile,Maps,Texts);
         Dlog("is%sready2parse",(ready2parse && parse) ? " " : " not ");
     }
     else
@@ -424,7 +424,7 @@ int cEPGSource::ReadOutput(char *&result, size_t &l)
 int cEPGSource::Import(cEPGExecutor &myExecutor)
 {
     Dlog("importing from db");
-    return import->Process(myExecutor);
+    return import->Process(this,myExecutor);
 }
 
 int cEPGSource::Execute(cEPGExecutor &myExecutor)

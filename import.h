@@ -45,7 +45,6 @@ private:
         IMPORT_EMPTYSCHEDULE
     };
     cEPGMappings *maps;
-    cEPGSource *source;
     cTEXTMappings *texts;
     cCharSetConv *conv;
     bool pendingtransaction;
@@ -57,24 +56,23 @@ private:
     char *AddEOT2Description(char *description);
     struct split split(char *in, char delim);
     cEvent *GetEventBefore(cSchedule* schedule, time_t start);
-    cEvent *SearchVDREvent(cSchedule* schedule, cXMLTVEvent *event);
+    cEvent *SearchVDREvent(cEPGSource *source, cSchedule* schedule, cXMLTVEvent *event);
     bool FetchXMLTVEvent(sqlite3_stmt *stmt, cXMLTVEvent *xevent);
     char *RemoveNonASCII(const char *src);
     cXMLTVEvent *PrepareAndReturn(sqlite3 *db, char *sql, sqlite3_stmt *stmt);
 public:
-    cImport(cEPGSource *Source, cEPGMappings *Maps, cTEXTMappings *Texts);
+    cImport(const char *EPGFile, cEPGMappings *Maps, cTEXTMappings *Texts);
     ~cImport();
-    int Process(cEPGExecutor &myExecutor);
-    void Commit(sqlite3 *Db);
-    bool WasChanged(cEvent *Event);
-    bool PutEvent(cEPGSource *source, sqlite3 *db, cSchedule* schedule, cEvent *event,
-                  cXMLTVEvent *xevent, int Flags, int Option=IMPORT_ALL);
-    cXMLTVEvent *SearchXMLTVEvent(sqlite3 **Db, const char *ChannelID, const cEvent *Event);
+    int Process(cEPGSource *Source, cEPGExecutor &myExecutor);
+    void Commit(cEPGSource *Source, sqlite3 *Db);
+    bool PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule, cEvent *Event,
+                  cXMLTVEvent *xEvent, int Flags, int Option=IMPORT_ALL);
     void UpdateXMLTVEvent(cEPGSource *Source, sqlite3 *Db, const cEvent *Event,
-                          const char *SourceName, tEventID EventID, tEventID EITEventID,
-                          const char *EITDescription=NULL);
-    cXMLTVEvent *AddXMLTVEvent(const char *EPGFile, const char *ChannelID, const cEvent *Event,
+                          tEventID EventID, tEventID EITEventID, const char *EITDescription=NULL);
+    cXMLTVEvent *SearchXMLTVEvent(sqlite3 **Db, const char *ChannelID, const cEvent *Event);
+    cXMLTVEvent *AddXMLTVEvent(sqlite3 *Db, const char *ChannelID, const cEvent *Event,
                                const char *EITDescription);
+    bool WasChanged(cEvent *Event);
 };
 
 #endif
