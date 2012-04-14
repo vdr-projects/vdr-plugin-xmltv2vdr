@@ -155,13 +155,19 @@ bool cEPGHandler::SetDescription(cEvent* Event, const char* Description)
         }
 
         cXMLTVEvent *xevent=import->SearchXMLTVEvent(&db,ChannelID,Event);
+        cEPGSource *source=NULL;
         if (!xevent)
         {
             if (!epall) return false;
-            xevent=import->AddXMLTVEvent(db,ChannelID,Event,Description);
+            source=sources->GetSource(EITSOURCE);
+            xevent=import->AddXMLTVEvent(source,db,ChannelID,Event,Description);
             if (!xevent) return false;
         }
-        cEPGSource *source=sources->GetSource(xevent->Source());
+        else
+        {
+            source=sources->GetSource(xevent->Source());
+        }
+        if (!source) return false;
         last.Set(source,xevent,Flags);
     }
     else
@@ -182,18 +188,16 @@ bool cEPGHandler::SetDescription(cEvent* Event, const char* Description)
 
     if (update)
     {
-        import->UpdateXMLTVEvent(last.Source(),db,Event,last.xEvent()->EventID(),
-                                 Event->EventID(),Description);
+        if (!import->UpdateXMLTVEvent(last.Source(),db,Event,last.xEvent()->EventID(),
+                                      Event->EventID(),Description))
+        {
+            return false;
+        }
     }
 
-    bool ret=import->PutEvent(last.Source(),db,
-                              (cSchedule *) Event->Schedule(),
-                              Event,last.xEvent(),last.Flags(),IMPORT_DESCRIPTION);
-    if (!ret)
-    {
-        dsyslog("xmltv2vdr: failed to put event description!");
-    }
-    return ret;
+    return import->PutEvent(last.Source(),db,
+                            (cSchedule *) Event->Schedule(),
+                            Event,last.xEvent(),last.Flags(),IMPORT_DESCRIPTION);
 }
 
 bool cEPGHandler::SetParentalRating(cEvent* Event, int ParentalRating)
@@ -221,9 +225,20 @@ bool cEPGHandler::SetParentalRating(cEvent* Event, int ParentalRating)
         if (!xevent) return false;
 
         cEPGSource *source=sources->GetSource(xevent->Source());
+        if (!source)
+        {
+            delete xevent;
+            return false;
+        }
 
-        if (!xevent->EITEventID()) import->UpdateXMLTVEvent(source,db,Event,xevent->EventID(),
-                    Event->EventID());
+        if (!xevent->EITEventID())
+        {
+            if (!import->UpdateXMLTVEvent(source,db,Event,xevent->EventID(),Event->EventID()))
+            {
+                delete xevent;
+                return false;
+            }
+        }
         last.Set(source,xevent,map->Flags());
     }
     else
@@ -269,6 +284,11 @@ bool cEPGHandler::SetShortText(cEvent* Event, const char* UNUSED(ShortText))
         if (!xevent) return false;
 
         cEPGSource *source=sources->GetSource(xevent->Source());
+        if (!source)
+        {
+            delete xevent;
+            return false;
+        }
 
         if (!xevent->EITEventID()) import->UpdateXMLTVEvent(source,db,Event,xevent->EventID(),
                     Event->EventID());
@@ -354,7 +374,7 @@ void cEPGTimer::Action()
         cXMLTVEvent *xevent=import->SearchXMLTVEvent(&db,ChannelID,event);
         if (!xevent)
         {
-            xevent=import->AddXMLTVEvent(db,ChannelID,event,event->Description());
+            xevent=import->AddXMLTVEvent(source,db,ChannelID,event,event->Description());
             if (!xevent) continue;
         }
 

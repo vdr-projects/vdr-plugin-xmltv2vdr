@@ -844,11 +844,14 @@ bool cImport::FetchXMLTVEvent(sqlite3_stmt *stmt, cXMLTVEvent *xevent)
 
 cXMLTVEvent *cImport::PrepareAndReturn(sqlite3 *db, char *sql, sqlite3_stmt *stmt)
 {
+    if (!db) return NULL;
+    if (!sql) return NULL;
+    if (!stmt) return NULL;
+
     int ret=sqlite3_prepare_v2(db,sql,strlen(sql),&stmt,NULL);
     if (ret!=SQLITE_OK)
     {
         esyslog("xmltv2vdr: ERROR %i %s",ret,sqlite3_errmsg(db));
-        esyslog("xmltv2vdr: ERROR failed to prepare %s",sql);
         free(sql);
         return NULL;
     }
@@ -864,10 +867,15 @@ cXMLTVEvent *cImport::PrepareAndReturn(sqlite3 *db, char *sql, sqlite3_stmt *stm
     return xevent;
 }
 
-cXMLTVEvent *cImport::AddXMLTVEvent(sqlite3 *Db, const char *ChannelID, const cEvent *Event,
+cXMLTVEvent *cImport::AddXMLTVEvent(cEPGSource *Source,sqlite3 *Db, const char *ChannelID, const cEvent *Event,
                                     const char *EITDescription)
 {
     if (!Db) return NULL;
+    if (!Source) return NULL;
+    if (!ChannelID) return NULL;
+    if (!Event) return NULL;
+    if (!EITDescription) return NULL;
+
     struct passwd pwd,*pwdbuf;
     char buf[1024],*epdir=NULL;
     iconv_t conv=(iconv_t) -1;
@@ -910,7 +918,7 @@ cXMLTVEvent *cImport::AddXMLTVEvent(sqlite3 *Db, const char *ChannelID, const cE
     cXMLTVEvent *xevent = new cXMLTVEvent();
     if (!xevent)
     {
-        esyslog("xmltv2vdr: ERROR out of memory");
+        Source->Elog("out of memory");
         free(epdir);
         iconv_close(conv);
         return NULL;
@@ -927,25 +935,19 @@ cXMLTVEvent *cImport::AddXMLTVEvent(sqlite3 *Db, const char *ChannelID, const cE
     xevent->SetSeason(season);
     xevent->SetEpisode(episode);
 
-    if (!pendingtransaction)
+    if (!Begin(Source,Db))
     {
-        char *errmsg;
-        if (sqlite3_exec(Db,"BEGIN",NULL,NULL,&errmsg)!=SQLITE_OK)
-        {
-            esyslog("xmltv2vdr: ERROR BEGIN -> %s",errmsg);
-            sqlite3_free(errmsg);
-        }
-        else
-        {
-            pendingtransaction=true;
-        }
+        delete xevent;
+        free(epdir);
+        iconv_close(conv);
+        return NULL;
     }
 
-    const char *sql=xevent->GetSQL((const char *) EITSOURCE,99,ChannelID);
+    const char *sql=xevent->GetSQL(Source->Name(),Source->Index(),ChannelID);
     char *errmsg;
     if (sqlite3_exec(Db,sql,NULL,NULL,&errmsg)!=SQLITE_OK)
     {
-        esyslog("xmltv2vdr: ERROR %s",errmsg);
+        Source->Elog("%s",errmsg);
         sqlite3_free(errmsg);
         delete xevent;
         xevent=NULL;
@@ -955,23 +957,14 @@ cXMLTVEvent *cImport::AddXMLTVEvent(sqlite3 *Db, const char *ChannelID, const cE
     return xevent;
 }
 
-void cImport::UpdateXMLTVEvent(cEPGSource *Source, sqlite3 *Db, const cEvent *Event,
+bool cImport::UpdateXMLTVEvent(cEPGSource *Source, sqlite3 *Db, const cEvent *Event,
                                tEventID EventID, tEventID EITEventID, const char *EITDescription)
 {
-    if (!Source) return;
-    if (!pendingtransaction)
-    {
-        char *errmsg;
-        if (sqlite3_exec(Db,"BEGIN",NULL,NULL,&errmsg)!=SQLITE_OK)
-        {
-            Source->Elog("BEGIN -> %s",errmsg);
-            sqlite3_free(errmsg);
-        }
-        else
-        {
-            pendingtransaction=true;
-        }
-    }
+    if (!Source) return false;
+    if (!Db) return false;
+    if (!Event) return false;
+
+    if (!Begin(Source,Db)) return false;
 
     char *sql=NULL;
     if (EITDescription)
@@ -980,7 +973,7 @@ void cImport::UpdateXMLTVEvent(cEPGSource *Source, sqlite3 *Db, const cEvent *Ev
         if (!eitdescription)
         {
             Source->Elog("out of memory");
-            return;
+            return false;
         }
 
         string ed=eitdescription;
@@ -998,7 +991,7 @@ void cImport::UpdateXMLTVEvent(cEPGSource *Source, sqlite3 *Db, const cEvent *Ev
         {
             free(eitdescription);
             Source->Elog("out of memory");
-            return;
+            return false;
         }
         free(eitdescription);
 
@@ -1023,7 +1016,7 @@ void cImport::UpdateXMLTVEvent(cEPGSource *Source, sqlite3 *Db, const cEvent *Ev
                      (long int) EITEventID,(long int) EventID,Source->Name())==-1)
         {
             Source->Elog("out of memory");
-            return;
+            return false;
         }
     }
 
@@ -1033,16 +1026,15 @@ void cImport::UpdateXMLTVEvent(cEPGSource *Source, sqlite3 *Db, const cEvent *Ev
         Source->Elog("%s -> %s",sql,errmsg);
         free(sql);
         sqlite3_free(errmsg);
-        return;
+        return false;
     }
 
     free(sql);
-    return;
+    return true;
 }
 
 cXMLTVEvent *cImport::SearchXMLTVEvent(sqlite3 **Db, const char *ChannelID, const cEvent *Event)
 {
-
     if (!Event) return NULL;
     if (!Db) return NULL;
     if (!*Db)
@@ -1116,9 +1108,30 @@ cXMLTVEvent *cImport::SearchXMLTVEvent(sqlite3 **Db, const char *ChannelID, cons
     return NULL;
 }
 
-void cImport::Commit(cEPGSource *Source, sqlite3 *Db)
+bool cImport::Begin(cEPGSource *Source, sqlite3 *Db)
 {
-    if (!Db) return;
+    if (!Source) return false;
+    if (!Db) return false;
+    if (!pendingtransaction)
+    {
+        char *errmsg;
+        if (sqlite3_exec(Db,"BEGIN",NULL,NULL,&errmsg)!=SQLITE_OK)
+        {
+            Source->Elog("sqlite3: BEGIN -> %s",errmsg);
+            sqlite3_free(errmsg);
+            return false;
+        }
+        else
+        {
+            pendingtransaction=true;
+        }
+    }
+    return true;
+}
+
+bool cImport::Commit(cEPGSource *Source, sqlite3 *Db)
+{
+    if (!Db) return false;
     if (pendingtransaction)
     {
         char *errmsg;
@@ -1126,16 +1139,18 @@ void cImport::Commit(cEPGSource *Source, sqlite3 *Db)
         {
             if (Source)
             {
-                Source->Elog("sqlite3: %s",errmsg);
+                Source->Elog("sqlite3: COMMIT -> %s",errmsg);
             }
             else
             {
-                esyslog("sqlite3: %s", errmsg);
+                esyslog("sqlite3: ERROR COMMIT -> %s",errmsg);
             }
             sqlite3_free(errmsg);
+            return false;
         }
         pendingtransaction=false;
     }
+    return true;
 }
 
 int cImport::Process(cEPGSource *Source, cEPGExecutor &myExecutor)
@@ -1266,8 +1281,10 @@ int cImport::Process(cEPGSource *Source, cEPGExecutor &myExecutor)
         }
     }
 
-    Commit(Source,db);
-    Source->Dlog("processed %i xmltv events",cnt);
+    if (Commit(Source,db))
+    {
+        Source->Dlog("processed %i xmltv events",cnt);
+    }
 
     sqlite3_finalize(stmt);
     sqlite3_close(db);

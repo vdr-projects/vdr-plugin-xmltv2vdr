@@ -64,14 +64,15 @@ public:
     cImport(const char *EPGFile, cEPGMappings *Maps, cTEXTMappings *Texts);
     ~cImport();
     int Process(cEPGSource *Source, cEPGExecutor &myExecutor);
-    void Commit(cEPGSource *Source, sqlite3 *Db);
+    bool Begin(cEPGSource *Source, sqlite3 *Db);
+    bool Commit(cEPGSource *Source, sqlite3 *Db);
     bool PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule, cEvent *Event,
                   cXMLTVEvent *xEvent, int Flags, int Option=IMPORT_ALL);
-    void UpdateXMLTVEvent(cEPGSource *Source, sqlite3 *Db, const cEvent *Event,
+    bool UpdateXMLTVEvent(cEPGSource *Source, sqlite3 *Db, const cEvent *Event,
                           tEventID EventID, tEventID EITEventID, const char *EITDescription=NULL);
     cXMLTVEvent *SearchXMLTVEvent(sqlite3 **Db, const char *ChannelID, const cEvent *Event);
-    cXMLTVEvent *AddXMLTVEvent(sqlite3 *Db, const char *ChannelID, const cEvent *Event,
-                               const char *EITDescription);
+    cXMLTVEvent *AddXMLTVEvent(cEPGSource *Source, sqlite3 *Db, const char *ChannelID, 
+			       const cEvent *Event, const char *EITDescription);
     bool WasChanged(cEvent *Event);
 };
 
