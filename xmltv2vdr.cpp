@@ -398,6 +398,42 @@ void cEPGTimer::Action()
 
 // -------------------------------------------------------------
 
+cHouseKeeping::cHouseKeeping(const char *EPGFile): cThread("xmltv2vdr housekeeping")
+{
+    epgfile=EPGFile;;
+}
+
+void cHouseKeeping::Action()
+{
+    sqlite3 *db=NULL;
+    if (sqlite3_open_v2(epgfile,&db,SQLITE_OPEN_READWRITE,NULL)==SQLITE_OK)
+    {
+        char *sql;
+        if (asprintf(&sql,"delete from epg where ((starttime+duration) < %li)",time(NULL))!=-1)
+        {
+            char *errmsg;
+            if (sqlite3_exec(db,sql,NULL,NULL,&errmsg)!=SQLITE_OK)
+            {
+                esyslog("xmltv2vdr: %s",errmsg);
+                sqlite3_free(errmsg);
+            }
+            else
+            {
+                int changes=sqlite3_changes(db);
+                if (changes)
+                {
+                    isyslog("xmltv2vdr: removed %i old entries from db",changes);
+                    sqlite3_exec(db,"VACCUM;",NULL,NULL,NULL);
+                }
+            }
+            free(sql);
+        }
+    }
+    sqlite3_close(db);
+}
+
+// -------------------------------------------------------------
+
 cPluginXmltv2vdr::cPluginXmltv2vdr(void) : epgexecutor(this, &epgsources)
 {
     // Initialize any member variables here.
@@ -408,6 +444,7 @@ cPluginXmltv2vdr::cPluginXmltv2vdr(void) : epgexecutor(this, &epgsources)
     srcorder=NULL;
     epghandler=NULL;
     epgtimer=NULL;
+    housekeeping=NULL;
     last_housetime_t=0;
     last_maintime_t=0;
     last_epcheck_t=0;
@@ -481,11 +518,12 @@ void cPluginXmltv2vdr::Wait4TimerThreadAndSetup()
 bool cPluginXmltv2vdr::EPGSourceMove(int From, int To)
 {
     if (From==To) return false;
-    if (!IsIdle()) return false;
+    if (epgexecutor.Active() || epgtimer->Active() || epghandler->Active()) return true;
+
     sqlite3 *db=NULL;
-    char *sql=NULL;
     if (sqlite3_open_v2(epgfile,&db,SQLITE_OPEN_READWRITE,NULL)==SQLITE_OK)
     {
+        char *sql=NULL;
         if (asprintf(&sql,"BEGIN TRANSACTION;" \
                      "UPDATE epg SET srcidx=98 WHERE srcidx=%i;" \
                      "UPDATE epg SET srcidx=%i WHERE srcidx=%i;" \
@@ -501,8 +539,8 @@ bool cPluginXmltv2vdr::EPGSourceMove(int From, int To)
             sqlite3_close(db);
             return false;
         }
+        free(sql);
     }
-    free(sql);
     sqlite3_close(db);
     epgsources.Move(From,To);
     return true;
@@ -564,6 +602,7 @@ bool cPluginXmltv2vdr::Start(void)
     ReadInEPGSources();
     epghandler = new cEPGHandler(this,epgfile,&epgsources,&epgmappings,&textmappings);
     epgtimer = new cEPGTimer(epgfile,&epgsources,&epgmappings,&textmappings);
+    housekeeping = new cHouseKeeping(epgfile);
 
     if (sqlite3_threadsafe()==0) esyslog("xmltv2vdr: ERROR sqlite3 not threadsafe!");
     return true;
@@ -574,7 +613,8 @@ void cPluginXmltv2vdr::Stop(void)
     // Stop any background activities the plugin is performing.
     cSchedules::Cleanup(true);
     epgtimer->Stop();
-    delete epgtimer;
+    if (epgtimer) delete epgtimer;
+    if (housekeeping) delete housekeeping;
     epgexecutor.Stop();
     epgsources.Remove();
     epgmappings.Remove();
@@ -603,38 +643,14 @@ void cPluginXmltv2vdr::Housekeeping(void)
     time_t now=time(NULL);
     if (now>(last_housetime_t+3600))
     {
-        if (IsIdle())
+        if (IsIdle() && (housekeeping))
         {
             struct stat statbuf;
             if (stat(epgfile,&statbuf)!=-1)
             {
                 if (statbuf.st_size)
                 {
-                    sqlite3 *db=NULL;
-                    if (sqlite3_open_v2(epgfile,&db,SQLITE_OPEN_READWRITE,NULL)==SQLITE_OK)
-                    {
-                        char *sql;
-                        if (asprintf(&sql,"delete from epg where ((starttime+duration) < %li)",now)!=-1)
-                        {
-                            char *errmsg;
-                            if (sqlite3_exec(db,sql,NULL,NULL,&errmsg)!=SQLITE_OK)
-                            {
-                                esyslog("xmltv2vdr: %s",errmsg);
-                                sqlite3_free(errmsg);
-                            }
-                            else
-                            {
-                                int changes=sqlite3_changes(db);
-                                if (changes)
-                                {
-                                    isyslog("xmltv2vdr: removed %i old entries from db",changes);
-                                    sqlite3_exec(db,"VACCUM;",NULL,NULL,NULL);
-                                }
-                            }
-                            free(sql);
-                        }
-                    }
-                    sqlite3_close(db);
+                    housekeeping->Start();
                 }
             }
         }

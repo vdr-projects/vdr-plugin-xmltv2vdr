@@ -141,11 +141,21 @@ public:
     virtual void Action();
 };
 
+class cHouseKeeping : public cThread
+{
+private:
+    const char *epgfile;
+public:
+    cHouseKeeping(const char *EPGFile);
+    virtual void Action();
+};
+
 class cPluginXmltv2vdr : public cPlugin
 {
 private:
     cEPGHandler *epghandler;
     cEPGTimer *epgtimer;
+    cHouseKeeping *housekeeping;    
     cEPGExecutor epgexecutor;
     cEPGMappings epgmappings;
     cEPGSources epgsources;
