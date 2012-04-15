@@ -58,6 +58,7 @@ void cMyMenuEditBitItem::Set(void)
 cMenuSetupXmltv2vdr::cMenuSetupXmltv2vdr(cPluginXmltv2vdr *Plugin)
 {
     baseplugin=Plugin;
+    baseplugin->SetSetupState(true);
     sourcesBegin=sourcesEnd=mappingBegin=mappingEnd=mappingEntry=0;
     epall=(int) baseplugin->EPAll();
     wakeup=(int) baseplugin->WakeUp();
@@ -68,6 +69,7 @@ cMenuSetupXmltv2vdr::cMenuSetupXmltv2vdr(cPluginXmltv2vdr *Plugin)
 
 cMenuSetupXmltv2vdr::~cMenuSetupXmltv2vdr()
 {
+    baseplugin->SetSetupState(false);
     if (cs) cs->ClearMenu();
     if (cm) cm->ClearMenu();
 }
@@ -707,20 +709,16 @@ cMenuSetupXmltv2vdrChannelSource::cMenuSetupXmltv2vdrChannelSource(cPluginXmltv2
 
     day=0;
     weekday=127;
-    start=0;
-    upstart=1;
+    start=10;
 
-    days=0;
+    days=1;
     pin[0]=0;
-
-    updateEntry=0;
 
     epgsrc=baseplugin->EPGSource(Index);
     if (!epgsrc) return;
 
     SetSection(cString::sprintf("%s '%s' : %s",trVDR("Plugin"), baseplugin->Name(), epgsrc->Name()));
 
-    upstart=epgsrc->ExecUpStart();
     weekday=epgsrc->ExecWeekDay();
     start=epgsrc->ExecTime();
     days=epgsrc->DaysInAdvance();
@@ -742,15 +740,10 @@ void cMenuSetupXmltv2vdrChannelSource::output(void)
 {
     Clear();
 
-    Add(NewTitle(tr("options")));
+    Add(NewTitle(tr("update options")));
 
-    Add(new cMenuEditBoolItem(tr("update"),&upstart,tr("on time"),tr("on start")),true);
-    updateEntry=Current();
-    if (!upstart)
-    {
-        Add(new cMenuEditDateItem(trVDR("Day"),&day,&weekday));
-        Add(new cMenuEditTimeItem(tr("update at"),&start));
-    }
+    Add(new cMenuEditDateItem(tr("update on"),&day,&weekday));
+    Add(new cMenuEditTimeItem(tr("update at"),&start));
     Add(new cMenuEditIntItem(tr("days in advance"),&days,1,epgsrc->DaysMax()));
     if (epgsrc->NeedPin())
     {
@@ -790,12 +783,6 @@ eOSState cMenuSetupXmltv2vdrChannelSource::ProcessKey(eKeys Key)
     if (HasSubMenu()) return osContinue;
     switch (state)
     {
-    case osContinue:
-        if ((Key==kLeft) || (Key==kRight) || (Key==(kLeft|k_Repeat)) || (Key==(kRight|k_Repeat)))
-        {
-            if (Current()==updateEntry) output();
-        }
-
     case osUnknown:
         if (Key==kOk)
         {
@@ -813,7 +800,7 @@ void cMenuSetupXmltv2vdrChannelSource::Store(void)
 {
     if ((!baseplugin) || (!sel) || (!epgsrc)) return;
 
-    epgsrc->ChangeExec(upstart,start,weekday);
+    epgsrc->ChangeExec(start,weekday);
     epgsrc->ChangeChannelSelection(sel);
     epgsrc->ChangeDaysInAdvance(days);
     if (epgsrc->NeedPin())

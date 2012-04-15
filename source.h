@@ -59,14 +59,11 @@ private:
     bool usepipe;
     bool needpin;
     bool running;
-    bool upstartdone;
     bool disabled;
     int daysinadvance;
-    int exec_upstart;
     int exec_weekday;
     int exec_time;
     int daysmax;
-    time_t lastexec;
     int lastretcode;
     void add2Log(const char prefix, const char *line);
     bool ReadConfig();
@@ -111,10 +108,6 @@ public:
     {
         return exec_weekday;
     }
-    int ExecUpStart()
-    {
-        return exec_upstart;
-    }
     int DaysMax()
     {
         return daysmax;
@@ -135,9 +128,8 @@ public:
     {
         return pin;
     }
-    void ChangeExec(int UpStart, int Time, int WeekDay)
+    void ChangeExec(int Time, int WeekDay)
     {
-        exec_upstart=UpStart;
         exec_time=Time;
         exec_weekday=WeekDay;
     }
@@ -149,10 +141,6 @@ public:
     {
         if (pin) free((void *) pin);
         pin=strdup(NewPin);
-    }
-    time_t LastExecution()
-    {
-        return lastexec;
     }
     void Tlog(const char *format, ...);    
     void Dlog(const char *format, ...);

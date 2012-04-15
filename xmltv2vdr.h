@@ -93,7 +93,6 @@ class cEPGHandler : public cEpgHandler
 {
 private:
     cPluginXmltv2vdr *baseplugin;
-    //const char *epgfile;
     cEPGMappings *maps;
     cEPGSources *sources;
     cImport *import;
@@ -108,7 +107,10 @@ public:
     {
         epall=Value;
     }
-    bool Active() { return (db!=NULL); }
+    bool Active()
+    {
+        return (db!=NULL);
+    }
     virtual ~cEPGHandler();
     virtual bool IgnoreChannel(const cChannel *Channel);
     virtual bool SetShortText(cEvent *Event, const char *ShortText);
@@ -156,7 +158,12 @@ private:
     char *srcorder;
     bool epall;
     bool wakeup;
+    bool insetup;
 public:
+    void SetSetupState(bool Value)
+    {
+        insetup=Value;
+    }
     void SetEPAll(bool Value)
     {
         epall=Value;
@@ -178,7 +185,7 @@ public:
     {
         epgsources.ReadIn(confdir,epgfile,&epgmappings,&textmappings,srcorder,Reload);
     }
-    void Wait4TimerThread();
+    void Wait4TimerThreadAndSetup();
     bool IsIdle(bool IncludeHandler=true);
     bool EPGSourceMove(int From, int To);
     int EPGSourceCount()

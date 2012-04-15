@@ -107,10 +107,8 @@ private:
     int *sel;
     time_t day;
     int weekday,start;
-    int upstart;
     int days;
     char pin[255];
-    int updateEntry;
     void output(void);
 public:
     cMenuSetupXmltv2vdrChannelSource(cPluginXmltv2vdr *Plugin, cMenuSetupXmltv2vdr *Menu, int Index);

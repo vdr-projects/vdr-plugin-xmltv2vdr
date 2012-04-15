@@ -55,7 +55,7 @@ void cEPGExecutor::Action()
         if (epgs->RunItNow())
         {
             // if timer thread is runnung, wait till it's stopped
-            baseplugin->Wait4TimerThread();
+            baseplugin->Wait4TimerThreadAndSetup();
 
             int retries=0;
             while (retries<=2)
@@ -116,13 +116,10 @@ cEPGSource::cEPGSource(const char *Name, const char *ConfDir, const char *EPGFil
     usepipe=false;
     needpin=false;
     running=false;
-    upstartdone=false;
-    daysinadvance=0;
-    exec_upstart=1;
-    exec_time=0;
+    daysinadvance=1;
+    exec_time=10;
     exec_weekday=127; // Mon->Sun
     lastretcode=255;
-    lastexec=(time_t) 0;
     disabled=false;
     if (strcmp(Name,EITSOURCE))
     {
@@ -156,7 +153,6 @@ cEPGSource::~cEPGSource()
 time_t cEPGSource::NextRunTime(time_t Now)
 {
     if (disabled) return 0; // never!
-    if (exec_upstart) return 0; // only once!
 
     time_t t;
     if (!Now)
@@ -173,7 +169,6 @@ time_t cEPGSource::NextRunTime(time_t Now)
     if (t<Now)
     {
         t=cTimer::IncDay(t,1);
-        lastexec=(time_t) 0;
     }
     return t;
 }
@@ -185,19 +180,11 @@ bool cEPGSource::RunItNow()
     if (stat(epgfile,&statbuf)==-1) return true; // no database? -> execute immediately
     if (!statbuf.st_size) return true; // no database? -> execute immediately
 
-    if (exec_upstart)
-    {
-        if (upstartdone) return false;
-        return true;
-    }
-    else
-    {
-        time_t t=(time(NULL)/60)*60;
-        time_t nrt=NextRunTime(t);
-        if (!nrt) return false;
-        if (t==nrt) return true;
-        return false;
-    }
+    time_t t=(time(NULL)/60)*60;
+    time_t nrt=NextRunTime(t);
+    if (!nrt) return false;
+    if (t==nrt) return true;
+    return false;
 }
 
 bool cEPGSource::ReadConfig()
@@ -244,10 +231,17 @@ bool cEPGSource::ReadConfig()
                     *pn=0;
                     pn++;
                 }
-                /*
-                  newdatatime=atoi(ndt);
-                  if (!newdatatime) Dlog("updates source data @%02i:%02i",1,2);
-                */
+                int h,m;
+                sscanf(ndt,"%02i:%02i",&h,&m);
+                Dlog("updates data @%02i:%02i",h,m);
+                m+=10;
+                if (m>60)
+                {
+                    m-=60;
+                    h+=1;
+                    if (h>23) h=0;
+                }
+                exec_time=(h*100)+m;
                 if (pn)
                 {
                     pn=compactspace(pn);
@@ -338,15 +332,12 @@ bool cEPGSource::ReadConfig()
         }
         if (linenr==2)
         {
-            sscanf(line,"%2d;%1d;%3d;%10d",&daysinadvance,&exec_upstart,&exec_weekday,&exec_time);
+            int reserve;
+            sscanf(line,"%2d;%1d;%3d;%10d",&daysinadvance,&reserve,&exec_weekday,&exec_time);
             Dlog("daysinadvance=%i",daysinadvance);
-            Dlog("upstart=%i",exec_upstart);
-            if (!exec_upstart)
-            {
-                Dlog("weekdays=%s",*cTimer::PrintDay(0,exec_weekday,true));
-                time_t nrt=NextRunTime();
-                Dlog("nextrun on %s",ctime(&nrt));
-            }
+            Dlog("weekdays=%s",*cTimer::PrintDay(0,exec_weekday,true));
+            time_t nrt=NextRunTime();
+            Dlog("nextrun on %s",ctime(&nrt));
         }
         if (linenr>2)
         {
@@ -437,7 +428,7 @@ int cEPGSource::Execute(cEPGExecutor &myExecutor)
     int l_err=0;
     int ret=0;
 
-    if ((Log) && (lastexec))
+    if (Log)
     {
         free(Log);
         Log=NULL;
@@ -451,6 +442,7 @@ int cEPGSource::Execute(cEPGExecutor &myExecutor)
         return 134;
     }
 
+    int cu=0;
     for (int x=0; x<channels.Count(); x++)
     {
         if (channels.Get(x)->InUse())
@@ -468,8 +460,17 @@ int cEPGSource::Execute(cEPGExecutor &myExecutor)
             strcat(cmd," ");
             strcat(cmd,channels.Get(x)->Name());
             strcat(cmd," ");
+            cu++;
         }
     }
+
+    if (!cu)
+    {
+        free(cmd);
+        Ilog("no channels, please configure source");
+        return 0;
+    }
+
     char *pcmd=strdup(cmd);
     if (pcmd)
     {
@@ -656,8 +657,6 @@ int cEPGSource::Execute(cEPGExecutor &myExecutor)
 
     if (!ret)
     {
-        lastexec=time(NULL);
-        upstartdone=true;
         lastretcode=ret;
     }
 
@@ -719,7 +718,7 @@ void cEPGSource::Store(void)
     {
         fprintf(w,"#no pin\n");
     }
-    fprintf(w,"%i;%i;%i;%i\n",daysinadvance,exec_upstart,exec_weekday,exec_time);
+    fprintf(w,"%i;%i;%i;%i\n",daysinadvance,0,exec_weekday,exec_time);
     for (int i=0; i<ChannelList()->Count(); i++)
     {
         if (ChannelList()->Get(i)->InUse())

@@ -412,6 +412,7 @@ cPluginXmltv2vdr::cPluginXmltv2vdr(void) : epgexecutor(this, &epgsources)
     last_maintime_t=0;
     last_epcheck_t=0;
     wakeup=0;
+    insetup=false;
     SetEPAll(false);
     TEXTMappingAdd(new cTEXTMapping("country",tr("country")));
     TEXTMappingAdd(new cTEXTMapping("year",tr("year")));
@@ -451,20 +452,30 @@ bool cPluginXmltv2vdr::IsIdle(bool IncludeHandler)
 {
     if (IncludeHandler)
     {
-        if (!epgexecutor.Active() && (!epgtimer->Active()) && (!epghandler->Active())) return true;
+        if (!insetup && !epgexecutor.Active() && (!epgtimer->Active()) && (!epghandler->Active())) return true;
     }
     else
     {
-        if (!epgexecutor.Active() && (!epgtimer->Active())) return true;
+        if (!insetup && !epgexecutor.Active() && (!epgtimer->Active())) return true;
     }
     return false;
 }
 
-void cPluginXmltv2vdr::Wait4TimerThread()
+void cPluginXmltv2vdr::Wait4TimerThreadAndSetup()
 {
-    if (!epgtimer->Active()) return;
-    dsyslog("xmltv2vdr: wait for timer thread");
-    pthread_join(epgtimer->ThreadId(),NULL);
+    if (epgtimer->Active())
+    {
+        dsyslog("xmltv2vdr: wait for timer thread");
+        pthread_join(epgtimer->ThreadId(),NULL);
+    }
+    if (insetup)
+    {
+        dsyslog("xmltv2vdr: wait for setup change");
+        while (insetup)
+        {
+            usleep(200000);
+        }
+    }
 }
 
 bool cPluginXmltv2vdr::EPGSourceMove(int From, int To)
