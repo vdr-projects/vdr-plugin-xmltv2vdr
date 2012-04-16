@@ -36,10 +36,11 @@ public:
     {
         return false;
     }
-    virtual bool SetShortText(cEvent *UNUSED(Event), const char *UNUSED(ShortText))
+    virtual bool FixEpgBugs(cEvent *UNUSED(Event))
     {
         return false;
     }
+    /*
     virtual bool SetDescription(cEvent *UNUSED(Event), const char *UNUSED(Description))
     {
         return false;
@@ -52,6 +53,11 @@ public:
     {
         return false;
     }
+    virtual bool SetShortText(cEvent *UNUSED(Event), const char *UNUSED(ShortText))
+    {
+        return false;
+    }
+    */
     virtual bool SortSchedule(cSchedule *Schedule)
     {
         return false;
@@ -99,7 +105,7 @@ private:
     bool epall;
     sqlite3 *db;
     void closedb(void);
-    cEPGHandlerState last;
+    //cEPGHandlerState last;
 public:
     cEPGHandler(cPluginXmltv2vdr *Plugin, const char *EpgFile, cEPGSources *Sources,
                 cEPGMappings *Maps, cTEXTMappings *Texts);
@@ -113,10 +119,13 @@ public:
     }
     virtual ~cEPGHandler();
     virtual bool IgnoreChannel(const cChannel *Channel);
-    virtual bool SetShortText(cEvent *Event, const char *ShortText);
+    virtual bool FixEpgBugs(cEvent *Event);
+    /*
     virtual bool SetDescription(cEvent *Event, const char *Description);
     virtual bool SetContents(cEvent *Event, uchar *Contents);
     virtual bool SetParentalRating(cEvent *Event, int ParentalRating);
+    virtual bool SetShortText(cEvent *Event, const char *ShortText);
+    */
     virtual bool SortSchedule(cSchedule *Schedule);
 };
 
@@ -155,7 +164,7 @@ class cPluginXmltv2vdr : public cPlugin
 private:
     cEPGHandler *epghandler;
     cEPGTimer *epgtimer;
-    cHouseKeeping *housekeeping;    
+    cHouseKeeping *housekeeping;
     cEPGExecutor epgexecutor;
     cEPGMappings epgmappings;
     cEPGSources epgsources;

@@ -59,7 +59,7 @@ private:
     cEvent *SearchVDREvent(cEPGSource *source, cSchedule* schedule, cXMLTVEvent *event);
     bool FetchXMLTVEvent(sqlite3_stmt *stmt, cXMLTVEvent *xevent);
     char *RemoveNonASCII(const char *src);
-    cXMLTVEvent *PrepareAndReturn(sqlite3 *db, char *sql, sqlite3_stmt *stmt);
+    cXMLTVEvent *PrepareAndReturn(sqlite3 *db, char *sql);
 public:
     cImport(const char *EPGFile, cEPGMappings *Maps, cTEXTMappings *Texts);
     ~cImport();

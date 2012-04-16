@@ -407,7 +407,7 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
             if (!strcasecmp(xEvent->ShortText(),Event->Title()))
             {
                 Source->Tlog("title and subtitle equal, clearing subtitle");
-                Event->SetShortText("");
+                Event->SetShortText(NULL);
             }
             else
             {
@@ -660,12 +660,6 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
                     }
                 }
             }
-#if VDRVERSNUM >= 10711 || EPGHANDLER
-            if (xEvent->ParentalRating())
-            {
-                Event->SetParentalRating(xEvent->ParentalRating());
-            }
-#endif
         }
 
         if (((Flags & USE_STARRATING)==USE_STARRATING) && (xEvent->StarRating()->Size()))
@@ -731,9 +725,21 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
             free(description);
         }
     }
+
+#if VDRVERSNUM >= 10711 || EPGHANDLER
+    if ((Flags & USE_RATING)==USE_RATING)
+    {
+        if (xEvent->ParentalRating() && xEvent->ParentalRating()>Event->ParentalRating())
+        {
+            Event->SetParentalRating(xEvent->ParentalRating());
+        }
+    }
+#endif
+
 #if VDRVERSNUM < 10726 && (!EPGHANDLER)
     event->SetTableID(0); // prevent EIT EPG to update this event
 #endif
+
     if ((!append) && (changed))
     {
         start=Event->StartTime();
@@ -842,12 +848,12 @@ bool cImport::FetchXMLTVEvent(sqlite3_stmt *stmt, cXMLTVEvent *xevent)
     return true;
 }
 
-cXMLTVEvent *cImport::PrepareAndReturn(sqlite3 *db, char *sql, sqlite3_stmt *stmt)
+cXMLTVEvent *cImport::PrepareAndReturn(sqlite3 *db, char *sql)
 {
     if (!db) return NULL;
     if (!sql) return NULL;
-    if (!stmt) return NULL;
 
+    sqlite3_stmt *stmt=NULL;
     int ret=sqlite3_prepare_v2(db,sql,strlen(sql),&stmt,NULL);
     if (ret!=SQLITE_OK)
     {
@@ -1049,7 +1055,6 @@ cXMLTVEvent *cImport::SearchXMLTVEvent(sqlite3 **Db, const char *ChannelID, cons
     }
 
     cXMLTVEvent *xevent=NULL;
-    sqlite3_stmt *stmt=NULL;
     char *sql=NULL;
 
     if (asprintf(&sql,"select channelid,eventid,starttime,duration,title,origtitle,shorttext,description," \
@@ -1061,7 +1066,7 @@ cXMLTVEvent *cImport::SearchXMLTVEvent(sqlite3 **Db, const char *ChannelID, cons
         return NULL;
     }
 
-    xevent=PrepareAndReturn(*Db,sql,stmt);
+    xevent=PrepareAndReturn(*Db,sql);
     if (xevent) return xevent;
 
     int eventTimeDiff=0;
@@ -1102,7 +1107,7 @@ cXMLTVEvent *cImport::SearchXMLTVEvent(sqlite3 **Db, const char *ChannelID, cons
     }
     free(sqltitle);
 
-    xevent=PrepareAndReturn(*Db,sql,stmt);
+    xevent=PrepareAndReturn(*Db,sql);
     if (xevent) return xevent;
 
     return NULL;

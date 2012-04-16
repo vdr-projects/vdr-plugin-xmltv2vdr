@@ -106,11 +106,89 @@ bool cEPGHandler::IgnoreChannel(const cChannel* Channel)
     return maps->IgnoreChannel(Channel);
 }
 
-bool cEPGHandler::SetContents(cEvent* UNUSED(Event), uchar* UNUSED(Contents))
+bool cEPGHandler::FixEpgBugs(cEvent* Event)
 {
-    return false;
+    if (!Event) return false;
+    if (!maps) return false;
+    if (!import) return false;
+    if (!baseplugin) return false;
+
+    bool special_epall_timer_handling=false;
+    if (!maps->ProcessChannel(Event->ChannelID()))
+    {
+        if (!epall) return false;
+        if (!Event->HasTimer()) return false;
+        if (!Event->ShortText()) return false;
+        special_epall_timer_handling=true;
+    }
+
+    if (!baseplugin->IsIdle(false))
+    {
+        if (import->WasChanged(Event)) return true;
+        return false;
+    }
+
+    int Flags=0;
+    const char *ChannelID;
+
+    if (special_epall_timer_handling)
+    {
+        cChannel *chan=Channels.GetByChannelID(Event->ChannelID());
+        if (!chan) return false;
+        Flags=USE_SEASON;
+        ChannelID=chan->Name();
+    }
+    else
+    {
+        cEPGMapping *map=maps->GetMap(Event->ChannelID());
+        if (!map) return false;
+        Flags=map->Flags();
+        ChannelID=map->ChannelName();
+    }
+
+    cEPGSource *source=NULL;
+    cXMLTVEvent *xevent=import->SearchXMLTVEvent(&db,ChannelID,Event);
+    if (!xevent)
+    {
+        if (!epall) return false;
+        source=sources->GetSource(EITSOURCE);
+        xevent=import->AddXMLTVEvent(source,db,ChannelID,Event,Event->Description());
+        if (!xevent) return false;
+    }
+    else
+    {
+        source=sources->GetSource(xevent->Source());
+    }
+    if (!source)
+    {
+        delete xevent;
+        return false;
+    }
+
+    bool update=false;
+
+    if (!xevent->EITEventID()) update=true;
+    if (!xevent->EITDescription() && Event->Description()) update=true;
+    if (xevent->EITDescription() && Event->Description() &&
+            strcasecmp(xevent->EITDescription(),Event->Description())) update=true;
+
+    if (update)
+    {
+        if (!import->UpdateXMLTVEvent(source,db,Event,xevent->EventID(),
+                                      Event->EventID(),Event->Description()))
+        {
+            delete xevent;
+            return false;
+        }
+    }
+
+    import->PutEvent(source,db,(cSchedule *) Event->Schedule(),Event,xevent,Flags);
+    delete xevent;
+    return false; // let VDR fix the bugs!
 }
 
+
+/*
 bool cEPGHandler::SetDescription(cEvent* Event, const char* Description)
 {
     if (!Event) return false;
@@ -200,6 +278,11 @@ bool cEPGHandler::SetDescription(cEvent* Event, const char* Description)
                             Event,last.xEvent(),last.Flags(),IMPORT_DESCRIPTION);
 }
 
+bool cEPGHandler::SetContents(cEvent* UNUSED(Event), uchar* UNUSED(Contents))
+{
+    return false;
+}
+
 bool cEPGHandler::SetParentalRating(cEvent* Event, int ParentalRating)
 {
     if (!Event) return false;
@@ -268,7 +351,6 @@ bool cEPGHandler::SetShortText(cEvent* Event, const char* UNUSED(ShortText))
     if (!last.isSame(Event->EventID()))
     {
         last.Clear();
-
         if (!maps->ProcessChannel(Event->ChannelID())) return false;
 
         if (!baseplugin->IsIdle(false))
@@ -276,7 +358,6 @@ bool cEPGHandler::SetShortText(cEvent* Event, const char* UNUSED(ShortText))
             if (import->WasChanged(Event)) return true;
             return false;
         }
-
         cEPGMapping *map=maps->GetMap(Event->ChannelID());
         if (!map) return false;
 
@@ -311,6 +392,7 @@ bool cEPGHandler::SetShortText(cEvent* Event, const char* UNUSED(ShortText))
     }
     return ret;
 }
+*/
 
 bool cEPGHandler::SortSchedule(cSchedule* UNUSED(Schedule))
 {
@@ -320,6 +402,7 @@ bool cEPGHandler::SortSchedule(cSchedule* UNUSED(Schedule))
         sqlite3_close(db);
         db=NULL;
     }
+    dsyslog("RRR: EOF");
     return false; // we dont sort!
 }
 
