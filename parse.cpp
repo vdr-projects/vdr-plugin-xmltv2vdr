@@ -508,6 +508,10 @@ bool cParse::FetchEvent(xmlNodePtr enode)
             {
                 // episode-num in not usable format -> just ignore
             }
+            else if ((!xmlStrcasecmp(node->name, (const xmlChar *) "subtitles")))
+            {
+                // info about subtitles -> just ignore (till now)
+            }
             else
             {
                 source->Elog("unknown element %s, please report!",node->name);
@@ -684,13 +688,13 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
             break;
         }
     }
-    
+
     if (sqlite3_exec(db,"COMMIT; ANALYZE epg;",NULL,NULL,&errmsg)!=SQLITE_OK)
     {
         source->Elog("sqlite3: %s",errmsg);
         sqlite3_free(errmsg);
     }
-    
+
     sqlite3_close(db);
 
     xmlFreeDoc(xmltv);
