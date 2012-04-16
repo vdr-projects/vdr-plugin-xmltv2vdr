@@ -402,7 +402,6 @@ bool cEPGHandler::SortSchedule(cSchedule* UNUSED(Schedule))
         sqlite3_close(db);
         db=NULL;
     }
-    dsyslog("RRR: EOF");
     return false; // we dont sort!
 }
 
