@@ -9,10 +9,11 @@
 #include <vdr/videodir.h>
 #include <unistd.h>
 #include <getopt.h>
-#include <pthread.h>
+#include <stdarg.h>
 
 #include "setup.h"
 #include "xmltv2vdr.h"
+#include "debug.h"
 
 int ioprio_set(int which, int who, int ioprio)
 {
@@ -37,60 +38,97 @@ int ioprio_set(int which, int who, int ioprio)
     }
 }
 
+char *logfile=NULL;
+
+void logger(cEPGSource *source, char logtype, const char* format, ...)
+{
+    va_list ap;
+    char fmt[255];
+    if (source && logtype!='T')
+    {
+        if (logtype=='E')
+        {
+            if (snprintf(fmt,sizeof(fmt),"xmltv2vdr: '%s' ERROR %s",source->Name(),format)==-1) return;
+        }
+        else
+        {
+            if (snprintf(fmt,sizeof(fmt),"xmltv2vdr: '%s' %s",source->Name(),format)==-1) return;
+        }
+    }
+    else
+    {
+        if (logtype=='E')
+        {
+            snprintf(fmt,sizeof(fmt),"xmltv2vdr: ERROR %s",format);
+        }
+        else
+        {
+            snprintf(fmt,sizeof(fmt),"xmltv2vdr: %s",format);
+        }
+    }
+
+    va_start(ap, format);
+    char *ptr;
+    if (vasprintf(&ptr,fmt,ap)==-1) return;
+    va_end(ap);
+
+    struct tm tm;
+    if (logfile || source)
+    {
+        time_t now=time(NULL);
+        localtime_r(&now,&tm);
+    }
+
+    char *crlf=strchr(ptr,'\n');
+    if (crlf) *crlf=0;
+    crlf=strchr(ptr,'\r');
+    if (crlf) *crlf=0;
+
+    if (source && logtype!='T')
+    {
+        source->Add2Log(&tm,logtype,ptr);
+    }
+
+    if (logfile)
+    {
+        char dt[30];
+        strftime(dt,sizeof(dt)-1,"%b %d %H:%M:%S",&tm);
+
+        FILE *l=fopen(logfile,"a+");
+        if (l)
+        {
+            fprintf(l,"%s [%i] %s\n",dt,cThread::ThreadId(),ptr);
+            fclose(l);
+        }
+    }
+    switch (logtype)
+    {
+    case 'E':
+        if (SysLogLevel>0) syslog_with_tid(LOG_ERR,"%s",ptr);
+        break;
+    case 'I':
+        if (SysLogLevel>1) syslog_with_tid(LOG_ERR,"%s",ptr);
+        break;
+    case 'D':
+        if (SysLogLevel>2) syslog_with_tid(LOG_ERR,"%s",ptr);
+        break;
+    default:
+        break;
+    }
+
+    free(ptr);
+}
+
 // -------------------------------------------------------------
 
-cEPGHandlerState::cEPGHandlerState()
-{
-    xevent=NULL;
-    Clear();
-}
-
-cEPGHandlerState::~cEPGHandlerState()
-{
-    Clear();
-}
-
-void cEPGHandlerState::Clear()
-{
-    if (xevent)
-    {
-        delete xevent;
-        xevent=NULL;
-    }
-    source=NULL;
-    flags=0;
-}
-
-
-void cEPGHandlerState::Set(cEPGSource* Source, cXMLTVEvent* xEvent, int Flags)
-{
-    Clear();
-    source=Source;
-    xevent=xEvent;
-    flags=Flags;
-    if (ioprio_set(1,getpid(),7 | 3 << 13)==-1)
-    {
-        esyslog("xmltv2vdr: failed to set ioprio to 3,7");
-    }
-}
-
-bool cEPGHandlerState::isSame(tEventID EventID)
-{
-    if (!xevent) return false;
-    if (xevent->EITEventID()==EventID) return true;
-    return false;
-}
-
-// -------------------------------------------------------------
-
-cEPGHandler::cEPGHandler(cPluginXmltv2vdr *Plugin, const char *EpgFile, cEPGSources *Sources,
+cEPGHandler::cEPGHandler(const char *EpgFile, cEPGSources *Sources,
                          cEPGMappings *Maps, cTEXTMappings *Texts)
 {
-    baseplugin=Plugin;
     epall=false;
     maps=Maps;
     sources=Sources;
     db=NULL;
+    epgfile = EpgFile;
     import = new cImport(EpgFile,Maps,Texts);
 }
 
@@ -106,27 +144,76 @@ bool cEPGHandler::IgnoreChannel(const cChannel* Channel)
     return maps->IgnoreChannel(Channel);
 }
 
-bool cEPGHandler::FixEpgBugs(cEvent* Event)
+bool cEPGHandler::check4proc(cEvent *event, bool &spth)
 {
-    if (!Event) return false;
-    if (!maps) return false;
+    if (!event) return false;
     if (!import) return false;
-    if (!baseplugin) return false;
+    /*
+    if (import->WasChanged(event)) {
+        tsyslog("{%i} already seen %s",Event->EventID(),Event->Title());
+    }
+    */
+    if (!maps) return false;
+    struct stat statbuf;
+    if (stat(epgfile,&statbuf)==-1) return false; // no database? -> exit immediately
+    if (!statbuf.st_size) return false; // no database? -> exit immediately
 
-    bool special_epall_timer_handling=false;
-    if (!maps->ProcessChannel(Event->ChannelID()))
+    spth=false;
+    if (!maps->ProcessChannel(event->ChannelID()))
     {
         if (!epall) return false;
-        if (!Event->HasTimer()) return false;
-        if (!Event->ShortText()) return false;
-        special_epall_timer_handling=true;
+        if (!event->HasTimer()) return false;
+        if (!event->ShortText()) return false;
+        spth=true;
     }
+    return true;
+}
 
-    if (!baseplugin->IsIdle(false))
+bool cEPGHandler::SetShortText(cEvent* Event, const char* ShortText)
+{
+    bool notused;
+    if (!check4proc(Event,notused)) return false;
+
+    if (import->WasChanged(Event))
     {
-        if (import->WasChanged(Event)) return true;
-        return false;
+        // ok we already changed this event!
+        tsyslog("{%i} already seen stext %s",Event->EventID(),Event->Title());
+        return true;
     }
+    if (!ShortText) return true; // prevent setting empty shorttext
+    if (!strlen(ShortText)) return true; // prevent setting empty shorttext
+    tsyslog("{%i} setting stext (%s) of %s",Event->EventID(),ShortText,Event->Title());
+    return false;
+}
+
+bool cEPGHandler::SetDescription(cEvent* Event, const char* Description)
+{
+    bool notused;
+    if (!check4proc(Event,notused)) return false;
+
+    if (import->WasChanged(Event))
+    {
+        // ok we already changed this event!
+        if (!Description) return true; // prevent setting nothing to description
+        int len=strlen(Description);
+        if (strncasecmp(Event->Description(),Description,len))
+        {
+            // eit description changed -> set it
+            tsyslog("{%i} changing descr of %s",Event->EventID(),Event->Title());
+            return false;
+        }
+        tsyslog("{%i} already seen descr %s",Event->EventID(),Event->Title());
+        return true;
+    }
+    tsyslog("{%i} setting descr of %s",Event->EventID(),Event->Title());
+    return false;
+}
+
+
+bool cEPGHandler::HandleEvent(cEvent* Event)
+{
+    bool special_epall_timer_handling=false;
+    if (!check4proc(Event,special_epall_timer_handling)) return false;
 
     int Flags=0;
     const char *ChannelID;
@@ -134,16 +221,29 @@ bool cEPGHandler::FixEpgBugs(cEvent* Event)
     if (special_epall_timer_handling)
     {
         cChannel *chan=Channels.GetByChannelID(Event->ChannelID());
-        if (!chan) return false;
+        if (!chan)
+        {
+            tsyslog("no channel for %s",*Event->ChannelID().ToString());
+            return false;
+        }
         Flags=USE_SEASON;
         ChannelID=chan->Name();
     }
     else
     {
         cEPGMapping *map=maps->GetMap(Event->ChannelID());
-        if (!map) return false;
+        if (!map)
+        {
+            tsyslog("no map for channel %s",*Event->ChannelID().ToString());
+            return false;
+        }
         Flags=map->Flags();
         ChannelID=map->ChannelName();
+    }
+
+    if (ioprio_set(1,getpid(),7 | 3 << 13)==-1)
+    {
+        tsyslog("failed to set ioprio to 3,7");
     }
 
     cEPGSource *source=NULL;
@@ -152,6 +252,7 @@ bool cEPGHandler::FixEpgBugs(cEvent* Event)
     {
         if (!epall) return false;
         source=sources->GetSource(EITSOURCE);
+        if (!source) tsyslog("no source for %s",EITSOURCE);
         xevent=import->AddXMLTVEvent(source,db,ChannelID,Event,Event->Description());
         if (!xevent) return false;
     }
@@ -161,6 +262,7 @@ bool cEPGHandler::FixEpgBugs(cEvent* Event)
     }
     if (!source)
     {
+        tsyslog("no source for %s",xevent->Source());
         delete xevent;
         return false;
     }
@@ -169,230 +271,18 @@ bool cEPGHandler::FixEpgBugs(cEvent* Event)
 
     if (!xevent->EITEventID()) update=true;
     if (!xevent->EITDescription() && Event->Description()) update=true;
-    if (xevent->EITDescription() && Event->Description() &&
+    if (xevent->EITDescription() && Event->Description() && !import->WasChanged(Event) &&
             strcasecmp(xevent->EITDescription(),Event->Description())) update=true;
 
     if (update)
     {
-        if (!import->UpdateXMLTVEvent(source,db,Event,xevent->EventID(),
-                                      Event->EventID(),Event->Description()))
-        {
-            delete xevent;
-            return false;
-        }
+        import->UpdateXMLTVEvent(source,db,Event,xevent); // ignore errors
     }
 
     import->PutEvent(source,db,(cSchedule *) Event->Schedule(),Event,xevent,Flags);
     delete xevent;
     return false; // let VDR fix the bugs!
 }
-
-
-/*
-bool cEPGHandler::SetDescription(cEvent* Event, const char* Description)
-{
-    if (!Event) return false;
-    if (!maps) return false;
-    if (!import) return false;
-    if (!baseplugin) return false;
-
-    if (!last.isSame(Event->EventID()))
-    {
-        last.Clear();
-        bool special_epall_timer_handling=false;
-        if (!maps->ProcessChannel(Event->ChannelID()))
-        {
-            if (!epall) return false;
-            if (!Event->HasTimer()) return false;
-            if (!Event->ShortText()) return false;
-            special_epall_timer_handling=true;
-        }
-
-        if (!baseplugin->IsIdle(false))
-        {
-            if (import->WasChanged(Event)) return true;
-            return false;
-        }
-
-        int Flags=0;
-        const char *ChannelID;
-
-        if (special_epall_timer_handling)
-        {
-            cChannel *chan=Channels.GetByChannelID(Event->ChannelID());
-            if (!chan) return false;
-            Flags=USE_SEASON;
-            ChannelID=chan->Name();
-        }
-        else
-        {
-            cEPGMapping *map=maps->GetMap(Event->ChannelID());
-            if (!map) return false;
-            Flags=map->Flags();
-            ChannelID=map->ChannelName();
-        }
-
-        cXMLTVEvent *xevent=import->SearchXMLTVEvent(&db,ChannelID,Event);
-        cEPGSource *source=NULL;
-        if (!xevent)
-        {
-            if (!epall) return false;
-            source=sources->GetSource(EITSOURCE);
-            xevent=import->AddXMLTVEvent(source,db,ChannelID,Event,Description);
-            if (!xevent) return false;
-        }
-        else
-        {
-            source=sources->GetSource(xevent->Source());
-        }
-        if (!source) return false;
-        last.Set(source,xevent,Flags);
-    }
-    else
-    {
-        if (!baseplugin->IsIdle(false))
-        {
-            if (import->WasChanged(Event)) return true;
-            return false;
-        }
-    }
-
-    bool update=false;
-
-    if (!last.xEvent()->EITEventID()) update=true;
-    if (!last.xEvent()->EITDescription() && Description) update=true;
-    if (last.xEvent()->EITDescription() && Description &&
-            strcasecmp(last.xEvent()->EITDescription(),Description)) update=true;
-
-    if (update)
-    {
-        if (!import->UpdateXMLTVEvent(last.Source(),db,Event,last.xEvent()->EventID(),
-                                      Event->EventID(),Description))
-        {
-            return false;
-        }
-    }
-
-    return import->PutEvent(last.Source(),db,
-                            (cSchedule *) Event->Schedule(),
-                            Event,last.xEvent(),last.Flags(),IMPORT_DESCRIPTION);
-}
-
-bool cEPGHandler::SetContents(cEvent* UNUSED(Event), uchar* UNUSED(Contents))
-{
-    return false;
-}
-
-bool cEPGHandler::SetParentalRating(cEvent* Event, int ParentalRating)
-{
-    if (!Event) return false;
-    if (!maps) return false;
-    if (!import) return false;
-
-    if (!last.isSame(Event->EventID()))
-    {
-        last.Clear();
-
-        if (!maps->ProcessChannel(Event->ChannelID())) return false;
-
-        if (!baseplugin->IsIdle(false))
-        {
-            if (import->WasChanged(Event)) return true;
-            return false;
-        }
-
-        cEPGMapping *map=maps->GetMap(Event->ChannelID());
-        if (!map) return false;
-
-        cXMLTVEvent *xevent=import->SearchXMLTVEvent(&db,map->ChannelName(),Event);
-        if (!xevent) return false;
-
-        cEPGSource *source=sources->GetSource(xevent->Source());
-        if (!source)
-        {
-            delete xevent;
-            return false;
-        }
-
-        if (!xevent->EITEventID())
-        {
-            if (!import->UpdateXMLTVEvent(source,db,Event,xevent->EventID(),Event->EventID()))
-            {
-                delete xevent;
-                return false;
-            }
-        }
-        last.Set(source,xevent,map->Flags());
-    }
-    else
-    {
-        if (!baseplugin->IsIdle(false))
-        {
-            if (import->WasChanged(Event)) return true;
-            return false;
-        }
-    }
-
-    if (ParentalRating>last.xEvent()->ParentalRating()) return false; // use dvb value
-    if (Event->ParentalRating()!=last.xEvent()->ParentalRating())
-    {
-        last.Source()->Tlog("changing rating of '%s'",Event->Title());
-        Event->SetParentalRating(last.xEvent()->ParentalRating());
-    }
-    return true;
-}
-
-bool cEPGHandler::SetShortText(cEvent* Event, const char* UNUSED(ShortText))
-{
-    if (!Event) return false;
-    if (!maps) return false;
-    if (!import) return false;
-
-    if (!last.isSame(Event->EventID()))
-    {
-        last.Clear();
-        if (!maps->ProcessChannel(Event->ChannelID())) return false;
-
-        if (!baseplugin->IsIdle(false))
-        {
-            if (import->WasChanged(Event)) return true;
-            return false;
-        }
-        cEPGMapping *map=maps->GetMap(Event->ChannelID());
-        if (!map) return false;
-
-        cXMLTVEvent *xevent=import->SearchXMLTVEvent(&db,map->ChannelName(),Event);
-        if (!xevent) return false;
-
-        cEPGSource *source=sources->GetSource(xevent->Source());
-        if (!source)
-        {
-            delete xevent;
-            return false;
-        }
-
-        if (!xevent->EITEventID()) import->UpdateXMLTVEvent(source,db,Event,xevent->EventID(),
-                    Event->EventID());
-        last.Set(source,xevent,map->Flags());
-    }
-    else
-    {
-        if (!baseplugin->IsIdle(false))
-        {
-            if (import->WasChanged(Event)) return true;
-            return false;
-        }
-    }
-
-    bool ret=import->PutEvent(last.Source(),db,(cSchedule *) Event->Schedule(),Event,last.xEvent(),
-                              last.Flags(),IMPORT_SHORTTEXT);
-    if (!ret)
-    {
-        dsyslog("xmltv2vdr: failed to put event shorttext!");
-    }
-    return ret;
-}
-*/
 
 bool cEPGHandler::SortSchedule(cSchedule* UNUSED(Schedule))
 {
@@ -427,11 +317,13 @@ void cEPGTimer::Action()
     SetPriority(19);
     if (ioprio_set(1,getpid(),7 | 3 << 13)==-1)
     {
-        esyslog("xmltv2vdr: failed to set ioprio to 3,7");
+        dsyslog("failed to set ioprio to 3,7");
     }
 
-    cSchedulesLock *schedulesLock = new cSchedulesLock(true,2000); // wait up to 2 secs for lock!
-    const cSchedules *schedules = cSchedules::Schedules(*schedulesLock);
+    cSchedulesLock *schedulesLock = NULL;
+    const cSchedules *schedules = NULL;
+    schedulesLock = new cSchedulesLock(true,10); // wait 10ms for lock!
+    schedules = cSchedules::Schedules(*schedulesLock);
     if (!schedules)
     {
         delete schedulesLock;
@@ -463,8 +355,7 @@ void cEPGTimer::Action()
         cSchedule* schedule = (cSchedule *) schedules->GetSchedule(chan,false);
         if (schedule)
         {
-            import->PutEvent(source,db,schedule,
-                             event,xevent,USE_SEASON,IMPORT_DESCRIPTION);
+            import->PutEvent(source,db,schedule,event,xevent,USE_SEASON);
         }
         delete xevent;
     }
@@ -482,11 +373,21 @@ void cEPGTimer::Action()
 
 cHouseKeeping::cHouseKeeping(const char *EPGFile): cThread("xmltv2vdr housekeeping")
 {
-    epgfile=EPGFile;;
+    epgfile=EPGFile;
 }
 
 void cHouseKeeping::Action()
 {
+    cSchedulesLock *schedulesLock = NULL;
+    const cSchedules *schedules = NULL;
+    schedulesLock = new cSchedulesLock(true,10); // wait 10ms for lock!
+    schedules = cSchedules::Schedules(*schedulesLock);
+    if (!schedules)
+    {
+        delete schedulesLock;
+        return;
+    }
+
     sqlite3 *db=NULL;
     if (sqlite3_open_v2(epgfile,&db,SQLITE_OPEN_READWRITE,NULL)==SQLITE_OK)
     {
@@ -496,7 +397,7 @@ void cHouseKeeping::Action()
             char *errmsg;
             if (sqlite3_exec(db,sql,NULL,NULL,&errmsg)!=SQLITE_OK)
             {
-                esyslog("xmltv2vdr: %s",errmsg);
+                esyslog("%s",errmsg);
                 sqlite3_free(errmsg);
             }
             else
@@ -504,7 +405,7 @@ void cHouseKeeping::Action()
                 int changes=sqlite3_changes(db);
                 if (changes)
                 {
-                    isyslog("xmltv2vdr: removed %i old entries from db",changes);
+                    isyslog("removed %i old entries from db",changes);
                     sqlite3_exec(db,"VACCUM;",NULL,NULL,NULL);
                 }
             }
@@ -512,17 +413,19 @@ void cHouseKeeping::Action()
         }
     }
     sqlite3_close(db);
+    delete schedulesLock;
 }
 
 // -------------------------------------------------------------
 
-cPluginXmltv2vdr::cPluginXmltv2vdr(void) : epgexecutor(this, &epgsources)
+cPluginXmltv2vdr::cPluginXmltv2vdr(void) : epgexecutor(&epgsources)
 {
     // Initialize any member variables here.
     // DON'T DO ANYTHING ELSE THAT MAY HAVE SIDE EFFECTS, REQUIRE GLOBAL
     // VDR OBJECTS TO EXIST OR PRODUCE ANY OUTPUT!
     confdir=NULL;
     epgfile=NULL;
+    logfile=NULL;
     srcorder=NULL;
     epghandler=NULL;
     epgtimer=NULL;
@@ -567,40 +470,9 @@ cPluginXmltv2vdr::~cPluginXmltv2vdr()
 #endif
 }
 
-bool cPluginXmltv2vdr::IsIdle(bool IncludeHandler)
-{
-    if (IncludeHandler)
-    {
-        if (!insetup && !epgexecutor.Active() && (!epgtimer->Active()) && (!epghandler->Active())) return true;
-    }
-    else
-    {
-        if (!insetup && !epgexecutor.Active() && (!epgtimer->Active())) return true;
-    }
-    return false;
-}
-
-void cPluginXmltv2vdr::Wait4TimerThreadAndSetup()
-{
-    if (epgtimer->Active())
-    {
-        dsyslog("xmltv2vdr: wait for timer thread");
-        pthread_join(epgtimer->ThreadId(),NULL);
-    }
-    if (insetup)
-    {
-        dsyslog("xmltv2vdr: wait for setup change");
-        while (insetup)
-        {
-            usleep(200000);
-        }
-    }
-}
-
 bool cPluginXmltv2vdr::EPGSourceMove(int From, int To)
 {
     if (From==To) return false;
-    if (epgexecutor.Active() || epgtimer->Active() || epghandler->Active()) return true;
 
     sqlite3 *db=NULL;
     if (sqlite3_open_v2(epgfile,&db,SQLITE_OPEN_READWRITE,NULL)==SQLITE_OK)
@@ -634,7 +506,10 @@ const char *cPluginXmltv2vdr::CommandLineHelp(void)
     // Return a string that describes all known command line options.
     return "  -E FILE,   --epgfile=FILE write the EPG data into the given FILE (default is\n"
            "                            'epg.db' in the video directory) - best performance\n"
-           "                            if located on a ramdisk\n";
+           "                            if located on a ramdisk\n"
+           "  -l FILE    --logfile=FILE write trace logs into the given FILE (default is\n"
+           "                            no trace log\n";
+
 }
 
 bool cPluginXmltv2vdr::ProcessArgs(int argc, char *argv[])
@@ -642,20 +517,25 @@ bool cPluginXmltv2vdr::ProcessArgs(int argc, char *argv[])
     // Command line argument processing
     static struct option long_options[] =
     {
-        { "epgfile",      required_argument, NULL, 'E'
-        },
+        { "epgfile",      required_argument, NULL, 'E'},
+        { "logfile",      required_argument, NULL, 'l'},
         { 0,0,0,0 }
     };
 
     int c;
-    while ((c = getopt_long(argc, argv, "E:", long_options, NULL)) != -1)
+    while ((c = getopt_long(argc, argv, "E:l:", long_options, NULL)) != -1)
     {
         switch (c)
         {
         case 'E':
             if (epgfile) free(epgfile);
             epgfile=strdup(optarg);
-            isyslog("xmltv2vdr: using file '%s' for epgdata",optarg);
+            isyslog("using file '%s' for epgdata",optarg);
+            break;
+        case 'l':
+            if (logfile) free(logfile);
+            logfile=strdup(optarg);
+            isyslog("using file '%s' for log",optarg);
             break;
         default:
             return false;
@@ -681,12 +561,15 @@ bool cPluginXmltv2vdr::Start(void)
     }
     cParse::InitLibXML();
 
+    dbmutex=sqlite3_mutex_alloc(SQLITE_MUTEX_FAST);
+    if (!dbmutex) return false;
+
     ReadInEPGSources();
-    epghandler = new cEPGHandler(this,epgfile,&epgsources,&epgmappings,&textmappings);
+    epghandler = new cEPGHandler(epgfile,&epgsources,&epgmappings,&textmappings);
     epgtimer = new cEPGTimer(epgfile,&epgsources,&epgmappings,&textmappings);
     housekeeping = new cHouseKeeping(epgfile);
 
-    if (sqlite3_threadsafe()==0) esyslog("xmltv2vdr: ERROR sqlite3 not threadsafe!");
+    if (sqlite3_threadsafe()==0) esyslog("sqlite3 not threadsafe!");
     return true;
 }
 
@@ -702,6 +585,10 @@ void cPluginXmltv2vdr::Stop(void)
     epgmappings.Remove();
     textmappings.Remove();
     cParse::CleanupLibXML();
+    if (dbmutex)
+    {
+        sqlite3_mutex_free(dbmutex);
+    }
     if (confdir)
     {
         free(confdir);
@@ -711,6 +598,11 @@ void cPluginXmltv2vdr::Stop(void)
     {
         free(epgfile);
         epgfile=NULL;
+    }
+    if (logfile)
+    {
+        free(logfile);
+        logfile=NULL;
     }
     if (srcorder)
     {
@@ -725,7 +617,7 @@ void cPluginXmltv2vdr::Housekeeping(void)
     time_t now=time(NULL);
     if (now>(last_housetime_t+3600))
     {
-        if (IsIdle() && (housekeeping))
+        if (housekeeping)
         {
             struct stat statbuf;
             if (stat(epgfile,&statbuf)!=-1)
@@ -757,10 +649,7 @@ void cPluginXmltv2vdr::MainThreadHook(void)
     {
         if (now>=(last_epcheck_t+600))
         {
-            if (IsIdle())
-            {
-                epgtimer->Start();
-            }
+            epgtimer->Start();
             last_epcheck_t=(now/600)*600;
         }
     }

@@ -36,29 +36,19 @@ public:
     {
         return false;
     }
-    virtual bool FixEpgBugs(cEvent *UNUSED(Event))
+    virtual bool SetShortText(cEvent *UNUSED(Event),const char *UNUSED(ShortText))
     {
         return false;
     }
-    /*
-    virtual bool SetDescription(cEvent *UNUSED(Event), const char *UNUSED(Description))
+    virtual bool SetDescription(cEvent *UNUSED(Event),const char *UNUSED(Description))
     {
         return false;
     }
-    virtual bool SetContents(cEvent *UNUSED(Event), uchar *UNUSED(Contents))
+    virtual bool HandleEvent(cEvent *UNUSED(Event))
     {
         return false;
     }
-    virtual bool SetParentalRating(cEvent *UNUSED(Event), int UNUSED(ParentalRating))
-    {
-        return false;
-    }
-    virtual bool SetShortText(cEvent *UNUSED(Event), const char *UNUSED(ShortText))
-    {
-        return false;
-    }
-    */
-    virtual bool SortSchedule(cSchedule *Schedule)
+    virtual bool SortSchedule(cSchedule *UNUSED(Schedule))
     {
         return false;
     }
@@ -69,45 +59,19 @@ class cEPGSources;
 class cImport;
 class cPluginXmltv2vdr;
 
-class cEPGHandlerState
-{
-private:
-    cXMLTVEvent *xevent;
-    cEPGSource *source;
-    int flags;
-public:
-    cEPGHandlerState();
-    ~cEPGHandlerState();
-    void Clear();
-    void Set(cEPGSource *Source, cXMLTVEvent *xEvent, int Flags);
-    bool isSame(tEventID EventID);
-    cXMLTVEvent *xEvent()
-    {
-        return xevent;
-    }
-    cEPGSource *Source()
-    {
-        return source;
-    }
-    int Flags()
-    {
-        return flags;
-    }
-};
-
 class cEPGHandler : public cEpgHandler
 {
 private:
-    cPluginXmltv2vdr *baseplugin;
     cEPGMappings *maps;
     cEPGSources *sources;
     cImport *import;
+    const char *epgfile;
     bool epall;
     sqlite3 *db;
     void closedb(void);
-    //cEPGHandlerState last;
+    bool check4proc(cEvent *event, bool &spth);
 public:
-    cEPGHandler(cPluginXmltv2vdr *Plugin, const char *EpgFile, cEPGSources *Sources,
+    cEPGHandler(const char *EpgFile, cEPGSources *Sources,
                 cEPGMappings *Maps, cTEXTMappings *Texts);
     void SetEPAll(bool Value)
     {
@@ -119,13 +83,9 @@ public:
     }
     virtual ~cEPGHandler();
     virtual bool IgnoreChannel(const cChannel *Channel);
-    virtual bool FixEpgBugs(cEvent *Event);
-    /*
-    virtual bool SetDescription(cEvent *Event, const char *Description);
-    virtual bool SetContents(cEvent *Event, uchar *Contents);
-    virtual bool SetParentalRating(cEvent *Event, int ParentalRating);
-    virtual bool SetShortText(cEvent *Event, const char *ShortText);
-    */
+    virtual bool SetShortText(cEvent *Event,const char *ShortText);
+    virtual bool SetDescription(cEvent *Event,const char *Description);
+    virtual bool HandleEvent(cEvent *Event);
     virtual bool SortSchedule(cSchedule *Schedule);
 };
 
@@ -137,8 +97,7 @@ private:
     cEPGMappings *maps;
     cImport *import;
 public:
-    cEPGTimer(const char *EpgFile, cEPGSources *Sources, cEPGMappings *Maps,
-              cTEXTMappings *Texts);
+    cEPGTimer(const char *EpgFile, cEPGSources *Sources, cEPGMappings *Maps,cTEXTMappings *Texts);
     bool StillRunning()
     {
         return Running();
@@ -169,6 +128,7 @@ private:
     cEPGMappings epgmappings;
     cEPGSources epgsources;
     cTEXTMappings textmappings;
+    sqlite3_mutex *dbmutex;
     time_t last_housetime_t;
     time_t last_maintime_t;
     time_t last_epcheck_t;
@@ -204,8 +164,6 @@ public:
     {
         epgsources.ReadIn(confdir,epgfile,&epgmappings,&textmappings,srcorder,Reload);
     }
-    void Wait4TimerThreadAndSetup();
-    bool IsIdle(bool IncludeHandler=true);
     bool EPGSourceMove(int From, int To);
     int EPGSourceCount()
     {

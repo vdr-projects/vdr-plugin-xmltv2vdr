@@ -13,6 +13,7 @@
 #include "maps.h"
 #include "import.h"
 #include "parse.h"
+#include "debug.h"
 
 #define EPGSOURCES "/var/lib/epgsources" // NEVER (!) CHANGE THIS
 
@@ -65,7 +66,6 @@ private:
     int exec_time;
     int daysmax;
     int lastretcode;
-    void add2Log(const char prefix, const char *line);
     bool ReadConfig();
     int ReadOutput(char *&result, size_t &l);
     cEPGChannels channels;
@@ -73,6 +73,10 @@ public:
     cEPGSource(const char *Name,const char *ConfDir,const char *EPGFile,
                cEPGMappings *Maps, cTEXTMappings *Texts);
     ~cEPGSource();
+    bool Trace()
+    {
+        return (logfile!=NULL);
+    }
     int Execute(cEPGExecutor &myExecutor);
     int Import(cEPGExecutor &myExecutor);
     bool RunItNow();
@@ -142,10 +146,7 @@ public:
         if (pin) free((void *) pin);
         pin=strdup(NewPin);
     }
-    void Tlog(const char *format, ...);    
-    void Dlog(const char *format, ...);
-    void Elog(const char *format, ...);
-    void Ilog(const char *format, ...);
+    void Add2Log(struct tm *Tm, const char Prefix, const char *Line);
     bool Active()
     {
         return running;
@@ -171,9 +172,8 @@ class cEPGExecutor : public cThread
 {
 private:
     cEPGSources *sources;
-    cPluginXmltv2vdr *baseplugin;
 public:
-    cEPGExecutor(cPluginXmltv2vdr *Plugin, cEPGSources *Sources);
+    cEPGExecutor(cEPGSources *Sources);
     bool StillRunning()
     {
         return Running();

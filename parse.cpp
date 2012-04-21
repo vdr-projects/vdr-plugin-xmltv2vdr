@@ -22,6 +22,7 @@
 
 #include "xmltv2vdr.h"
 #include "parse.h"
+#include "debug.h"
 
 // -------------------------------------------------------
 
@@ -514,7 +515,7 @@ bool cParse::FetchEvent(xmlNodePtr enode)
             }
             else
             {
-                source->Elog("unknown element %s, please report!",node->name);
+                esyslogs(source,"unknown element %s, please report!",node->name);
             }
         }
         node=node->next;
@@ -535,27 +536,51 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
     if (!buffer) return 134;
     if (!bufsize) return 134;
 
+    cSchedulesLock *schedulesLock=NULL;
+    const cSchedules *schedules=NULL;
+
+    int l=0;
+    while (l<300)
+    {
+        if (schedulesLock) delete schedulesLock;
+        schedulesLock = new cSchedulesLock(true,200); // wait up to 60 secs for lock!
+        schedules = cSchedules::Schedules(*schedulesLock);
+        if (!myExecutor.StillRunning())
+        {
+            delete schedulesLock;
+            isyslogs(source,"request to stop from vdr");
+            return 0;
+        }
+        if (schedules) break;
+        l++;
+    }
+
+    dsyslogs(source,"parsing output");
+
     xmlDocPtr xmltv;
     xmltv=xmlReadMemory(buffer,bufsize,NULL,NULL,0);
     if (!xmltv)
     {
-        source->Elog("failed to parse xmltv");
+        esyslogs(source,"failed to parse xmltv");
+        delete schedulesLock;
         return 141;
     }
 
     xmlNodePtr rootnode=xmlDocGetRootElement(xmltv);
     if (!rootnode)
     {
-        source->Elog("no rootnode in xmltv");
+        esyslogs(source,"no rootnode in xmltv");
         xmlFreeDoc(xmltv);
+        delete schedulesLock;
         return 141;
     }
 
     sqlite3 *db=NULL;
     if (sqlite3_open(epgfile,&db)!=SQLITE_OK)
     {
-        source->Elog("failed to open or create %s",epgfile);
+        esyslogs(source,"failed to open or create %s",epgfile);
         xmlFreeDoc(xmltv);
+        delete schedulesLock;
         return 141;
     }
 
@@ -579,10 +604,11 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
     char *errmsg;
     if (sqlite3_exec(db,sql,NULL,NULL,&errmsg)!=SQLITE_OK)
     {
-        source->Elog("createdb: %s",errmsg);
+        esyslogs(source,"createdb: %s",errmsg);
         sqlite3_free(errmsg);
         sqlite3_close(db);
         xmlFreeDoc(xmltv);
+        delete schedulesLock;
         return 141;
     }
 
@@ -590,6 +616,7 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
     xmlNodePtr node=rootnode->xmlChildrenNode;
 
     int lerr=0;
+    int cnt=0;
     while (node)
     {
         if (node->type!=XML_ELEMENT_NODE)
@@ -606,7 +633,7 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
         if (!channelid)
         {
             if (lerr!=PARSE_NOCHANNELID)
-                source->Elog("missing channelid in xmltv file");
+                esyslogs(source,"missing channelid in xmltv file");
             lerr=PARSE_NOCHANNELID;
             node=node->next;
             continue;
@@ -615,7 +642,7 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
         if (!map)
         {
             if (lerr!=PARSE_NOMAPPING)
-                source->Elog("no mapping for channelid %s",channelid);
+                esyslogs(source,"no mapping for channelid %s",channelid);
             lerr=PARSE_NOMAPPING;
             xmlFree(channelid);
             node=node->next;
@@ -644,7 +671,7 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
         if (!starttime)
         {
             if (lerr!=PARSE_XMLTVERR)
-                source->Elog("no starttime, check xmltv file");
+                esyslogs(source,"no starttime, check xmltv file");
             lerr=PARSE_XMLTVERR;
             xmlFree(channelid);
             node=node->next;
@@ -665,7 +692,7 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
 
         if (!FetchEvent(node)) // sets xevent
         {
-            source->Tlog("failed to fetch event");
+            tsyslogs(source,"failed to fetch event");
             node=node->next;
             xmlFree(channelid);
             continue;
@@ -674,30 +701,34 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
         const char *sql=xevent.GetSQL(source->Name(),source->Index(),(const char *) channelid);
         if (sqlite3_exec(db,sql,NULL,NULL,&errmsg)!=SQLITE_OK)
         {
-            source->Elog("sqlite3: %s",errmsg);
+            tsyslogs(source,"sqlite3: %s",errmsg);
             sqlite3_free(errmsg);
             xmlFree(channelid);
             break;
         }
         xmlFree(channelid);
+        cnt++;
 
         node=node->next;
         if (!myExecutor.StillRunning())
         {
-            source->Ilog("request to stop from vdr");
+            isyslogs(source,"request to stop from vdr");
             break;
         }
     }
 
+    dsyslogs(source,"processed %i xmltv events",cnt);
+
     if (sqlite3_exec(db,"COMMIT; ANALYZE epg;",NULL,NULL,&errmsg)!=SQLITE_OK)
     {
-        source->Elog("sqlite3: %s",errmsg);
+        esyslogs(source,"sqlite3: %s",errmsg);
         sqlite3_free(errmsg);
     }
 
     sqlite3_close(db);
 
     xmlFreeDoc(xmltv);
+    delete schedulesLock;
     return 0;
 }
 

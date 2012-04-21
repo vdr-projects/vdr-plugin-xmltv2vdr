@@ -13,6 +13,7 @@
 #include "xmltv2vdr.h"
 #include "source.h"
 #include "extpipe.h"
+#include "debug.h"
 
 cEPGChannel::cEPGChannel(const char *Name, bool InUse)
 {
@@ -33,37 +34,32 @@ int cEPGChannel::Compare(const cListObject &ListObject) const
 
 // -------------------------------------------------------------
 
-cEPGExecutor::cEPGExecutor(cPluginXmltv2vdr *Plugin,cEPGSources *Sources) : cThread("xmltv2vdr importer")
+cEPGExecutor::cEPGExecutor(cEPGSources *Sources) : cThread("xmltv2vdr importer")
 {
-    baseplugin=Plugin;
     sources=Sources;
 }
 
 void cEPGExecutor::Action()
 {
     if (!sources) return;
-    if (!baseplugin) return;
 
     SetPriority(19);
     if (ioprio_set(1,getpid(),7 | 3 << 13)==-1)
     {
-        esyslog("xmltv2vdr: failed to set ioprio to 3,7");
+        esyslog("failed to set ioprio to 3,7");
     }
 
     for (cEPGSource *epgs=sources->First(); epgs; epgs=sources->Next(epgs))
     {
         if (epgs->RunItNow())
         {
-            // if timer thread is runnung, wait till it's stopped
-            baseplugin->Wait4TimerThreadAndSetup();
-
             int retries=0;
             while (retries<=2)
             {
                 int ret=epgs->Execute(*this);
                 if ((ret>0) && (ret<126) && (retries<2))
                 {
-                    epgs->Dlog("waiting 60 seconds");
+                    dsyslogs(epgs,"waiting 60 seconds");
                     int l=0;
                     while (l<300)
                     {
@@ -73,7 +69,7 @@ void cEPGExecutor::Action()
                         nanosleep(&req,NULL);
                         if (!Running())
                         {
-                            epgs->Ilog("request to stop from vdr");
+                            isyslogs(epgs,"request to stop from vdr");
                             return;
                         }
                         l++;
@@ -82,7 +78,7 @@ void cEPGExecutor::Action()
                 }
                 if ((retries==2) || (!ret)) break;
             }
-            if (retries>=2) epgs->Elog("skipping after %i retries",retries);
+            if (retries>=2) esyslogs(epgs,"skipping after %i retries",retries);
         }
     }
 
@@ -105,7 +101,7 @@ cEPGSource::cEPGSource(const char *Name, const char *ConfDir, const char *EPGFil
 {
     if (strcmp(Name,EITSOURCE))
     {
-        dsyslog("xmltv2vdr: '%s' added epgsource",Name);
+        dsyslog("'%s' added epgsource",Name);
     }
     name=strdup(Name);
     confdir=ConfDir;
@@ -126,7 +122,7 @@ cEPGSource::cEPGSource(const char *Name, const char *ConfDir, const char *EPGFil
         ready2parse=ReadConfig();
         parse=new cParse(EPGFile,this, Maps);
         import=new cImport(EPGFile,Maps,Texts);
-        Dlog("is%sready2parse",(ready2parse && parse) ? " " : " not ");
+        dsyslogs(this,"is%sready2parse",(ready2parse && parse) ? " " : " not ");
     }
     else
     {
@@ -141,7 +137,7 @@ cEPGSource::~cEPGSource()
 {
     if (strcmp(name,EITSOURCE))
     {
-        dsyslog("xmltv2vdr: '%s' epgsource removed",name);
+        dsyslog("'%s' epgsource removed",name);
     }
     free((void *) name);
     if (pin) free((void *) pin);
@@ -192,17 +188,17 @@ bool cEPGSource::ReadConfig()
     char *fname=NULL;
     if (asprintf(&fname,"%s/%s",EPGSOURCES,name)==-1)
     {
-        Elog("out of memory");
+        esyslogs(this,"out of memory");
         return false;
     }
     FILE *f=fopen(fname,"r");
     if (!f)
     {
-        Elog("cannot read config file %s",fname);
+        esyslogs(this,"cannot read config file %s",fname);
         free(fname);
         return false;
     }
-    Dlog("reading source config");
+    dsyslogs(this,"reading source config");
     size_t lsize;
     char *line=NULL;
     int linenr=1;
@@ -212,12 +208,12 @@ bool cEPGSource::ReadConfig()
         {
             if (!strncmp(line,"pipe",4))
             {
-                Dlog("is providing data through a pipe");
+                dsyslogs(this,"is providing data through a pipe");
                 usepipe=true;
             }
             else
             {
-                Dlog("is providing data through a file");
+                dsyslogs(this,"is providing data through a file");
                 usepipe=false;
             }
             char *ndt=strchr(line,';');
@@ -233,7 +229,7 @@ bool cEPGSource::ReadConfig()
                 }
                 int h,m;
                 sscanf(ndt,"%02i:%02i",&h,&m);
-                Dlog("updates data @%02i:%02i",h,m);
+                dsyslogs(this,"updates data @%02i:%02i",h,m);
                 m+=10;
                 if (m>60)
                 {
@@ -247,7 +243,7 @@ bool cEPGSource::ReadConfig()
                     pn=compactspace(pn);
                     if (pn[0]=='1')
                     {
-                        Dlog("is needing a pin");
+                        dsyslogs(this,"is needing a pin");
                         needpin=true;
                     }
                 }
@@ -267,7 +263,7 @@ bool cEPGSource::ReadConfig()
             {
                 daysmax=atoi(line);
             }
-            Dlog("daysmax=%i",daysmax);
+            dsyslogs(this,"daysmax=%i",daysmax);
         }
         if (linenr>2)
         {
@@ -299,7 +295,7 @@ bool cEPGSource::ReadConfig()
 
     if (asprintf(&fname,"%s/%s",confdir,name)==-1)
     {
-        Elog("out of memory");
+        esyslogs(this,"out of memory");
         return false;
     }
     f=fopen(fname,"r+");
@@ -307,7 +303,7 @@ bool cEPGSource::ReadConfig()
     {
         if (errno!=ENOENT)
         {
-            Elog("cannot read config file %s",fname);
+            esyslogs(this,"cannot read config file %s",fname);
             free(fname);
             return true;
         }
@@ -315,7 +311,7 @@ bool cEPGSource::ReadConfig()
         free(fname);
         return true;
     }
-    Dlog("reading plugin config");
+    dsyslogs(this,"reading plugin config");
     line=NULL;
     linenr=1;
     while (getline(&line,&lsize,f)!=-1)
@@ -327,17 +323,17 @@ bool cEPGSource::ReadConfig()
             if (strcmp(line,"#no pin"))
             {
                 ChangePin(line);
-                Dlog("pin set");
+                dsyslogs(this,"pin set");
             }
         }
         if (linenr==2)
         {
             int reserve;
             sscanf(line,"%2d;%1d;%3d;%10d",&daysinadvance,&reserve,&exec_weekday,&exec_time);
-            Dlog("daysinadvance=%i",daysinadvance);
-            Dlog("weekdays=%s",*cTimer::PrintDay(0,exec_weekday,true));
+            dsyslogs(this,"daysinadvance=%i",daysinadvance);
+            dsyslogs(this,"weekdays=%s",*cTimer::PrintDay(0,exec_weekday,true));
             time_t nrt=NextRunTime();
-            Dlog("nextrun on %s",ctime(&nrt));
+            dsyslogs(this,"nextrun on %s",ctime(&nrt));
         }
         if (linenr>2)
         {
@@ -370,15 +366,15 @@ int cEPGSource::ReadOutput(char *&result, size_t &l)
     char *fname=NULL;
     if (asprintf(&fname,"%s/%s.xmltv",EPGSOURCES,name)==-1)
     {
-        Elog("out of memory");
+        esyslogs(this,"out of memory");
         return 134;
     }
-    Dlog("reading from '%s'",fname);
+    dsyslogs(this,"reading from '%s'",fname);
 
     int fd=open(fname,O_RDONLY);
     if (fd==-1)
     {
-        Elog("failed to open '%s'",fname);
+        esyslogs(this,"failed to open '%s'",fname);
         free(fname);
         return 157;
     }
@@ -386,7 +382,7 @@ int cEPGSource::ReadOutput(char *&result, size_t &l)
     struct stat statbuf;
     if (fstat(fd,&statbuf)==-1)
     {
-        Elog("failed to stat '%s'",fname);
+        esyslogs(this,"failed to stat '%s'",fname);
         close(fd);
         free(fname);
         return 157;
@@ -397,12 +393,12 @@ int cEPGSource::ReadOutput(char *&result, size_t &l)
     {
         close(fd);
         free(fname);
-        Elog("out of memory");
+        esyslogs(this,"out of memory");
         return 134;
     }
     if (read(fd,result,statbuf.st_size)!=statbuf.st_size)
     {
-        Elog("failed to read '%s'",fname);
+        esyslogs(this,"failed to read '%s'",fname);
         ret=149;
         free(result);
         result=NULL;
@@ -414,7 +410,6 @@ int cEPGSource::ReadOutput(char *&result, size_t &l)
 
 int cEPGSource::Import(cEPGExecutor &myExecutor)
 {
-    Dlog("importing from db");
     return import->Process(this,myExecutor);
 }
 
@@ -438,7 +433,7 @@ int cEPGSource::Execute(cEPGExecutor &myExecutor)
     char *cmd=NULL;
     if (asprintf(&cmd,"%s %i '%s'",name,daysinadvance,pin ? pin : "")==-1)
     {
-        Elog("out of memory");
+        esyslogs(this,"out of memory");
         return 134;
     }
 
@@ -453,7 +448,7 @@ int cEPGSource::Execute(cEPGExecutor &myExecutor)
             if (!ncmd)
             {
                 free(cmd);
-                Elog("out of memory");
+                esyslogs(this,"out of memory");
                 return 134;
             }
             cmd=ncmd;
@@ -467,7 +462,7 @@ int cEPGSource::Execute(cEPGExecutor &myExecutor)
     if (!cu)
     {
         free(cmd);
-        Ilog("no channels, please configure source");
+        isyslogs(this,"no channels, please configure source");
         return 0;
     }
 
@@ -502,7 +497,7 @@ int cEPGSource::Execute(cEPGExecutor &myExecutor)
                     pe++;
                 }
             }
-            Ilog("%s",pcmd);
+            isyslogs(this,"%s",pcmd);
         }
         free(pcmd);
     }
@@ -510,11 +505,11 @@ int cEPGSource::Execute(cEPGExecutor &myExecutor)
     if (!p.Open(cmd))
     {
         free(cmd);
-        Elog("failed to open pipe");
+        esyslogs(this,"failed to open pipe");
         return 141;
     }
     free(cmd);
-    Dlog("executing epgsource");
+    dsyslogs(this,"executing epgsource");
     running=true;
 
     int fdsopen=2;
@@ -591,14 +586,14 @@ int cEPGSource::Execute(cEPGExecutor &myExecutor)
                 p.Close(status);
                 if (r_out) free(r_out);
                 if (r_err) free(r_err);
-                Ilog("request to stop from vdr");
+                isyslogs(this,"request to stop from vdr");
                 running=false;
                 return 0;
             }
         }
         else
         {
-            Elog("failed polling");
+            esyslogs(this,"failed polling");
             break;
         }
     }
@@ -613,18 +608,17 @@ int cEPGSource::Execute(cEPGExecutor &myExecutor)
             int returncode=WEXITSTATUS(status);
             if ((!returncode) && (r_out))
             {
-                Dlog("parsing output");
                 ret=parse->Process(myExecutor,r_out,l_out);
             }
             else
             {
-                Elog("epgsource returned %i",returncode);
+                esyslogs(this,"epgsource returned %i",returncode);
                 ret=returncode;
             }
         }
         else
         {
-            Elog("failed to execute");
+            esyslogs(this,"failed to execute");
             ret=126;
         }
     }
@@ -641,14 +635,13 @@ int cEPGSource::Execute(cEPGExecutor &myExecutor)
                 ret=ReadOutput(result,l);
                 if ((!ret) && (result))
                 {
-                    Dlog("parsing output");
                     ret=parse->Process(myExecutor,result,l);
                 }
                 if (result) free(result);
             }
             else
             {
-                Elog("epgsource returned %i",returncode);
+                esyslogs(this,"epgsource returned %i",returncode);
                 ret=returncode;
             }
         }
@@ -669,7 +662,7 @@ int cEPGSource::Execute(cEPGExecutor &myExecutor)
         {
             if (strcmp(last,pch))
             {
-                Elog("%s",pch);
+                esyslogs(this,"%s",pch);
                 last=pch;
             }
             pch=strtok_r(NULL,"\n",&saveptr);
@@ -695,7 +688,7 @@ void cEPGSource::Store(void)
     if (asprintf(&fname1,"%s/%s",confdir,name)==-1) return;
     if (asprintf(&fname2,"%s/%s.new",confdir,name)==-1)
     {
-        Elog("out of memory");
+        esyslogs(this,"out of memory");
         free(fname1);
         return;
     }
@@ -703,7 +696,7 @@ void cEPGSource::Store(void)
     FILE *w=fopen(fname2,"w+");
     if (!w)
     {
-        Elog("cannot create %s",fname2);
+        esyslogs(this,"cannot create %s",fname2);
         unlink(fname2);
         free(fname1);
         free(fname2);
@@ -739,17 +732,14 @@ void cEPGSource::Store(void)
     free(fname2);
 }
 
-void cEPGSource::add2Log(const char Prefix, const char *line)
+void cEPGSource::Add2Log(struct tm *Tm, const char Prefix, const char *Line)
 {
-    if (!line) return;
+    if (!Line) return;
 
-    struct tm tm;
-    time_t now=time(NULL);
-    localtime_r(&now,&tm);
     char dt[30];
-    strftime(dt,sizeof(dt)-1,"%H:%M ",&tm);
+    strftime(dt,sizeof(dt)-1,"%H:%M ",Tm);
 
-    loglen+=strlen(line)+3+strlen(dt);
+    loglen+=strlen(Line)+3+strlen(dt);
     char *nptr=(char *) realloc(Log,loglen);
     if (nptr)
     {
@@ -760,66 +750,10 @@ void cEPGSource::add2Log(const char Prefix, const char *line)
         prefix[1]=0;
         strcat(Log,prefix);
         strcat(Log,dt);
-        strcat(Log,line);
+        strcat(Log,Line);
         strcat(Log,"\n");
         Log[loglen-1]=0;
     }
-}
-
-void cEPGSource::Elog(const char *format, ...)
-{
-    va_list ap;
-    char fmt[255];
-    if (snprintf(fmt,sizeof(fmt),"xmltv2vdr: '%s' ERROR %s",name,format)==-1) return;
-    va_start(ap, format);
-    char *ptr;
-    if (vasprintf(&ptr,fmt,ap)==-1) return;
-    va_end(ap);
-    esyslog(ptr);
-    add2Log('E',ptr+20+strlen(name));
-    free(ptr);
-}
-
-void cEPGSource::Tlog(const char *format, ...)
-{
-    va_list ap;
-    char fmt[255];
-    if (snprintf(fmt,sizeof(fmt),"xmltv2vdr: '%s' %s",name,format)==-1) return;
-    va_start(ap, format);
-    char *ptr;
-    if (vasprintf(&ptr,fmt,ap)==-1) return;
-    va_end(ap);
-    //tsyslog(ptr);
-    add2Log('D',ptr+14+strlen(name));
-    free(ptr);
-}
-
-void cEPGSource::Dlog(const char *format, ...)
-{
-    va_list ap;
-    char fmt[255];
-    if (snprintf(fmt,sizeof(fmt),"xmltv2vdr: '%s' %s",name,format)==-1) return;
-    va_start(ap, format);
-    char *ptr;
-    if (vasprintf(&ptr,fmt,ap)==-1) return;
-    va_end(ap);
-    dsyslog(ptr);
-    add2Log('D',ptr+14+strlen(name));
-    free(ptr);
-}
-
-void cEPGSource::Ilog(const char *format, ...)
-{
-    va_list ap;
-    char fmt[255];
-    if (snprintf(fmt,sizeof(fmt),"xmltv2vdr: '%s' %s",name,format)==-1) return;
-    va_start(ap, format);
-    char *ptr;
-    if (vasprintf(&ptr,fmt,ap)==-1) return;
-    va_end(ap);
-    isyslog(ptr);
-    add2Log('I',ptr+14+strlen(name));
-    free(ptr);
 }
 
 // -------------------------------------------------------------
@@ -903,6 +837,7 @@ void cEPGSources::ReadIn(const char *ConfDir, const char *EpgFile, cEPGMappings 
     while (dirent=readdir(dir))
     {
         if (strchr(&dirent->d_name[0],'.')) continue;
+        if (dirent->d_type==4) continue;
         if (!Exists(dirent->d_name))
         {
             char *path=NULL;
@@ -916,7 +851,7 @@ void cEPGSources::ReadIn(const char *ConfDir, const char *EpgFile, cEPGMappings 
                         char id[5];
                         if (read(fd,id,4)!=4)
                         {
-                            esyslog("xmltv2vdr: cannot read config file '%s'",dirent->d_name);
+                            esyslog("cannot read config file '%s'",dirent->d_name);
                         }
                         else
                         {
@@ -927,19 +862,19 @@ void cEPGSources::ReadIn(const char *ConfDir, const char *EpgFile, cEPGMappings 
                             }
                             else
                             {
-                                dsyslog("xmltv2vdr: ignoring non config file '%s'",dirent->d_name);
+                                dsyslog("ignoring non config file '%s'",dirent->d_name);
                             }
                             close(fd);
                         }
                     }
                     else
                     {
-                        esyslog("xmltv2vdr: cannot open config file '%s'",dirent->d_name);
+                        esyslog("cannot open config file '%s'",dirent->d_name);
                     }
                 }
                 else
                 {
-                    esyslog("xmltv2vdr: cannot access config file '%s'",dirent->d_name);
+                    esyslog("cannot access config file '%s'",dirent->d_name);
                 }
                 free(path);
             }
@@ -971,7 +906,7 @@ void cEPGSources::ReadIn(const char *ConfDir, const char *EpgFile, cEPGMappings 
         {
             if (disable)
             {
-                isyslog("xmltv2vdr: disabling source '%s'",Get(oldpos)->Name());
+                isyslog("disabling source '%s'",Get(oldpos)->Name());
                 Get(oldpos)->Disable();
             }
             if (oldpos!=newpos) Move(oldpos,newpos);

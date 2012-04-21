@@ -19,6 +19,7 @@
 #include "xmltv2vdr.h"
 #include "import.h"
 #include "event.h"
+#include "debug.h"
 
 extern char *strcatrealloc(char *, const char*);
 
@@ -172,7 +173,7 @@ cEvent *cImport::SearchVDREvent(cEPGSource *source, cSchedule* schedule, cXMLTVE
                     if (diff<=maxdiff)
                     {
                         if (!WasChanged(p))
-                            source->Tlog("found '%s' for '%s'",p->Title(),conv->Convert(xevent->Title()));
+                            tsyslogs(source,"found '%s' for '%s'",p->Title(),conv->Convert(xevent->Title()));
                         f=p;
                         maxdiff=diff;
                     }
@@ -239,10 +240,33 @@ char *cImport::Add2Description(char *description, const char *Name, int Value)
     return description;
 }
 
-char *cImport::AddEOT2Description(char *description)
+char *cImport::AddEOT2Description(char *description, bool checkutf8)
 {
-    const char nbsp[]={0xc2,0xa0,0};
-    description=strcatrealloc(description,nbsp);
+    const char nbspUTF8[]={0xc2,0xa0,0};
+    const char nbsp[]={0xa0,0};
+
+    if (checkutf8)
+    {
+        if (!codeset)
+        {
+            description=strcatrealloc(description,nbspUTF8);
+        }
+        else
+        {
+            if (strncasecmp(codeset,"UTF-8",5))
+            {
+                description=strcatrealloc(description,nbsp);
+            }
+            else
+            {
+                description=strcatrealloc(description,nbspUTF8);
+            }
+        }
+    }
+    else
+    {
+        description=strcatrealloc(description,nbspUTF8);
+    }
     return description;
 }
 
@@ -250,14 +274,12 @@ bool cImport::WasChanged(cEvent* Event)
 {
     if (!Event) return false;
     if (!Event->Description()) return false;
-    int len=strlen(Event->Description());
-    if (len<1) return false;
-    if ((uchar)(Event->Description()[len-1])==0xA0) return true;
-    return false;
+    if (!strchr(Event->Description(),0xA0)) return false;
+    return true;
 }
 
 bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
-                       cEvent *Event, cXMLTVEvent *xEvent,int Flags, int Option)
+                       cEvent *Event, cXMLTVEvent *xEvent,int Flags)
 {
     if (!Source) return false;
     if (!Db) return false;
@@ -295,7 +317,7 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
                     strftime(from,sizeof(from)-1,"%b %d %H:%M",&tm);
                     localtime_r(&end,&tm);
                     strftime(till,sizeof(till)-1,"%b %d %H:%M",&tm);
-                    Source->Elog("cannot add '%s'@%s-%s",xEvent->Title(),from,till);
+                    esyslogs(Source,"cannot add '%s'@%s-%s",xEvent->Title(),from,till);
 
                     time_t pstart=prev->StartTime();
                     time_t pstop=prev->EndTime();
@@ -303,7 +325,7 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
                     strftime(from,sizeof(from)-1,"%b %d %H:%M",&tm);
                     localtime_r(&pstop,&tm);
                     strftime(till,sizeof(till)-1,"%b %d %H:%M",&tm);
-                    Source->Elog("found '%s'@%s-%s",prev->Title(),from,till);
+                    esyslogs(Source,"found '%s'@%s-%s",prev->Title(),from,till);
 
                     time_t nstart=next->StartTime();
                     time_t nstop=next->EndTime();
@@ -311,7 +333,7 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
                     strftime(from,sizeof(from)-1,"%b %d %H:%M",&tm);
                     localtime_r(&nstop,&tm);
                     strftime(till,sizeof(till)-1,"%b %d %H:%M",&tm);
-                    Source->Elog("found '%s'@%s-%s",next->Title(),from,till);
+                    esyslogs(Source,"found '%s'@%s-%s",next->Title(),from,till);
                     return false;
                 }
 
@@ -325,7 +347,7 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
                         strftime(from,sizeof(from)-1,"%b %d %H:%M",&tm);
                         localtime_r(&end,&tm);
                         strftime(till,sizeof(till)-1,"%b %d %H:%M",&tm);
-                        Source->Elog("cannot add '%s'@%s-%s",xEvent->Title(),from,till);
+                        esyslogs(Source,"cannot add '%s'@%s-%s",xEvent->Title(),from,till);
 
                         time_t nstart=next->StartTime();
                         time_t nstop=next->EndTime();
@@ -333,7 +355,7 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
                         strftime(from,sizeof(from)-1,"%b %d %H:%M",&tm);
                         localtime_r(&nstop,&tm);
                         strftime(till,sizeof(till)-1,"%b %d %H:%M",&tm);
-                        Source->Elog("found '%s'@%s-%s",next->Title(),from,till);
+                        esyslogs(Source,"found '%s'@%s-%s",next->Title(),from,till);
                         return false;
                     }
                     else
@@ -352,7 +374,7 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
                     strftime(from,sizeof(from)-1,"%b %d %H:%M",&tm);
                     localtime_r(&end,&tm);
                     strftime(till,sizeof(till)-1,"%b %d %H:%M",&tm);
-                    Source->Elog("cannot add '%s'@%s-%s",xEvent->Title(),from,till);
+                    esyslogs(Source,"cannot add '%s'@%s-%s",xEvent->Title(),from,till);
 
                     time_t pstart=prev->StartTime();
                     time_t pstop=prev->EndTime();
@@ -360,7 +382,7 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
                     strftime(from,sizeof(from)-1,"%b %d %H:%M",&tm);
                     localtime_r(&pstop,&tm);
                     strftime(till,sizeof(till)-1,"%b %d %H:%M",&tm);
-                    Source->Elog("found '%s'@%s-%s",prev->Title(),from,till);
+                    esyslogs(Source,"found '%s'@%s-%s",prev->Title(),from,till);
                     return false;
                 }
                 else
@@ -387,11 +409,14 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
         Event->SetTableID(0);
         Schedule->AddEvent(Event);
         Schedule->Sort();
-        localtime_r(&start,&tm);
-        strftime(from,sizeof(from)-1,"%b %d %H:%M",&tm);
-        localtime_r(&end,&tm);
-        strftime(till,sizeof(till)-1,"%b %d %H:%M",&tm);
-        Source->Tlog("adding '%s'@%s-%s",xEvent->Title(),from,till);
+        if (Source->Trace())
+        {
+            localtime_r(&start,&tm);
+            strftime(from,sizeof(from)-1,"%b %d %H:%M",&tm);
+            localtime_r(&end,&tm);
+            strftime(till,sizeof(till)-1,"%b %d %H:%M",&tm);
+            tsyslogs(Source,"adding '%s'@%s-%s",xEvent->Title(),from,till);
+        }
     }
     else
     {
@@ -406,7 +431,7 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
         {
             if (!strcasecmp(xEvent->ShortText(),Event->Title()))
             {
-                Source->Tlog("title and subtitle equal, clearing subtitle");
+                tsyslogs(Source,"title and subtitle equal, clearing subtitle");
                 Event->SetShortText(NULL);
             }
             else
@@ -421,309 +446,306 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
         }
     }
 
-    if (Option!=IMPORT_SHORTTEXT)
+    char *description=NULL;
+    if (((Flags & USE_LONGTEXT)==USE_LONGTEXT) || ((Flags & OPT_APPEND)==OPT_APPEND))
     {
-        char *description=NULL;
-        if (((Flags & USE_LONGTEXT)==USE_LONGTEXT) || ((Flags & OPT_APPEND)==OPT_APPEND))
+        if (xEvent->Description() && (strlen(xEvent->Description())>0))
         {
-            if (xEvent->Description() && (strlen(xEvent->Description())>0))
+            description=strdup(xEvent->Description());
+        }
+    }
+
+    if (!description && xEvent->EITDescription() && (strlen(xEvent->EITDescription())>0))
+    {
+        description=strdup(xEvent->EITDescription());
+    }
+
+    if (!description && Event->Description() && (strlen(Event->Description())>0))
+    {
+        if (WasChanged(Event)) return true;
+        UpdateXMLTVEvent(Source,Db,Event,xEvent);
+        description=strdup(Event->Description());
+    }
+
+    if (description) description=Add2Description(description,"\n");
+
+    if ((Flags & USE_CREDITS)==USE_CREDITS)
+    {
+        cXMLTVStringList *credits=xEvent->Credits();
+        if (credits->Size())
+        {
+            cTEXTMapping *oldtext=NULL;
+            for (int i=0; i<credits->Size(); i++)
             {
-                description=strdup(xEvent->Description());
-            }
-        }
-
-        if (!description && xEvent->EITDescription() && (strlen(xEvent->EITDescription())>0))
-        {
-            description=strdup(xEvent->EITDescription());
-        }
-
-        if (!description && Event->Description() && (strlen(Event->Description())>0))
-        {
-            if (WasChanged(Event)) return true;
-            UpdateXMLTVEvent(Source,Db,Event,xEvent->EventID(),Event->EventID(),Event->Description());
-            description=strdup(Event->Description());
-        }
-
-        if (description) description=Add2Description(description,"\n");
-
-        if ((Flags & USE_CREDITS)==USE_CREDITS)
-        {
-            cXMLTVStringList *credits=xEvent->Credits();
-            if (credits->Size())
-            {
-                cTEXTMapping *oldtext=NULL;
-                for (int i=0; i<credits->Size(); i++)
+                char *ctype=strdup((*credits)[i]);
+                if (ctype)
                 {
-                    char *ctype=strdup((*credits)[i]);
-                    if (ctype)
+                    char *cval=strchr(ctype,'|');
+                    if (cval)
                     {
-                        char *cval=strchr(ctype,'|');
-                        if (cval)
+                        *cval=0;
+                        cval++;
+                        bool add=true;
+                        if (((Flags & CREDITS_ACTORS)!=CREDITS_ACTORS) &&
+                                (!strcasecmp(ctype,"actor"))) add=false;
+                        if (((Flags & CREDITS_DIRECTORS)!=CREDITS_DIRECTORS) &&
+                                (!strcasecmp(ctype,"director"))) add=false;
+                        if (((Flags & CREDITS_OTHERS)!=CREDITS_OTHERS) &&
+                                (add) && (strcasecmp(ctype,"actor")) &&
+                                (strcasecmp(ctype,"director"))) add=false;
+                        if (add)
                         {
-                            *cval=0;
-                            cval++;
-                            bool add=true;
-                            if (((Flags & CREDITS_ACTORS)!=CREDITS_ACTORS) &&
-                                    (!strcasecmp(ctype,"actor"))) add=false;
-                            if (((Flags & CREDITS_DIRECTORS)!=CREDITS_DIRECTORS) &&
-                                    (!strcasecmp(ctype,"director"))) add=false;
-                            if (((Flags & CREDITS_OTHERS)!=CREDITS_OTHERS) &&
-                                    (add) && (strcasecmp(ctype,"actor")) &&
-                                    (strcasecmp(ctype,"director"))) add=false;
-                            if (add)
+                            cTEXTMapping *text=texts->GetMap(ctype);
+                            if ((Flags & CREDITS_LIST)==CREDITS_LIST)
                             {
-                                cTEXTMapping *text=texts->GetMap(ctype);
-                                if ((Flags & CREDITS_LIST)==CREDITS_LIST)
+                                if (oldtext!=text)
                                 {
-                                    if (oldtext!=text)
+                                    if (oldtext)
                                     {
-                                        if (oldtext)
-                                        {
-                                            description=RemoveLastCharFromDescription(description);
-                                            description=RemoveLastCharFromDescription(description);
-                                            description=Add2Description(description,"\n");
-                                        }
-                                        description=Add2Description(description,text->Value());
-                                        description=Add2Description(description,": ");
+                                        description=RemoveLastCharFromDescription(description);
+                                        description=RemoveLastCharFromDescription(description);
+                                        description=Add2Description(description,"\n");
                                     }
-                                    description=Add2Description(description,cval);
-                                    description=Add2Description(description,", ");
-                                }
-                                else
-                                {
-                                    if (text)
-                                    {
-                                        description=Add2Description(description,text->Value(),cval);
-                                    }
-                                }
-                                oldtext=text;
-                            }
-                        }
-                        free(ctype);
-                    }
-                }
-                if ((oldtext) && ((Flags & CREDITS_LIST)==CREDITS_LIST))
-                {
-                    description=RemoveLastCharFromDescription(description);
-                    description=RemoveLastCharFromDescription(description);
-                    description=Add2Description(description,"\n");
-                }
-            }
-        }
-
-        if ((Flags & USE_COUNTRYDATE)==USE_COUNTRYDATE)
-        {
-            if (xEvent->Country())
-            {
-                cTEXTMapping *text=texts->GetMap("country");
-                if (text) description=Add2Description(description,text->Value(),xEvent->Country());
-            }
-
-            if (xEvent->Year())
-            {
-                cTEXTMapping *text=texts->GetMap("year");
-                if (text) description=Add2Description(description,text->Value(),xEvent->Year());
-            }
-        }
-        if (((Flags & USE_ORIGTITLE)==USE_ORIGTITLE) && (xEvent->OrigTitle()))
-        {
-            cTEXTMapping *text=texts->GetMap("originaltitle");
-            if (text) description=Add2Description(description,text->Value(),xEvent->OrigTitle());
-        }
-        if (((Flags & USE_CATEGORIES)==USE_CATEGORIES) && (xEvent->Category()->Size()))
-        {
-            cTEXTMapping *text=texts->GetMap("category");
-            if (text)
-            {
-                cXMLTVStringList *categories=xEvent->Category();
-                description=Add2Description(description,text->Value(),(*categories)[0]);
-                for (int i=1; i<categories->Size(); i++)
-                {
-                    // prevent duplicates
-                    if (strcasecmp((*categories)[i],(*categories)[i-1]))
-                        description=Add2Description(description,text->Value(),(*categories)[i]);
-                }
-            }
-        }
-
-        if (((Flags & USE_VIDEO)==USE_VIDEO) && (xEvent->Video()->Size()))
-        {
-            cTEXTMapping *text=texts->GetMap("video");
-            if (text)
-            {
-                description=Add2Description(description,text->Value());
-                description=Add2Description(description,": ");
-                cXMLTVStringList *video=xEvent->Video();
-                for (int i=0; i<video->Size(); i++)
-                {
-                    char *vtype=strdup((*video)[i]);
-                    if (vtype)
-                    {
-                        char *vval=strchr(vtype,'|');
-                        if (vval)
-                        {
-                            *vval=0;
-                            vval++;
-
-                            if (i)
-                            {
-                                description=Add2Description(description,", ");
-                            }
-
-                            if (!strcasecmp(vtype,"colour"))
-                            {
-                                if (!strcasecmp(vval,"no"))
-                                {
-                                    cTEXTMapping *text=texts->GetMap("blacknwhite");
                                     description=Add2Description(description,text->Value());
+                                    description=Add2Description(description,": ");
                                 }
+                                description=Add2Description(description,cval);
+                                description=Add2Description(description,", ");
                             }
                             else
                             {
-                                description=Add2Description(description,vval);
+                                if (text)
+                                {
+                                    description=Add2Description(description,text->Value(),cval);
+                                }
                             }
+                            oldtext=text;
                         }
-                        free(vtype);
                     }
+                    free(ctype);
                 }
+            }
+            if ((oldtext) && ((Flags & CREDITS_LIST)==CREDITS_LIST))
+            {
+                description=RemoveLastCharFromDescription(description);
+                description=RemoveLastCharFromDescription(description);
                 description=Add2Description(description,"\n");
             }
         }
+    }
 
-        if ((Flags & USE_AUDIO)==USE_AUDIO)
+    if ((Flags & USE_COUNTRYDATE)==USE_COUNTRYDATE)
+    {
+        if (xEvent->Country())
         {
-            if (xEvent->Audio())
-            {
-                cTEXTMapping *text=texts->GetMap("audio");
-                if (text)
-                {
-                    description=Add2Description(description,text->Value());
-                    description=Add2Description(description,": ");
+            cTEXTMapping *text=texts->GetMap("country");
+            if (text) description=Add2Description(description,text->Value(),xEvent->Country());
+        }
 
-                    if ((!strcasecmp(xEvent->Audio(),"mono")) || (!strcasecmp(xEvent->Audio(),"stereo")))
+        if (xEvent->Year())
+        {
+            cTEXTMapping *text=texts->GetMap("year");
+            if (text) description=Add2Description(description,text->Value(),xEvent->Year());
+        }
+    }
+    if (((Flags & USE_ORIGTITLE)==USE_ORIGTITLE) && (xEvent->OrigTitle()))
+    {
+        cTEXTMapping *text=texts->GetMap("originaltitle");
+        if (text) description=Add2Description(description,text->Value(),xEvent->OrigTitle());
+    }
+    if (((Flags & USE_CATEGORIES)==USE_CATEGORIES) && (xEvent->Category()->Size()))
+    {
+        cTEXTMapping *text=texts->GetMap("category");
+        if (text)
+        {
+            cXMLTVStringList *categories=xEvent->Category();
+            description=Add2Description(description,text->Value(),(*categories)[0]);
+            for (int i=1; i<categories->Size(); i++)
+            {
+                // prevent duplicates
+                if (strcasecmp((*categories)[i],(*categories)[i-1]))
+                    description=Add2Description(description,text->Value(),(*categories)[i]);
+            }
+        }
+    }
+
+    if (((Flags & USE_VIDEO)==USE_VIDEO) && (xEvent->Video()->Size()))
+    {
+        cTEXTMapping *text=texts->GetMap("video");
+        if (text)
+        {
+            description=Add2Description(description,text->Value());
+            description=Add2Description(description,": ");
+            cXMLTVStringList *video=xEvent->Video();
+            for (int i=0; i<video->Size(); i++)
+            {
+                char *vtype=strdup((*video)[i]);
+                if (vtype)
+                {
+                    char *vval=strchr(vtype,'|');
+                    if (vval)
                     {
-                        description=Add2Description(description,xEvent->Audio());
-                        description=Add2Description(description,"\n");
-                    }
-                    else
-                    {
-                        cTEXTMapping *text=texts->GetMap(xEvent->Audio());
-                        if (text)
+                        *vval=0;
+                        vval++;
+
+                        if (i)
                         {
-                            description=Add2Description(description,text->Value());
-                            description=Add2Description(description,"\n");
+                            description=Add2Description(description,", ");
+                        }
+
+                        if (!strcasecmp(vtype,"colour"))
+                        {
+                            if (!strcasecmp(vval,"no"))
+                            {
+                                cTEXTMapping *text=texts->GetMap("blacknwhite");
+                                description=Add2Description(description,text->Value());
+                            }
+                        }
+                        else
+                        {
+                            description=Add2Description(description,vval);
                         }
                     }
+                    free(vtype);
                 }
             }
+            description=Add2Description(description,"\n");
         }
-        if ((Flags & USE_SEASON)==USE_SEASON)
+    }
+
+    if ((Flags & USE_AUDIO)==USE_AUDIO)
+    {
+        if (xEvent->Audio())
         {
-            if (xEvent->Season())
-            {
-                cTEXTMapping *text=texts->GetMap("season");
-                if (text) description=Add2Description(description,text->Value(),xEvent->Season());
-            }
-
-            if (xEvent->Episode())
-            {
-                cTEXTMapping *text=texts->GetMap("episode");
-                if (text) description=Add2Description(description,text->Value(),xEvent->Episode());
-            }
-        }
-
-        if (((Flags & USE_RATING)==USE_RATING) && (xEvent->Rating()->Size()))
-        {
-#if VDRVERSNUM < 10711 && !EPGHANDLER
-            Flags|=OPT_RATING_TEXT; // always add to text if we dont have the internal tag!
-#endif
-            if ((Flags & OPT_RATING_TEXT)==OPT_RATING_TEXT)
-            {
-                cXMLTVStringList *rating=xEvent->Rating();
-                for (int i=0; i<rating->Size(); i++)
-                {
-                    char *rtype=strdup((*rating)[i]);
-                    if (rtype)
-                    {
-                        char *rval=strchr(rtype,'|');
-                        if (rval)
-                        {
-                            *rval=0;
-                            rval++;
-
-                            description=Add2Description(description,rtype);
-                            description=Add2Description(description,": ");
-                            description=Add2Description(description,rval);
-                            description=Add2Description(description,"\n");
-                        }
-                        free(rtype);
-                    }
-                }
-            }
-        }
-
-        if (((Flags & USE_STARRATING)==USE_STARRATING) && (xEvent->StarRating()->Size()))
-        {
-            cTEXTMapping *text=texts->GetMap("starrating");
+            cTEXTMapping *text=texts->GetMap("audio");
             if (text)
             {
                 description=Add2Description(description,text->Value());
                 description=Add2Description(description,": ");
-                cXMLTVStringList *starrating=xEvent->StarRating();
-                for (int i=0; i<starrating->Size(); i++)
-                {
-                    char *rtype=strdup((*starrating)[i]);
-                    if (rtype)
-                    {
-                        char *rval=strchr(rtype,'|');
-                        if (rval)
-                        {
-                            *rval=0;
-                            rval++;
 
-                            if (i)
-                            {
-                                description=Add2Description(description,", ");
-                            }
-                            if (strcasecmp(rtype,"*"))
-                            {
-                                description=Add2Description(description,rtype);
-                                description=Add2Description(description," ");
-                            }
-                            description=Add2Description(description,rval);
-                        }
-                        free(rtype);
+                if ((!strcasecmp(xEvent->Audio(),"mono")) || (!strcasecmp(xEvent->Audio(),"stereo")))
+                {
+                    description=Add2Description(description,xEvent->Audio());
+                    description=Add2Description(description,"\n");
+                }
+                else
+                {
+                    cTEXTMapping *text=texts->GetMap(xEvent->Audio());
+                    if (text)
+                    {
+                        description=Add2Description(description,text->Value());
+                        description=Add2Description(description,"\n");
                     }
                 }
-                description=Add2Description(description,"\n");
             }
         }
-
-        if (((Flags & USE_REVIEW)==USE_REVIEW) && (xEvent->Review()->Size()))
+    }
+    if ((Flags & USE_SEASON)==USE_SEASON)
+    {
+        if (xEvent->Season())
         {
-            cTEXTMapping *text=texts->GetMap("review");
-            if (text)
+            cTEXTMapping *text=texts->GetMap("season");
+            if (text) description=Add2Description(description,text->Value(),xEvent->Season());
+        }
+
+        if (xEvent->Episode())
+        {
+            cTEXTMapping *text=texts->GetMap("episode");
+            if (text) description=Add2Description(description,text->Value(),xEvent->Episode());
+        }
+    }
+
+    if (((Flags & USE_RATING)==USE_RATING) && (xEvent->Rating()->Size()))
+    {
+#if VDRVERSNUM < 10711 && !EPGHANDLER
+        Flags|=OPT_RATING_TEXT; // always add to text if we dont have the internal tag!
+#endif
+        if ((Flags & OPT_RATING_TEXT)==OPT_RATING_TEXT)
+        {
+            cXMLTVStringList *rating=xEvent->Rating();
+            for (int i=0; i<rating->Size(); i++)
             {
-                cXMLTVStringList *review=xEvent->Review();
-                for (int i=0; i<review->Size(); i++)
+                char *rtype=strdup((*rating)[i]);
+                if (rtype)
                 {
-                    description=Add2Description(description,text->Value(),(*review)[i]);
+                    char *rval=strchr(rtype,'|');
+                    if (rval)
+                    {
+                        *rval=0;
+                        rval++;
+
+                        description=Add2Description(description,rtype);
+                        description=Add2Description(description,": ");
+                        description=Add2Description(description,rval);
+                        description=Add2Description(description,"\n");
+                    }
+                    free(rtype);
                 }
             }
         }
+    }
 
-        if (description)
+    if (((Flags & USE_STARRATING)==USE_STARRATING) && (xEvent->StarRating()->Size()))
+    {
+        cTEXTMapping *text=texts->GetMap("starrating");
+        if (text)
         {
-            description=RemoveLastCharFromDescription(description);
-            description=AddEOT2Description(description);
-            const char *dp=conv->Convert(description);
-            if (!Event->Description() || strcmp(Event->Description(),dp))
+            description=Add2Description(description,text->Value());
+            description=Add2Description(description,": ");
+            cXMLTVStringList *starrating=xEvent->StarRating();
+            for (int i=0; i<starrating->Size(); i++)
             {
-                Event->SetDescription(dp);
-                changed|=CHANGED_DESCRIPTION;
+                char *rtype=strdup((*starrating)[i]);
+                if (rtype)
+                {
+                    char *rval=strchr(rtype,'|');
+                    if (rval)
+                    {
+                        *rval=0;
+                        rval++;
+
+                        if (i)
+                        {
+                            description=Add2Description(description,", ");
+                        }
+                        if (strcasecmp(rtype,"*"))
+                        {
+                            description=Add2Description(description,rtype);
+                            description=Add2Description(description," ");
+                        }
+                        description=Add2Description(description,rval);
+                    }
+                    free(rtype);
+                }
             }
-            free(description);
+            description=Add2Description(description,"\n");
         }
+    }
+
+    if (((Flags & USE_REVIEW)==USE_REVIEW) && (xEvent->Review()->Size()))
+    {
+        cTEXTMapping *text=texts->GetMap("review");
+        if (text)
+        {
+            cXMLTVStringList *review=xEvent->Review();
+            for (int i=0; i<review->Size(); i++)
+            {
+                description=Add2Description(description,text->Value(),(*review)[i]);
+            }
+        }
+    }
+
+    if (description)
+    {
+        description=RemoveLastCharFromDescription(description);
+        description=AddEOT2Description(description);
+        const char *dp=conv->Convert(description);
+        if (!Event->Description() || strcmp(Event->Description(),dp))
+        {
+            Event->SetDescription(dp);
+            changed|=CHANGED_DESCRIPTION;
+        }
+        free(description);
     }
 
 #if VDRVERSNUM >= 10711 || EPGHANDLER
@@ -740,25 +762,44 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
     event->SetTableID(0); // prevent EIT EPG to update this event
 #endif
 
-    if ((!append) && (changed))
+    if (!append && changed)
     {
-        start=Event->StartTime();
-        end=Event->EndTime();
-        localtime_r(&start,&tm);
-        strftime(from,sizeof(from)-1,"%b %d %H:%M",&tm);
-        localtime_r(&end,&tm);
-        strftime(till,sizeof(till)-1,"%b %d %H:%M",&tm);
-        switch (changed)
+
+        if ((changed==CHANGED_SHORTTEXT) && (WasChanged(Event)==false))
         {
-        case CHANGED_SHORTTEXT:
-            Source->Tlog("changing shorttext of '%s'@%s-%s",Event->Title(),from,till);
-            break;
-        case CHANGED_DESCRIPTION:
-            Source->Tlog("changing description of '%s'@%s-%s",Event->Title(),from,till);
-            break;
-        case CHANGED_ALL:
-            Source->Tlog("changing stext+descr of '%s'@%s-%s",Event->Title(),from,till);
-            break;
+            description=strdup(Event->Description());
+            if (description)
+            {
+                description=AddEOT2Description(description,true);
+                tsyslogs(Source,"{%i} adding EOT to '%s'",Event->EventID(),Event->Title());
+                Event->SetDescription(description);
+                free(description);
+            }
+        }
+
+        if (Source->Trace())
+        {
+            start=Event->StartTime();
+            end=Event->EndTime();
+            localtime_r(&start,&tm);
+            strftime(from,sizeof(from)-1,"%b %d %H:%M",&tm);
+            localtime_r(&end,&tm);
+            strftime(till,sizeof(till)-1,"%b %d %H:%M",&tm);
+            switch (changed)
+            {
+            case CHANGED_SHORTTEXT:
+                tsyslogs(Source,"{%i} changing shorttext (%s) of '%s'@%s-%s",Event->EventID(),
+                         Event->ShortText(),Event->Title(),from,till);
+                break;
+            case CHANGED_DESCRIPTION:
+                tsyslogs(Source,"{%i} changing description of '%s'@%s-%s",Event->EventID(),
+                         Event->Title(),from,till);
+                break;
+            case CHANGED_ALL:
+                tsyslogs(Source,"{%i} changing stext (%s)+descr of '%s'@%s-%s",Event->EventID(),
+                         Event->ShortText(),Event->Title(),from,till);
+                break;
+            }
         }
     }
     return true;
@@ -857,7 +898,7 @@ cXMLTVEvent *cImport::PrepareAndReturn(sqlite3 *db, char *sql)
     int ret=sqlite3_prepare_v2(db,sql,strlen(sql),&stmt,NULL);
     if (ret!=SQLITE_OK)
     {
-        esyslog("xmltv2vdr: ERROR %i %s",ret,sqlite3_errmsg(db));
+        esyslog("%i %s",ret,sqlite3_errmsg(db));
         free(sql);
         return NULL;
     }
@@ -916,6 +957,7 @@ cXMLTVEvent *cImport::AddXMLTVEvent(cEPGSource *Source,sqlite3 *Db, const char *
     if (!cParse::FetchSeasonEpisode(conv,epdir,Event->Title(),
                                     Event->ShortText(),season,episode))
     {
+        tsyslogs(Source,"no season/episode found for '%s'/'%s'",Event->Title(),Event->ShortText());
         free(epdir);
         iconv_close(conv);
         return NULL;
@@ -924,7 +966,7 @@ cXMLTVEvent *cImport::AddXMLTVEvent(cEPGSource *Source,sqlite3 *Db, const char *
     cXMLTVEvent *xevent = new cXMLTVEvent();
     if (!xevent)
     {
-        Source->Elog("out of memory");
+        esyslogs(Source,"out of memory");
         free(epdir);
         iconv_close(conv);
         return NULL;
@@ -953,7 +995,7 @@ cXMLTVEvent *cImport::AddXMLTVEvent(cEPGSource *Source,sqlite3 *Db, const char *
     char *errmsg;
     if (sqlite3_exec(Db,sql,NULL,NULL,&errmsg)!=SQLITE_OK)
     {
-        Source->Elog("%s",errmsg);
+        esyslogs(Source,"%s",errmsg);
         sqlite3_free(errmsg);
         delete xevent;
         xevent=NULL;
@@ -963,22 +1005,28 @@ cXMLTVEvent *cImport::AddXMLTVEvent(cEPGSource *Source,sqlite3 *Db, const char *
     return xevent;
 }
 
-bool cImport::UpdateXMLTVEvent(cEPGSource *Source, sqlite3 *Db, const cEvent *Event,
-                               tEventID EventID, tEventID EITEventID, const char *EITDescription)
+bool cImport::UpdateXMLTVEvent(cEPGSource *Source, sqlite3 *Db, const cEvent *Event, cXMLTVEvent *xEvent)
 {
     if (!Source) return false;
     if (!Db) return false;
     if (!Event) return false;
+    if (!xEvent) return false;
+
+    if (Event->Description())
+    {
+        xEvent->SetEITDescription(Event->Description());
+    }
+    xEvent->SetEITEventID(Event->EventID());
 
     if (!Begin(Source,Db)) return false;
 
     char *sql=NULL;
-    if (EITDescription)
+    if (Event->Description())
     {
-        char *eitdescription=strdup(EITDescription);
+        char *eitdescription=strdup(Event->Description());
         if (!eitdescription)
         {
-            Source->Elog("out of memory");
+            esyslogs(Source,"out of memory");
             return false;
         }
 
@@ -993,43 +1041,45 @@ bool cImport::UpdateXMLTVEvent(cEPGSource *Source, sqlite3 *Db, const cEvent *Ev
         }
 
         if (asprintf(&sql,"update epg set eiteventid=%li, eitdescription='%s' where eventid=%li and src='%s'",
-                     (long int) EITEventID,eitdescription,(long int) EventID,Source->Name())==-1)
+                     (long int) Event->EventID(),eitdescription,(long int) xEvent->EventID(),Source->Name())==-1)
         {
             free(eitdescription);
-            Source->Elog("out of memory");
+            esyslogs(Source,"out of memory");
             return false;
         }
         free(eitdescription);
-
-        if (Event)
-        {
-            struct tm tm;
-            char from[80];
-            char till[80];
-            time_t start,end;
-            start=Event->StartTime();
-            end=Event->EndTime();
-            localtime_r(&start,&tm);
-            strftime(from,sizeof(from)-1,"%b %d %H:%M",&tm);
-            localtime_r(&end,&tm);
-            strftime(till,sizeof(till)-1,"%b %d %H:%M",&tm);
-            Source->Tlog("updating description of '%s'@%s-%s in db",Event->Title(),from,till);
-        }
     }
     else
     {
         if (asprintf(&sql,"update epg set eiteventid=%li where eventid=%li and src='%s'",
-                     (long int) EITEventID,(long int) EventID,Source->Name())==-1)
+                     (long int) Event->EventID(),(long int) xEvent->EventID(),Source->Name())==-1)
         {
-            Source->Elog("out of memory");
+            esyslogs(Source,"out of memory");
             return false;
         }
+    }
+
+    if (Source->Trace())
+    {
+        struct tm tm;
+        char from[80];
+        char till[80];
+        time_t start,end;
+        start=Event->StartTime();
+        end=Event->EndTime();
+        localtime_r(&start,&tm);
+        strftime(from,sizeof(from)-1,"%b %d %H:%M",&tm);
+        localtime_r(&end,&tm);
+        strftime(till,sizeof(till)-1,"%b %d %H:%M",&tm);
+        tsyslogs(Source,"{%i} updating %s of '%s'@%s-%s in db",Event->EventID(),
+                 Event->Description() ? "eitdescription/eiteventid" :
+                 "eiteventid",Event->Title(),from,till);
     }
 
     char *errmsg;
     if (sqlite3_exec(Db,sql,NULL,NULL,&errmsg)!=SQLITE_OK)
     {
-        Source->Elog("%s -> %s",sql,errmsg);
+        esyslogs(Source,"%s -> %s",sql,errmsg);
         free(sql);
         sqlite3_free(errmsg);
         return false;
@@ -1039,7 +1089,7 @@ bool cImport::UpdateXMLTVEvent(cEPGSource *Source, sqlite3 *Db, const cEvent *Ev
     return true;
 }
 
-cXMLTVEvent *cImport::SearchXMLTVEvent(sqlite3 **Db, const char *ChannelID, const cEvent *Event)
+cXMLTVEvent *cImport::SearchXMLTVEvent(sqlite3 **Db,const char *ChannelID, const cEvent *Event)
 {
     if (!Event) return NULL;
     if (!Db) return NULL;
@@ -1048,7 +1098,7 @@ cXMLTVEvent *cImport::SearchXMLTVEvent(sqlite3 **Db, const char *ChannelID, cons
         // we need READWRITE because the epg.db maybe updated later
         if (sqlite3_open_v2(epgfile,Db,SQLITE_OPEN_READWRITE,NULL)!=SQLITE_OK)
         {
-            esyslog("xmltv2vdr: ERROR failed to open %s",epgfile);
+            esyslog("failed to open %s",epgfile);
             *Db=NULL;
             return NULL;
         }
@@ -1062,7 +1112,7 @@ cXMLTVEvent *cImport::SearchXMLTVEvent(sqlite3 **Db, const char *ChannelID, cons
                  "mixing,src,eiteventid,eitdescription from epg where eiteventid=%li and channelid='%s' " \
                  "order by srcidx asc limit 1;",(long int) Event->EventID(),ChannelID)==-1)
     {
-        esyslog("xmltv2vdr: ERROR out of memory");
+        esyslog("out of memory");
         return NULL;
     }
 
@@ -1076,7 +1126,7 @@ cXMLTVEvent *cImport::SearchXMLTVEvent(sqlite3 **Db, const char *ChannelID, cons
     char *sqltitle=strdup(Event->Title());
     if (!sqltitle)
     {
-        esyslog("xmltv2vdr: ERROR out of memory");
+        esyslog("out of memory");
         return NULL;
     }
 
@@ -1102,7 +1152,7 @@ cXMLTVEvent *cImport::SearchXMLTVEvent(sqlite3 **Db, const char *ChannelID, cons
                  Event->StartTime()+eventTimeDiff,sqltitle,ChannelID)==-1)
     {
         free(sqltitle);
-        esyslog("xmltv2vdr: ERROR out of memory");
+        esyslog("out of memory");
         return NULL;
     }
     free(sqltitle);
@@ -1122,7 +1172,7 @@ bool cImport::Begin(cEPGSource *Source, sqlite3 *Db)
         char *errmsg;
         if (sqlite3_exec(Db,"BEGIN",NULL,NULL,&errmsg)!=SQLITE_OK)
         {
-            Source->Elog("sqlite3: BEGIN -> %s",errmsg);
+            esyslogs(Source,"sqlite3: BEGIN -> %s",errmsg);
             sqlite3_free(errmsg);
             return false;
         }
@@ -1144,11 +1194,11 @@ bool cImport::Commit(cEPGSource *Source, sqlite3 *Db)
         {
             if (Source)
             {
-                Source->Elog("sqlite3: COMMIT -> %s",errmsg);
+                esyslogs(Source,"sqlite3: COMMIT -> %s",errmsg);
             }
             else
             {
-                esyslog("sqlite3: ERROR COMMIT -> %s",errmsg);
+                esyslog("sqlite3: COMMIT -> %s",errmsg);
             }
             sqlite3_free(errmsg);
             return false;
@@ -1167,10 +1217,31 @@ int cImport::Process(cEPGSource *Source, cEPGExecutor &myExecutor)
     time_t endoneday=begin+86400;
 #endif
 
-    sqlite3 *db=NULL;
-    if (sqlite3_open_v2(epgfile,&db,SQLITE_OPEN_READWRITE,NULL)!=SQLITE_OK)
+    cSchedulesLock *schedulesLock=NULL;
+    const cSchedules *schedules=NULL;
+
+    int l=0;
+    while (l<300)
     {
-        Source->Elog("failed to open %s",epgfile);
+        if (schedulesLock) delete schedulesLock;
+        schedulesLock = new cSchedulesLock(true,200); // wait up to 60 secs for lock!
+        schedules = cSchedules::Schedules(*schedulesLock);
+        if (!myExecutor.StillRunning())
+        {
+            delete schedulesLock;
+            isyslogs(Source,"request to stop from vdr");
+            return 0;
+        }
+        if (schedules) break;
+        l++;
+    }
+
+    dsyslogs(Source,"importing from db");
+    sqlite3 *db=NULL;
+    if (sqlite3_open(epgfile,&db)!=SQLITE_OK)
+    {
+        esyslogs(Source,"failed to open %s",epgfile);
+        delete schedulesLock;
         return 141;
     }
 
@@ -1182,7 +1253,8 @@ int cImport::Process(cEPGSource *Source, cEPGExecutor &myExecutor)
                  " and src='%s';",begin,begin,end,Source->Name())==-1)
     {
         sqlite3_close(db);
-        Source->Elog("out of memory");
+        esyslogs(Source,"out of memory");
+        delete schedulesLock;
         return 134;
     }
 
@@ -1190,14 +1262,13 @@ int cImport::Process(cEPGSource *Source, cEPGExecutor &myExecutor)
     if (sqlite3_prepare_v2(db,sql,strlen(sql),&stmt,NULL)!=SQLITE_OK)
     {
         sqlite3_close(db);
-        Source->Elog("failed to prepare %s",sql);
+        esyslogs(Source,"failed to prepare %s",sql);
         free(sql);
+        delete schedulesLock;
         return 141;
     }
     free(sql);
 
-    cSchedulesLock *schedulesLock=NULL;
-    const cSchedules *schedules=NULL;
     int lerr=0;
     int cnt=0;
     for (;;)
@@ -1211,7 +1282,7 @@ int cImport::Process(cEPGSource *Source, cEPGExecutor &myExecutor)
                 if (!map)
                 {
                     if (lerr!=IMPORT_NOMAPPING)
-                        Source->Elog("no mapping for channelid %s",xevent.ChannelID());
+                        esyslogs(Source,"no mapping for channelid %s",xevent.ChannelID());
                     lerr=IMPORT_NOMAPPING;
                     continue;
                 }
@@ -1225,36 +1296,18 @@ int cImport::Process(cEPGSource *Source, cEPGExecutor &myExecutor)
                     if (!channel)
                     {
                         if (lerr!=IMPORT_NOCHANNEL)
-                            Source->Elog("channel %s not found in channels.conf",
-                                         *map->ChannelIDs()[i].ToString());
+                            esyslogs(Source,"channel %s not found in channels.conf",
+                                     *map->ChannelIDs()[i].ToString());
                         lerr=IMPORT_NOCHANNEL;
                         continue;
-                    }
-
-                    int l=0;
-                    while (l<300)
-                    {
-                        if (schedulesLock) delete schedulesLock;
-                        schedulesLock = new cSchedulesLock(true,200); // wait up to 60 secs for lock!
-                        schedules = cSchedules::Schedules(*schedulesLock);
-                        if (schedules) break;
-                        if (!myExecutor.StillRunning())
-                        {
-                            delete schedulesLock;
-                            Source->Ilog("request to stop from vdr");
-                            sqlite3_finalize(stmt);
-                            sqlite3_close(db);
-                            return 0;
-                        }
-                        l++;
                     }
 
                     cSchedule* schedule = (cSchedule *) schedules->GetSchedule(channel,addevents);
                     if (!schedule)
                     {
                         if (lerr!=IMPORT_NOSCHEDULE)
-                            Source->Elog("cannot get schedule for channel %s%s",
-                                         channel->Name(),addevents ? "" : " - try add option");
+                            esyslogs(Source,"cannot get schedule for channel %s%s",
+                                     channel->Name(),addevents ? "" : " - try add option");
                         lerr=IMPORT_NOSCHEDULE;
                         continue;
                     }
@@ -1263,7 +1316,7 @@ int cImport::Process(cEPGSource *Source, cEPGExecutor &myExecutor)
 
                     if (addevents && event && (event->EventID() != xevent.EventID()))
                     {
-                        Source->Elog("found another event with different eventid");
+                        esyslogs(Source,"found another event with different eventid");
                         int newflags=map->Flags();
                         newflags &=~OPT_APPEND;
                         map->ChangeFlags(newflags);
@@ -1274,9 +1327,6 @@ int cImport::Process(cEPGSource *Source, cEPGExecutor &myExecutor)
 #endif
                     PutEvent(Source, db, schedule, event, &xevent, map->Flags());
                     cnt++;
-
-                    delete schedulesLock;
-                    schedulesLock=NULL;
                 }
             }
         }
@@ -1288,11 +1338,12 @@ int cImport::Process(cEPGSource *Source, cEPGExecutor &myExecutor)
 
     if (Commit(Source,db))
     {
-        Source->Dlog("processed %i xmltv events",cnt);
+        dsyslogs(Source,"processed %i xmltv events",cnt);
     }
 
     sqlite3_finalize(stmt);
     sqlite3_close(db);
+    delete schedulesLock;
     return 0;
 }
 
@@ -1303,23 +1354,30 @@ cImport::cImport(const char *EPGFile, cEPGMappings* Maps, cTEXTMappings *Texts)
     pendingtransaction=false;
     epgfile=EPGFile;
 
-    char *CodeSet=NULL;
+    char *codeset=NULL;
     if (setlocale(LC_CTYPE,""))
-        CodeSet=nl_langinfo(CODESET);
+        codeset=strdup(nl_langinfo(CODESET));
     else
     {
         char *LangEnv=getenv("LANG");
         if (LangEnv)
         {
-            CodeSet=strchr(LangEnv,'.');
-            if (CodeSet)
-                CodeSet++;
+            codeset=strdup(strchr(LangEnv,'.'));
+            if (codeset)
+                codeset++; // skip dot
         }
     }
-    conv = new cCharSetConv("UTF-8",CodeSet ? CodeSet : "US-ASCII//TRANSLIT");
+    if (!codeset)
+    {
+        codeset=strdup("US-ASCII//TRANSLIT");
+    }
+    isyslog("codeset is '%s'",codeset);
+    conv = new cCharSetConv("UTF-8",codeset);
+
 }
 
 cImport::~cImport()
 {
+    if (codeset) free(codeset);
     delete conv;
 }
