@@ -247,7 +247,7 @@ bool cParse::FetchSeasonEpisode(iconv_t Conv, const char *EPDir, const char *Tit
 
     if (!found)
     {
-        isyslog("xmltv2vdr: failed to find '%s' for '%s' in eplists",ShortText,Title);
+        isyslog("failed to find '%s' for '%s' in eplists",ShortText,Title);
     }
     if (line) free(line);
     fclose(f);

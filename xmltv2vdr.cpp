@@ -177,12 +177,16 @@ bool cEPGHandler::SetShortText(cEvent* Event, const char* ShortText)
     if (import->WasChanged(Event))
     {
         // ok we already changed this event!
-        tsyslog("{%i} already seen stext %s",Event->EventID(),Event->Title());
+        tsyslog("{%i} already seen stext '%s'",Event->EventID(),Event->Title());
         return true;
     }
-    if (!ShortText) return true; // prevent setting empty shorttext
-    if (!strlen(ShortText)) return true; // prevent setting empty shorttext
-    tsyslog("{%i} setting stext (%s) of %s",Event->EventID(),ShortText,Event->Title());
+    // prevent setting empty shorttext
+    if (!ShortText) return true;
+    // prevent setting empty shorttext
+    if (!strlen(ShortText)) return true;
+    // prevent setting shorttext equal
+    if (Event->Title() && !strcasecmp(Event->Title(),ShortText)) return true;
+    tsyslog("{%i} setting stext (%s) of '%s'",Event->EventID(),ShortText,Event->Title());
     return false;
 }
 
@@ -199,13 +203,13 @@ bool cEPGHandler::SetDescription(cEvent* Event, const char* Description)
         if (strncasecmp(Event->Description(),Description,len))
         {
             // eit description changed -> set it
-            tsyslog("{%i} changing descr of %s",Event->EventID(),Event->Title());
+            tsyslog("{%i} changing descr of '%s'",Event->EventID(),Event->Title());
             return false;
         }
-        tsyslog("{%i} already seen descr %s",Event->EventID(),Event->Title());
+        tsyslog("{%i} already seen descr '%s'",Event->EventID(),Event->Title());
         return true;
     }
-    tsyslog("{%i} setting descr of %s",Event->EventID(),Event->Title());
+    tsyslog("{%i} setting descr of '%s'",Event->EventID(),Event->Title());
     return false;
 }
 
@@ -672,6 +676,7 @@ time_t cPluginXmltv2vdr::WakeupTime(void)
 
     time_t nt=epgsources.NextRunTime();
     if (nt) nt-=(time_t) 180;
+    tsyslog("reporting wakeuptime %s",ctime(&nt));
     return nt;
 }
 
