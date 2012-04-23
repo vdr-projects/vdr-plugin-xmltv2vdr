@@ -82,7 +82,7 @@ char *cImport::RemoveNonASCII(const char *src)
     return dst;
 }
 
-cEvent *cImport::SearchVDREvent(cEPGSource *source, cSchedule* schedule, cXMLTVEvent *xevent)
+cEvent *cImport::SearchVDREvent(cEPGSource *source, cSchedule* schedule, cXMLTVEvent *xevent, bool append)
 {
     if (!source) return NULL;
     if (!schedule) return NULL;
@@ -95,7 +95,7 @@ cEvent *cImport::SearchVDREvent(cEPGSource *source, cSchedule* schedule, cXMLTVE
     if (xevent->EITEventID()) f=(cEvent *) schedule->GetEvent(xevent->EITEventID());
     if (f) return f;
 
-    if (xevent->EventID() && !xevent->Mixing()) f=(cEvent *) schedule->GetEvent(xevent->EventID());
+    if (xevent->EventID() && append) f=(cEvent *) schedule->GetEvent(xevent->EventID());
     if (f) return f;
 
     // 2nd with StartTime
@@ -298,6 +298,8 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
 
     int changed=CHANGED_NOTHING;
     bool append=false;
+    bool retcode=false;
+
     if ((Flags & OPT_APPEND)==OPT_APPEND) append=true;
 
     if (append && !Event)
@@ -417,6 +419,7 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
             strftime(till,sizeof(till)-1,"%b %d %H:%M",&tm);
             tsyslogs(Source,"adding '%s'@%s-%s",xEvent->Title(),from,till);
         }
+        retcode=true;
     }
     else
     {
@@ -462,7 +465,7 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
 
     if (!description && Event->Description() && (strlen(Event->Description())>0))
     {
-        if (WasChanged(Event)) return true;
+        if (WasChanged(Event)) return false;
         UpdateXMLTVEvent(Source,Db,Event,xEvent);
         description=strdup(Event->Description());
     }
@@ -767,7 +770,7 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
 
         if ((changed==CHANGED_SHORTTEXT) && (WasChanged(Event)==false))
         {
-            description=strdup(Event->Description());
+            if (Event->Description()) description=strdup(Event->Description());
             if (description)
             {
                 description=AddEOT2Description(description,true);
@@ -801,8 +804,9 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
                 break;
             }
         }
+        retcode=true;
     }
-    return true;
+    return retcode;
 }
 
 bool cImport::FetchXMLTVEvent(sqlite3_stmt *stmt, cXMLTVEvent *xevent)
@@ -873,7 +877,7 @@ bool cImport::FetchXMLTVEvent(sqlite3_stmt *stmt, cXMLTVEvent *xevent)
             xevent->SetEpisode(sqlite3_column_int(stmt,col));
             break;
         case 19:
-            if (sqlite3_column_int(stmt,col)==1) xevent->SetMixing();
+            if (sqlite3_column_int(stmt,col)==1) xevent->SetPicExists();
             break;
         case 20: // source
             xevent->SetSource((const char *) sqlite3_column_text(stmt,col));
@@ -1040,8 +1044,9 @@ bool cImport::UpdateXMLTVEvent(cEPGSource *Source, sqlite3 *Db, const cEvent *Ev
             strcpy(eitdescription,ed.c_str());
         }
 
-        if (asprintf(&sql,"update epg set eiteventid=%li, eitdescription='%s' where eventid=%li and src='%s'",
-                     (long int) Event->EventID(),eitdescription,(long int) xEvent->EventID(),Source->Name())==-1)
+        if (asprintf(&sql,"update epg set eiteventid=%li, eitdescription='%s' where eventid=%li and "
+                     "src='%s' and channelid='%s'",(long int) Event->EventID(),eitdescription,
+                     (long int) xEvent->EventID(),Source->Name(),*Event->ChannelID().ToString())==-1)
         {
             free(eitdescription);
             esyslogs(Source,"out of memory");
@@ -1051,8 +1056,9 @@ bool cImport::UpdateXMLTVEvent(cEPGSource *Source, sqlite3 *Db, const cEvent *Ev
     }
     else
     {
-        if (asprintf(&sql,"update epg set eiteventid=%li where eventid=%li and src='%s'",
-                     (long int) Event->EventID(),(long int) xEvent->EventID(),Source->Name())==-1)
+        if (asprintf(&sql,"update epg set eiteventid=%li where eventid=%li and src='%s' and "
+                     "channelid='%s'",(long int) Event->EventID(),(long int) xEvent->EventID(),
+                     Source->Name(),*Event->ChannelID().ToString())==-1)
         {
             esyslogs(Source,"out of memory");
             return false;
@@ -1109,7 +1115,7 @@ cXMLTVEvent *cImport::SearchXMLTVEvent(sqlite3 **Db,const char *ChannelID, const
 
     if (asprintf(&sql,"select channelid,eventid,starttime,duration,title,origtitle,shorttext,description," \
                  "country,year,credits,category,review,rating,starrating,video,audio,season,episode," \
-                 "mixing,src,eiteventid,eitdescription from epg where eiteventid=%li and channelid='%s' " \
+                 "picexists,src,eiteventid,eitdescription from epg where eiteventid=%li and channelid='%s' " \
                  "order by srcidx asc limit 1;",(long int) Event->EventID(),ChannelID)==-1)
     {
         esyslog("out of memory");
@@ -1146,7 +1152,7 @@ cXMLTVEvent *cImport::SearchXMLTVEvent(sqlite3 **Db,const char *ChannelID, const
 
     if (asprintf(&sql,"select channelid,eventid,starttime,duration,title,origtitle,shorttext,description," \
                  "country,year,credits,category,review,rating,starrating,video,audio,season,episode," \
-                 "mixing,src,eiteventid,eitdescription,abs(starttime-%li) as diff from epg where " \
+                 "picexists,src,eiteventid,eitdescription,abs(starttime-%li) as diff from epg where " \
                  " (starttime>=%li and starttime<=%li) and title='%s' and channelid='%s' " \
                  " order by diff,srcidx asc limit 1;",Event->StartTime(),Event->StartTime()-eventTimeDiff,
                  Event->StartTime()+eventTimeDiff,sqltitle,ChannelID)==-1)
@@ -1248,7 +1254,7 @@ int cImport::Process(cEPGSource *Source, cEPGExecutor &myExecutor)
     char *sql;
     if (asprintf(&sql,"select channelid,eventid,starttime,duration,title,origtitle,shorttext,description," \
                  "country,year,credits,category,review,rating,starrating,video,audio,season,episode," \
-                 "mixing,src,eiteventid,eitdescription from epg where (starttime > %li or " \
+                 "picexists,src,eiteventid,eitdescription from epg where (starttime > %li or " \
                  " (starttime + duration) > %li) and (starttime + duration) < %li "\
                  " and src='%s';",begin,begin,end,Source->Name())==-1)
     {
@@ -1278,7 +1284,7 @@ int cImport::Process(cEPGSource *Source, cEPGExecutor &myExecutor)
             cXMLTVEvent xevent;
             if (FetchXMLTVEvent(stmt,&xevent))
             {
-                cEPGMapping *map=maps->GetMap(xevent.ChannelID());
+                cEPGMapping *map=maps->GetMap(tChannelID::FromString(xevent.ChannelID()));
                 if (!map)
                 {
                     if (lerr!=IMPORT_NOMAPPING)
@@ -1312,7 +1318,7 @@ int cImport::Process(cEPGSource *Source, cEPGExecutor &myExecutor)
                         continue;
                     }
 
-                    cEvent *event=SearchVDREvent(Source, schedule, &xevent);
+                    cEvent *event=SearchVDREvent(Source, schedule, &xevent, addevents);
 
                     if (addevents && event && (event->EventID() != xevent.EventID()))
                     {
@@ -1325,8 +1331,7 @@ int cImport::Process(cEPGSource *Source, cEPGExecutor &myExecutor)
 #if VDRVERSNUM < 10726 && (!EPGHANDLER)
                     if ((!addevents) && (xevent.StartTime()>endoneday)) continue;
 #endif
-                    PutEvent(Source, db, schedule, event, &xevent, map->Flags());
-                    cnt++;
+                    if (PutEvent(Source, db, schedule, event, &xevent, map->Flags())) cnt++;
                 }
             }
         }
@@ -1338,7 +1343,14 @@ int cImport::Process(cEPGSource *Source, cEPGExecutor &myExecutor)
 
     if (Commit(Source,db))
     {
-        dsyslogs(Source,"processed %i xmltv events",cnt);
+        if (cnt)
+        {
+            dsyslogs(Source,"processed %i vdr events",cnt);
+        }
+        else
+        {
+            dsyslogs(Source,"processed no vdr events - all up to date?");
+        }
     }
 
     sqlite3_finalize(stmt);
@@ -1346,6 +1358,16 @@ int cImport::Process(cEPGSource *Source, cEPGExecutor &myExecutor)
     delete schedulesLock;
     return 0;
 }
+
+bool cImport::DBExists()
+{
+    if (!epgfile) return true; // is this safe?
+    struct stat statbuf;
+    if (stat(epgfile,&statbuf)==-1) return false; // no database
+    if (!statbuf.st_size) return false; // no database
+    return true;
+}
+
 
 cImport::cImport(const char *EPGFile, cEPGMappings* Maps, cTEXTMappings *Texts)
 {

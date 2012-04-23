@@ -42,7 +42,7 @@ private:
     char *sql;
     char *channelid;
     char *source;
-    bool mixing;
+    bool picexists;
     int year;
     time_t starttime;
     int duration;
@@ -136,9 +136,9 @@ public:
     {
         eiteventid=EventID;
     }
-    void SetMixing(void)
+    void SetPicExists(void)
     {
-        mixing=true;
+        picexists=true;
     }
     int ParentalRating() const
     {
@@ -212,9 +212,9 @@ public:
     {
         return episode;
     }
-    bool Mixing(void)
+    bool PicExists(void)
     {
-        return mixing;
+        return picexists;
     }
 };
 

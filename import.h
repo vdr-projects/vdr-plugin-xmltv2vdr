@@ -50,7 +50,7 @@ private:
     char *AddEOT2Description(char *description, bool checkutf8=false);
     struct split split(char *in, char delim);
     cEvent *GetEventBefore(cSchedule* schedule, time_t start);
-    cEvent *SearchVDREvent(cEPGSource *source, cSchedule* schedule, cXMLTVEvent *event);
+    cEvent *SearchVDREvent(cEPGSource *source, cSchedule* schedule, cXMLTVEvent *event, bool append);
     bool FetchXMLTVEvent(sqlite3_stmt *stmt, cXMLTVEvent *xevent);
     char *RemoveNonASCII(const char *src);
     cXMLTVEvent *PrepareAndReturn(sqlite3 *db, char *sql);
@@ -60,6 +60,7 @@ public:
     int Process(cEPGSource *Source, cEPGExecutor &myExecutor);
     bool Begin(cEPGSource *Source, sqlite3 *Db);
     bool Commit(cEPGSource *Source, sqlite3 *Db);
+    bool DBExists();
     bool PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule, cEvent *Event,
                   cXMLTVEvent *xEvent, int Flags);
     bool UpdateXMLTVEvent(cEPGSource *Source, sqlite3 *Db, const cEvent *Event, cXMLTVEvent *xEvent);

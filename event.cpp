@@ -275,7 +275,7 @@ const char *cXMLTVEvent::GetSQL(const char *Source, int SrcIdx, const char *Chan
 
     if (asprintf(&sql,"INSERT OR IGNORE INTO epg (src,channelid,eventid,starttime,duration,"\
                  "title,origtitle,shorttext,description,country,year,credits,category,"\
-                 "review,rating,starrating,video,audio,season,episode,mixing,srcidx) "\
+                 "review,rating,starrating,video,audio,season,episode,picexists,srcidx) "\
                  "VALUES (^%s^,^%s^,%i,%li,%i,"\
                  "^%s^,^%s^,^%s^,^%s^,^%s^,%i,^%s^,^%s^,"\
                  "^%s^,^%s^,^%s^,^%s^,^%s^,%i,%i,%i,%i);"\
@@ -283,7 +283,7 @@ const char *cXMLTVEvent::GetSQL(const char *Source, int SrcIdx, const char *Chan
                  "UPDATE epg SET duration=%i,starttime=%li,title=^%s^,origtitle=^%s^,"\
                  "shorttext=^%s^,description=^%s^,country=^%s^,year=%i,credits=^%s^,category=^%s^,"\
                  "review=^%s^,rating=^%s^,starrating=^%s^,video=^%s^,audio=^%s^,season=%i,episode=%i, "\
-                 "mixing=%i,srcidx=%i " \
+                 "picexists=%i,srcidx=%i " \
                  " where changes()=0 and src=^%s^ and channelid=^%s^ and eventid=%i"
                  ,
                  Source,ChannelID,eventid,starttime,duration,title,
@@ -294,7 +294,7 @@ const char *cXMLTVEvent::GetSQL(const char *Source, int SrcIdx, const char *Chan
                  year,
                  cr,ca,re,ra,sr,vi,
                  audio ? audio : "NULL",
-                 season, episode, mixing, SrcIdx,
+                 season, episode, picexists, SrcIdx,
 
                  duration,starttime,title,
                  origtitle ? origtitle : "NULL",
@@ -304,7 +304,7 @@ const char *cXMLTVEvent::GetSQL(const char *Source, int SrcIdx, const char *Chan
                  year,
                  cr,ca,re,ra,sr,vi,
                  audio ? audio : "NULL",
-                 season, episode, mixing, SrcIdx,
+                 season, episode, picexists, SrcIdx,
 
                  Source,ChannelID,eventid
 
@@ -390,7 +390,7 @@ void cXMLTVEvent::Clear()
     episode=0;
     parentalRating=0;
     memset(&contents,0,sizeof(contents));
-    mixing=false;
+    picexists=false;
 }
 
 cXMLTVEvent::cXMLTVEvent()

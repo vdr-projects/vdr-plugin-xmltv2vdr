@@ -64,8 +64,7 @@ class cEPGHandler : public cEpgHandler
 private:
     cEPGMappings *maps;
     cEPGSources *sources;
-    cImport *import;
-    const char *epgfile;
+    cImport import;
     bool epall;
     sqlite3 *db;
     void closedb(void);
@@ -81,7 +80,6 @@ public:
     {
         return (db!=NULL);
     }
-    virtual ~cEPGHandler();
     virtual bool IgnoreChannel(const cChannel *Channel);
     virtual bool SetShortText(cEvent *Event,const char *ShortText);
     virtual bool SetDescription(cEvent *Event,const char *Description);
@@ -128,10 +126,10 @@ private:
     cEPGMappings epgmappings;
     cEPGSources epgsources;
     cTEXTMappings textmappings;
-    sqlite3_mutex *dbmutex;
     time_t last_housetime_t;
     time_t last_maintime_t;
     time_t last_epcheck_t;
+    time_t nextruntime;
     char *confdir;
     char *epgfile;
     char *srcorder;

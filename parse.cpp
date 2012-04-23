@@ -211,10 +211,7 @@ bool cParse::FetchSeasonEpisode(iconv_t Conv, const char *EPDir, const char *Tit
     RemoveNonAlphaNumeric(dshorttext);
     if (!strlen(dshorttext))
     {
-        free(dshorttext);
-        fclose(f);
-        free(epfile);
-        return false;
+        strcpy(dshorttext,ShortText); // ok lets try with the original text
     }
 
     char *line=NULL;
@@ -236,6 +233,10 @@ bool cParse::FetchSeasonEpisode(iconv_t Conv, const char *EPDir, const char *Tit
             if (iconv(Conv,&FromPtr,&slen,&ToPtr,&dlen)!=(size_t) -1)
             {
                 RemoveNonAlphaNumeric(depshorttext);
+                if (!strlen(depshorttext))
+                {
+                    strcpy(depshorttext,epshorttext); // ok lets try with the original text
+                }
                 if (!strncasecmp(dshorttext,depshorttext,strlen(depshorttext)))
                 {
                     found=true;
@@ -500,6 +501,7 @@ bool cParse::FetchEvent(xmlNodePtr enode)
             else if ((!xmlStrcasecmp(node->name, (const xmlChar *) "icon")))
             {
                 // http-link inside -> just ignore
+                xevent.SetPicExists();
             }
             else if ((!xmlStrcasecmp(node->name, (const xmlChar *) "length")))
             {
@@ -590,7 +592,7 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
                "shorttext nvarchar(255), description text, eitdescription text, " \
                "country nvarchar(255), year int, " \
                "credits text, category text, review text, rating text, " \
-               "starrating text, video text, audio text, season int, episode int, mixing int," \
+               "starrating text, video text, audio text, season int, episode int, picexists int," \
                "srcidx int," \
                "PRIMARY KEY(src, channelid, eventid)" \
                ");" \
@@ -648,6 +650,7 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
             node=node->next;
             continue;
         }
+        xmlFree(channelid);
 
         xmlChar *start,*stop;
         time_t starttime=(time_t) 0;
@@ -673,14 +676,12 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
             if (lerr!=PARSE_XMLTVERR)
                 esyslogs(source,"no starttime, check xmltv file");
             lerr=PARSE_XMLTVERR;
-            xmlFree(channelid);
             node=node->next;
             continue;
         }
 
         if (starttime<begin)
         {
-            xmlFree(channelid);
             node=node->next;
             continue;
         }
@@ -688,25 +689,22 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
         xevent.SetStartTime(starttime);
         if (stoptime) xevent.SetDuration(stoptime-starttime);
 
-        if ((map->Flags() & OPT_APPEND)!=OPT_APPEND) xevent.SetMixing();
-
         if (!FetchEvent(node)) // sets xevent
         {
             tsyslogs(source,"failed to fetch event");
             node=node->next;
-            xmlFree(channelid);
             continue;
         }
-
-        const char *sql=xevent.GetSQL(source->Name(),source->Index(),(const char *) channelid);
-        if (sqlite3_exec(db,sql,NULL,NULL,&errmsg)!=SQLITE_OK)
+        for (int i=0; i<map->NumChannelIDs(); i++)
         {
-            tsyslogs(source,"sqlite3: %s",errmsg);
-            sqlite3_free(errmsg);
-            xmlFree(channelid);
-            break;
+            const char *sql=xevent.GetSQL(source->Name(),source->Index(),map->ChannelIDs()[i].ToString());
+            if (sqlite3_exec(db,sql,NULL,NULL,&errmsg)!=SQLITE_OK)
+            {
+                tsyslogs(source,"sqlite3: %s",errmsg);
+                sqlite3_free(errmsg);
+                break;
+            }
         }
-        xmlFree(channelid);
         cnt++;
 
         node=node->next;
