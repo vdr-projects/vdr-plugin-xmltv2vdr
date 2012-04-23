@@ -1354,7 +1354,7 @@ cImport::cImport(const char *EPGFile, cEPGMappings* Maps, cTEXTMappings *Texts)
     pendingtransaction=false;
     epgfile=EPGFile;
 
-    char *codeset=NULL;
+    codeset=NULL;
     if (setlocale(LC_CTYPE,""))
         codeset=strdup(nl_langinfo(CODESET));
     else
