@@ -128,10 +128,12 @@ cEPGHandler::cEPGHandler(const char *EpgFile, cEPGSources *Sources,
     maps=Maps;
     sources=Sources;
     db=NULL;
+    now=time(NULL);
 }
 
 bool cEPGHandler::IgnoreChannel(const cChannel* Channel)
 {
+    now=time(NULL);
     if (!maps) return false;
     if (!Channel) return false;
     return maps->IgnoreChannel(Channel);
@@ -139,16 +141,17 @@ bool cEPGHandler::IgnoreChannel(const cChannel* Channel)
 
 bool cEPGHandler::check4proc(cEvent *event, bool &spth)
 {
+    spth=false;
     if (!event) return false;
     /*
     if (import.WasChanged(event)) {
         tsyslog("{%i} already seen %s",Event->EventID(),Event->Title());
     }
     */
+    if (now>(event->StartTime()+event->Duration())) return false; // event in the past?
     if (!maps) return false;
     if (!import.DBExists()) return false;
 
-    spth=false;
     if (!maps->ProcessChannel(event->ChannelID()))
     {
         if (!epall) return false;
@@ -211,7 +214,7 @@ bool cEPGHandler::SetDescription(cEvent* Event, const char* Description)
 
 bool cEPGHandler::HandleEvent(cEvent* Event)
 {
-    bool special_epall_timer_handling=false;
+    bool special_epall_timer_handling;
     if (!check4proc(Event,special_epall_timer_handling)) return false;
 
     int Flags=0;
@@ -269,21 +272,9 @@ bool cEPGHandler::HandleEvent(cEvent* Event)
         return false;
     }
 
-    bool update=false;
-
-    if (!xevent->EITEventID()) update=true;
-    if (!xevent->EITDescription() && Event->Description()) update=true;
-    if (xevent->EITDescription() && Event->Description() && !import.WasChanged(Event) &&
-            strcasecmp(xevent->EITDescription(),Event->Description())) update=true;
-
-    if (update)
-    {
-        import.UpdateXMLTVEvent(source,db,Event,xevent); // ignore errors
-    }
-
     import.PutEvent(source,db,(cSchedule *) Event->Schedule(),Event,xevent,Flags);
     delete xevent;
-    return false; // let VDR fix the bugs!
+    return false; // let other handlers change this event
 }
 
 bool cEPGHandler::SortSchedule(cSchedule* UNUSED(Schedule))
@@ -301,19 +292,15 @@ bool cEPGHandler::SortSchedule(cSchedule* UNUSED(Schedule))
 // -------------------------------------------------------------
 
 cEPGTimer::cEPGTimer(const char *EpgFile, cEPGSources *Sources, cEPGMappings *Maps,
-                     cTEXTMappings *Texts) : cThread("xmltv2vdr timer")
+                     cTEXTMappings *Texts) : cThread("xmltv2vdr timer"),import(EpgFile,Maps,Texts)
 {
-    epgfile=EpgFile;
     sources=Sources;
     maps=Maps;
-    import = new cImport(EpgFile,Maps,Texts);
 }
 
 void cEPGTimer::Action()
 {
-    struct stat statbuf;
-    if (stat(epgfile,&statbuf)==-1) return; // no database? -> exit immediately
-    if (!statbuf.st_size) return; // no database? -> exit immediately
+    if (!import.DBExists()) return; // no database? -> exit immediately
     if (Timers.BeingEdited()) return;
     Timers.IncBeingEdited();
     SetPriority(19);
@@ -347,10 +334,10 @@ void cEPGTimer::Action()
         if (!chan) continue;
         const char *ChannelID=strdup(*event->ChannelID().ToString());
 
-        cXMLTVEvent *xevent=import->SearchXMLTVEvent(&db,ChannelID,event);
+        cXMLTVEvent *xevent=import.SearchXMLTVEvent(&db,ChannelID,event);
         if (!xevent)
         {
-            xevent=import->AddXMLTVEvent(source,db,ChannelID,event,event->Description());
+            xevent=import.AddXMLTVEvent(source,db,ChannelID,event,event->Description());
             if (!xevent)
             {
                 free((void*)ChannelID);
@@ -362,13 +349,13 @@ void cEPGTimer::Action()
         cSchedule* schedule = (cSchedule *) schedules->GetSchedule(chan,false);
         if (schedule)
         {
-            import->PutEvent(source,db,schedule,event,xevent,USE_SEASON);
+            import.PutEvent(source,db,schedule,event,xevent,USE_SEASON);
         }
         delete xevent;
     }
     if (db)
     {
-        import->Commit(source,db);
+        import.Commit(source,db);
         sqlite3_close(db);
     }
     Timers.DecBeingEdited();
@@ -440,7 +427,6 @@ cPluginXmltv2vdr::cPluginXmltv2vdr(void) : epgexecutor(&epgsources)
     last_housetime_t=0;
     last_maintime_t=0;
     last_epcheck_t=0;
-    nextruntime=0;
     wakeup=0;
     insetup=false;
     SetEPAll(false);
@@ -477,6 +463,33 @@ cPluginXmltv2vdr::~cPluginXmltv2vdr()
     delete epghandler;
 #endif
 }
+
+int cPluginXmltv2vdr::GetLastImportSource()
+{
+    sqlite3 *db=NULL;
+    if (sqlite3_open_v2(epgfile,&db,SQLITE_OPEN_READWRITE,NULL)!=SQLITE_OK) return -1;
+
+    char sql[]="select srcidx from epg where srcidx<>99 order by starttime desc limit 1";
+    sqlite3_stmt *stmt;
+    if (sqlite3_prepare_v2(db,sql,strlen(sql),&stmt,NULL)!=SQLITE_OK)
+    {
+        sqlite3_close(db);
+        tsyslog("failed to prepare %s",sql);
+        return -1;
+    }
+
+    int idx=-1;
+    if (sqlite3_step(stmt)==SQLITE_ROW)
+    {
+        idx=sqlite3_column_int(stmt,0);
+    }
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+    tsyslog("lastimportsource=%i",idx);
+    return idx;
+}
+
+
 
 bool cPluginXmltv2vdr::EPGSourceMove(int From, int To)
 {
@@ -573,7 +586,7 @@ bool cPluginXmltv2vdr::Start(void)
     epghandler = new cEPGHandler(epgfile,&epgsources,&epgmappings,&textmappings);
     epgtimer = new cEPGTimer(epgfile,&epgsources,&epgmappings,&textmappings);
     housekeeping = new cHouseKeeping(epgfile);
-
+    
     if (sqlite3_threadsafe()==0) esyslog("sqlite3 not threadsafe!");
     return true;
 }
@@ -583,20 +596,17 @@ void cPluginXmltv2vdr::Stop(void)
     // Stop any background activities the plugin is performing.
     cSchedules::Cleanup(true);
     epgtimer->Stop();
-    if (epgtimer) {
-      delete epgtimer;
-      epgtimer=NULL;
+    if (epgtimer)
+    {
+        delete epgtimer;
+        epgtimer=NULL;
     }
-    if (housekeeping) {
-      delete housekeeping;
-      housekeeping=NULL;
+    if (housekeeping)
+    {
+        delete housekeeping;
+        housekeeping=NULL;
     }
     epgexecutor.Stop();
-    if (wakeup)
-    {
-        nextruntime=epgsources.NextRunTime();
-        if (nextruntime) nextruntime-=(time_t) 180;
-    }
     epgsources.Remove();
     epgmappings.Remove();
     textmappings.Remove();
@@ -681,7 +691,8 @@ time_t cPluginXmltv2vdr::WakeupTime(void)
 {
     // Return custom wakeup time for shutdown script
     if (!wakeup) return (time_t) 0;
-    if (!nextruntime) return (time_t) 0;
+    time_t nextruntime=epgsources.NextRunTime();
+    if (nextruntime) nextruntime-=(time_t) 180;
     tsyslog("reporting wakeuptime %s",ctime(&nextruntime));
     return nextruntime;
 }
@@ -752,14 +763,14 @@ const char **cPluginXmltv2vdr::SVDRPHelpPages(void)
     // Returns help text
     static const char *HelpPages[]=
     {
-        "UPDT\n"
-        "    Start epg update",
+        "UPDT [force]\n"
+        "    Start epg update from db, with force download data before",
         NULL
     };
     return HelpPages;
 }
 
-cString cPluginXmltv2vdr::SVDRPCommand(const char *Command, const char *UNUSED(Option), int &ReplyCode)
+cString cPluginXmltv2vdr::SVDRPCommand(const char *Command, const char *Option, int &ReplyCode)
 {
     // Process SVDRP commands
 
@@ -773,15 +784,31 @@ cString cPluginXmltv2vdr::SVDRPCommand(const char *Command, const char *UNUSED(O
         }
         else
         {
-            if (epgexecutor.Start())
-            {
-                ReplyCode=250;
-                output="Update started\n";
-            }
-            else
+            if (epgexecutor.Active())
             {
                 ReplyCode=550;
                 output="Update already running\n";
+            }
+            else
+            {
+                if (Option && strstr(Option,"force"))
+                {
+                    epgexecutor.SetForceDownload();
+                }
+                else
+                {
+                    epgexecutor.SetForceImport(GetLastImportSource());
+                }
+                if (epgexecutor.Start())
+                {
+                    ReplyCode=250;
+                    output="Update started\n";
+                }
+                else
+                {
+                    ReplyCode=550;
+                    output="Failed to start update\n";
+                }
             }
         }
     }

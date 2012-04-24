@@ -37,6 +37,8 @@ int cEPGChannel::Compare(const cListObject &ListObject) const
 cEPGExecutor::cEPGExecutor(cEPGSources *Sources) : cThread("xmltv2vdr importer")
 {
     sources=Sources;
+    forcedownload=false;
+    forceimportsrc=-1;
 }
 
 void cEPGExecutor::Action()
@@ -51,7 +53,7 @@ void cEPGExecutor::Action()
 
     for (cEPGSource *epgs=sources->First(); epgs; epgs=sources->Next(epgs))
     {
-        if (epgs->RunItNow())
+        if (epgs->RunItNow(forcedownload))
         {
             int retries=0;
             while (retries<=2)
@@ -83,15 +85,25 @@ void cEPGExecutor::Action()
     }
 
     int ret=1;
-    for (cEPGSource *epgs=sources->First(); epgs; epgs=sources->Next(epgs))
+    if (forceimportsrc>=0)
     {
-        if (!epgs->LastRetCode())
+        cEPGSource *epgs=sources->Get(forceimportsrc);
+        if (epgs) ret=epgs->Import(*this);
+    }
+    else
+    {
+        for (cEPGSource *epgs=sources->First(); epgs; epgs=sources->Next(epgs))
         {
-            ret=epgs->Import(*this);
-            break; // only import from the first successful source!
+            if (!epgs->LastRetCode())
+            {
+                ret=epgs->Import(*this);
+                break; // only import from the first successful source!
+            }
         }
     }
     if (!ret) cSchedules::Cleanup(true);
+    forceimportsrc=-1;
+    forcedownload=false;
 }
 
 // -------------------------------------------------------------
@@ -169,12 +181,18 @@ time_t cEPGSource::NextRunTime(time_t Now)
     return t;
 }
 
-bool cEPGSource::RunItNow()
+bool cEPGSource::RunItNow(bool ForceDownload)
 {
     if (disabled) return false;
     struct stat statbuf;
     if (stat(epgfile,&statbuf)==-1) return true; // no database? -> execute immediately
     if (!statbuf.st_size) return true; // no database? -> execute immediately
+
+    if (ForceDownload)
+    {
+        tsyslogs(this,"download forced");
+        return true;
+    }
 
     time_t t=(time(NULL)/60)*60;
     time_t nrt=NextRunTime(t);
@@ -820,6 +838,7 @@ time_t cEPGSources::NextRunTime()
         time_t nrt=Get(i)->NextRunTime();
         if (nrt)
         {
+            if (next==(time_t) -1) next=nrt;
             if (nrt<next) next=nrt;
         }
     }

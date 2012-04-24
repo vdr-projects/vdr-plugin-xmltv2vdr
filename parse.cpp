@@ -500,8 +500,25 @@ bool cParse::FetchEvent(xmlNodePtr enode)
             }
             else if ((!xmlStrcasecmp(node->name, (const xmlChar *) "icon")))
             {
-                // http-link inside -> just ignore
-                xevent.SetPicExists();
+                xmlChar *src=xmlGetProp(node,(const xmlChar *) "src");
+                if (src)
+                {
+                    const xmlChar *f=xmlStrstr(src,(const xmlChar *) "://");
+                    if (f)
+                    {
+                        // url: skip scheme and scheme-specific-part
+                        f+=3;
+                    }
+                    else
+                    {
+                        // just try it
+                        f=src;
+                    }
+                    struct stat statbuf;
+                    if (stat((const char *) f,&statbuf)!=-1) xevent.SetPicExists();
+                    xmlFree(src);
+                }
+
             }
             else if ((!xmlStrcasecmp(node->name, (const xmlChar *) "length")))
             {

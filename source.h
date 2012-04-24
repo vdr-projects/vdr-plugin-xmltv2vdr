@@ -79,7 +79,7 @@ public:
     }
     int Execute(cEPGExecutor &myExecutor);
     int Import(cEPGExecutor &myExecutor);
-    bool RunItNow();
+    bool RunItNow(bool ForceDownload=false);
     time_t NextRunTime(time_t Now=(time_t) 0);
     void Store(void);
     void ChangeChannelSelection(int *Selection);
@@ -162,6 +162,7 @@ public:
     time_t NextRunTime();
     bool Exists(const char *Name);
     cEPGSource *GetSource(const char *Name);
+    cEPGSource *GetSourceDB(const char *EpgFile);
     int GetSourceIdx(const char *Name);
     void Remove();
 };
@@ -172,6 +173,8 @@ class cEPGExecutor : public cThread
 {
 private:
     cEPGSources *sources;
+    bool forcedownload;
+    int forceimportsrc;
 public:
     cEPGExecutor(cEPGSources *Sources);
     bool StillRunning()
@@ -181,6 +184,18 @@ public:
     void Stop()
     {
         Cancel(3);
+    }
+    void SetForceDownload()
+    {
+        forcedownload=true;
+    }
+    void SetForceImport(int SourceIdx)
+    {
+        forceimportsrc=-1;
+        if (!sources) return;
+        if (SourceIdx>sources->Count()) return;
+        if (SourceIdx<0) return;
+        forceimportsrc=SourceIdx;
     }
     virtual void Action();
 };

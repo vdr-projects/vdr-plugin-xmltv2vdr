@@ -67,7 +67,7 @@ private:
     cImport import;
     bool epall;
     sqlite3 *db;
-    void closedb(void);
+    time_t now;
     bool check4proc(cEvent *event, bool &spth);
 public:
     cEPGHandler(const char *EpgFile, cEPGSources *Sources,
@@ -90,10 +90,9 @@ public:
 class cEPGTimer : public cThread
 {
 private:
-    const char *epgfile;
     cEPGSources *sources;
     cEPGMappings *maps;
-    cImport *import;
+    cImport import;
 public:
     cEPGTimer(const char *EpgFile, cEPGSources *Sources, cEPGMappings *Maps,cTEXTMappings *Texts);
     bool StillRunning()
@@ -129,13 +128,13 @@ private:
     time_t last_housetime_t;
     time_t last_maintime_t;
     time_t last_epcheck_t;
-    time_t nextruntime;
     char *confdir;
     char *epgfile;
     char *srcorder;
     bool epall;
     bool wakeup;
     bool insetup;
+    int GetLastImportSource();
 public:
     void SetSetupState(bool Value)
     {

@@ -428,6 +428,17 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
 
     if (!Event) return false;
 
+    if (!append)
+    {
+        const char *eitdescription=Event->Description();
+        if (WasChanged(Event)) eitdescription=NULL; // we cannot use Event->Description() - it is already changed!
+        if (!xEvent->EITEventID() || eitdescription)
+        {
+            UpdateXMLTVEvent(Source,Db,Event,xEvent,eitdescription);
+        }
+        if (!eitdescription && !xEvent->EITDescription()) return false;
+    }
+
     if (((Flags & USE_SHORTTEXT)==USE_SHORTTEXT) || (append))
     {
         if (xEvent->ShortText() && (strlen(xEvent->ShortText())>0))
@@ -450,7 +461,7 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
     }
 
     char *description=NULL;
-    if (((Flags & USE_LONGTEXT)==USE_LONGTEXT) || ((Flags & OPT_APPEND)==OPT_APPEND))
+    if (((Flags & USE_LONGTEXT)==USE_LONGTEXT) || (append))
     {
         if (xEvent->Description() && (strlen(xEvent->Description())>0))
         {
@@ -461,13 +472,6 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
     if (!description && xEvent->EITDescription() && (strlen(xEvent->EITDescription())>0))
     {
         description=strdup(xEvent->EITDescription());
-    }
-
-    if (!description && Event->Description() && (strlen(Event->Description())>0))
-    {
-        if (WasChanged(Event)) return false;
-        UpdateXMLTVEvent(Source,Db,Event,xEvent);
-        description=strdup(Event->Description());
     }
 
     if (description) description=Add2Description(description,"\n");
@@ -791,11 +795,11 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
             switch (changed)
             {
             case CHANGED_SHORTTEXT:
-                tsyslogs(Source,"{%i} changing shorttext (%s) of '%s'@%s-%s",Event->EventID(),
+                tsyslogs(Source,"{%i} changing stext (%s) of '%s'@%s-%s",Event->EventID(),
                          Event->ShortText(),Event->Title(),from,till);
                 break;
             case CHANGED_DESCRIPTION:
-                tsyslogs(Source,"{%i} changing description of '%s'@%s-%s",Event->EventID(),
+                tsyslogs(Source,"{%i} changing descr of '%s'@%s-%s",Event->EventID(),
                          Event->Title(),from,till);
                 break;
             case CHANGED_ALL:
@@ -961,7 +965,7 @@ cXMLTVEvent *cImport::AddXMLTVEvent(cEPGSource *Source,sqlite3 *Db, const char *
     if (!cParse::FetchSeasonEpisode(conv,epdir,Event->Title(),
                                     Event->ShortText(),season,episode))
     {
-        tsyslogs(Source,"no season/episode found for '%s'/'%s'",Event->Title(),Event->ShortText());
+        //tsyslogs(Source,"no season/episode found for '%s'/'%s'",Event->Title(),Event->ShortText());
         free(epdir);
         iconv_close(conv);
         return NULL;
@@ -1009,25 +1013,34 @@ cXMLTVEvent *cImport::AddXMLTVEvent(cEPGSource *Source,sqlite3 *Db, const char *
     return xevent;
 }
 
-bool cImport::UpdateXMLTVEvent(cEPGSource *Source, sqlite3 *Db, const cEvent *Event, cXMLTVEvent *xEvent)
+bool cImport::UpdateXMLTVEvent(cEPGSource *Source, sqlite3 *Db, const cEvent *Event, cXMLTVEvent *xEvent,
+                               const char *Description)
 {
     if (!Source) return false;
     if (!Db) return false;
     if (!Event) return false;
     if (!xEvent) return false;
 
-    if (Event->Description())
+    // prevent unnecessary updates
+    if (!Description && (xEvent->EITEventID()==Event->EventID())) return false;
+
+    if (Description)
     {
-        xEvent->SetEITDescription(Event->Description());
+        xEvent->SetEITDescription(Description);
     }
-    xEvent->SetEITEventID(Event->EventID());
+    bool eventid=false;
+    if (!xEvent->EITEventID())
+    {
+        xEvent->SetEITEventID(Event->EventID());
+        eventid=true;
+    }
 
     if (!Begin(Source,Db)) return false;
 
     char *sql=NULL;
-    if (Event->Description())
+    if (Description)
     {
-        char *eitdescription=strdup(Event->Description());
+        char *eitdescription=strdup(Description);
         if (!eitdescription)
         {
             esyslogs(Source,"out of memory");
@@ -1067,19 +1080,19 @@ bool cImport::UpdateXMLTVEvent(cEPGSource *Source, sqlite3 *Db, const cEvent *Ev
 
     if (Source->Trace())
     {
-        struct tm tm;
-        char from[80];
-        char till[80];
-        time_t start,end;
-        start=Event->StartTime();
-        end=Event->EndTime();
-        localtime_r(&start,&tm);
-        strftime(from,sizeof(from)-1,"%b %d %H:%M",&tm);
-        localtime_r(&end,&tm);
-        strftime(till,sizeof(till)-1,"%b %d %H:%M",&tm);
-        tsyslogs(Source,"{%i} updating %s of '%s'@%s-%s in db",Event->EventID(),
-                 Event->Description() ? "eitdescription/eiteventid" :
-                 "eiteventid",Event->Title(),from,till);
+        char buf[80]="";
+        if (Description)
+        {
+            strcat(buf,"eitdescription");
+            if (eventid) strcat(buf,"/");
+        }
+        if (eventid)
+        {
+            strcat(buf,"eiteventid");
+        }
+
+        tsyslogs(Source,"{%i} updating %s of '%s' in db",Event->EventID(),buf,
+                 Event->Title());
     }
 
     char *errmsg;
