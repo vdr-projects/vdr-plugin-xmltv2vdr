@@ -68,9 +68,9 @@ private:
     bool epall;
     sqlite3 *db;
     time_t now;
-    bool check4proc(cEvent *event, bool &spth);
+    bool check4proc(cEvent *event, bool &spth, cEPGMapping **map);
 public:
-    cEPGHandler(const char *EpgFile, cEPGSources *Sources,
+    cEPGHandler(const char *EpgFile, const char *EPDir, cEPGSources *Sources,
                 cEPGMappings *Maps, cTEXTMappings *Texts);
     void SetEPAll(bool Value)
     {
@@ -94,7 +94,8 @@ private:
     cEPGMappings *maps;
     cImport import;
 public:
-    cEPGTimer(const char *EpgFile, cEPGSources *Sources, cEPGMappings *Maps,cTEXTMappings *Texts);
+    cEPGTimer(const char *EpgFile, const char *EPDir, cEPGSources *Sources,
+              cEPGMappings *Maps,cTEXTMappings *Texts);
     bool StillRunning()
     {
         return Running();
@@ -130,6 +131,7 @@ private:
     time_t last_epcheck_t;
     char *confdir;
     char *epgfile;
+    char *epdir;
     char *srcorder;
     bool epall;
     bool wakeup;
@@ -157,9 +159,13 @@ public:
     {
         return wakeup;
     }
+    const char *EPDir()
+    {
+        return epdir;
+    }
     void ReadInEPGSources(bool Reload=false)
     {
-        epgsources.ReadIn(confdir,epgfile,&epgmappings,&textmappings,srcorder,Reload);
+        epgsources.ReadIn(confdir,epgfile,epdir,&epgmappings,&textmappings,srcorder,Reload);
     }
     bool EPGSourceMove(int From, int To);
     int EPGSourceCount()

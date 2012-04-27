@@ -41,6 +41,9 @@ private:
     cTEXTMappings *texts;
     cCharSetConv *conv;
     char *codeset;
+    iconv_t cep2ascii;
+    iconv_t cutf2ascii;
+    const char *epdir;    
     bool pendingtransaction;
     const char *epgfile;
     char *RemoveLastCharFromDescription(char *description);
@@ -55,7 +58,7 @@ private:
     char *RemoveNonASCII(const char *src);
     cXMLTVEvent *PrepareAndReturn(sqlite3 *db, char *sql);
 public:
-    cImport(const char *EPGFile, cEPGMappings *Maps, cTEXTMappings *Texts);
+    cImport(const char *EPGFile, const char *EPDir, cEPGMappings *Maps, cTEXTMappings *Texts);
     ~cImport();
     int Process(cEPGSource *Source, cEPGExecutor &myExecutor);
     bool Begin(cEPGSource *Source, sqlite3 *Db);

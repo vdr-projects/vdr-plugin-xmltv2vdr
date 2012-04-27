@@ -109,7 +109,7 @@ void cEPGExecutor::Action()
 // -------------------------------------------------------------
 
 cEPGSource::cEPGSource(const char *Name, const char *ConfDir, const char *EPGFile,
-                       cEPGMappings *Maps, cTEXTMappings *Texts)
+                       const char *EPDir, cEPGMappings *Maps, cTEXTMappings *Texts)
 {
     if (strcmp(Name,EITSOURCE))
     {
@@ -132,8 +132,8 @@ cEPGSource::cEPGSource(const char *Name, const char *ConfDir, const char *EPGFil
     if (strcmp(Name,EITSOURCE))
     {
         ready2parse=ReadConfig();
-        parse=new cParse(EPGFile,this, Maps);
-        import=new cImport(EPGFile,Maps,Texts);
+        parse=new cParse(EPGFile,EPDir,this, Maps);
+        import=new cImport(EPGFile,EPDir,Maps,Texts);
         dsyslogs(this,"is%sready2parse",(ready2parse && parse) ? " " : " not ");
     }
     else
@@ -846,8 +846,9 @@ time_t cEPGSources::NextRunTime()
     return next;
 }
 
-void cEPGSources::ReadIn(const char *ConfDir, const char *EpgFile, cEPGMappings *EPGMappings,
-                         cTEXTMappings *TextMappings, const char *SourceOrder, bool Reload)
+void cEPGSources::ReadIn(const char *ConfDir, const char *EpgFile, const char *EPDir,
+                         cEPGMappings *EPGMappings, cTEXTMappings *TextMappings,
+                         const char *SourceOrder, bool Reload)
 {
     if (Reload) Remove();
     DIR *dir=opendir(EPGSOURCES);
@@ -877,7 +878,7 @@ void cEPGSources::ReadIn(const char *ConfDir, const char *EpgFile, cEPGMappings 
                             id[4]=0;
                             if (!strcmp(id,"file") || !strcmp(id,"pipe"))
                             {
-                                Add(new cEPGSource(dirent->d_name,ConfDir,EpgFile,EPGMappings,TextMappings));
+                                Add(new cEPGSource(dirent->d_name,ConfDir,EpgFile,EPDir,EPGMappings,TextMappings));
                             }
                             else
                             {
@@ -903,7 +904,7 @@ void cEPGSources::ReadIn(const char *ConfDir, const char *EpgFile, cEPGMappings 
 
     if (!Exists(EITSOURCE))
     {
-        Add(new cEPGSource(EITSOURCE,ConfDir,EpgFile,EPGMappings,TextMappings));
+        Add(new cEPGSource(EITSOURCE,ConfDir,EpgFile,EPDir,EPGMappings,TextMappings));
     }
 
     if (!SourceOrder) return;

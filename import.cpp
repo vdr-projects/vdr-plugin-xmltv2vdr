@@ -12,7 +12,6 @@
 #include <langinfo.h>
 #include <pcrecpp.h>
 #include <unistd.h>
-#include <pwd.h>
 #include <sys/types.h>
 #include <vdr/channels.h>
 
@@ -747,7 +746,7 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
         description=RemoveLastCharFromDescription(description);
         description=AddEOT2Description(description);
         const char *dp=conv->Convert(description);
-        if (!Event->Description() || strcmp(Event->Description(),dp))
+        if (!Event->Description() || strcasecmp(Event->Description(),dp))
         {
             Event->SetDescription(dp);
             changed|=CHANGED_DESCRIPTION;
@@ -930,44 +929,15 @@ cXMLTVEvent *cImport::AddXMLTVEvent(cEPGSource *Source,sqlite3 *Db, const char *
     if (!ChannelID) return NULL;
     if (!Event) return NULL;
     if (!EITDescription) return NULL;
-
-    struct passwd pwd,*pwdbuf;
-    char buf[1024],*epdir=NULL;
-    iconv_t conv=(iconv_t) -1;
-    getpwuid_r(getuid(),&pwd,buf,sizeof(buf),&pwdbuf);
-    if (pwdbuf)
-    {
-        if (asprintf(&epdir,"%s/.eplists/lists",pwdbuf->pw_dir)!=-1)
-        {
-            if (access(epdir,R_OK))
-            {
-                free(epdir);
-                epdir=NULL;
-            }
-            else
-            {
-                conv=iconv_open("US-ASCII//TRANSLIT","UTF-8");
-            }
-        }
-        else
-        {
-            epdir=NULL;
-        }
-    }
     if (!epdir) return NULL;
-    if (conv==(iconv_t) -1)
-    {
-        free(epdir);
-        return NULL;
-    }
 
     int season,episode;
-    if (!cParse::FetchSeasonEpisode(conv,epdir,Event->Title(),
+    if (!cParse::FetchSeasonEpisode(cep2ascii,cutf2ascii,epdir,Event->Title(),
                                     Event->ShortText(),season,episode))
     {
-        //tsyslogs(Source,"no season/episode found for '%s'/'%s'",Event->Title(),Event->ShortText());
-        free(epdir);
-        iconv_close(conv);
+#ifdef VDRDEBUG
+        tsyslogs(Source,"no season/episode found for '%s'/'%s'",Event->Title(),Event->ShortText());
+#endif
         return NULL;
     }
 
@@ -975,8 +945,6 @@ cXMLTVEvent *cImport::AddXMLTVEvent(cEPGSource *Source,sqlite3 *Db, const char *
     if (!xevent)
     {
         esyslogs(Source,"out of memory");
-        free(epdir);
-        iconv_close(conv);
         return NULL;
     }
 
@@ -994,8 +962,6 @@ cXMLTVEvent *cImport::AddXMLTVEvent(cEPGSource *Source,sqlite3 *Db, const char *
     if (!Begin(Source,Db))
     {
         delete xevent;
-        free(epdir);
-        iconv_close(conv);
         return NULL;
     }
 
@@ -1008,8 +974,6 @@ cXMLTVEvent *cImport::AddXMLTVEvent(cEPGSource *Source,sqlite3 *Db, const char *
         delete xevent;
         xevent=NULL;
     }
-    free(epdir);
-    iconv_close(conv);
     return xevent;
 }
 
@@ -1382,7 +1346,7 @@ bool cImport::DBExists()
 }
 
 
-cImport::cImport(const char *EPGFile, cEPGMappings* Maps, cTEXTMappings *Texts)
+cImport::cImport(const char *EPGFile, const char *EPDir, cEPGMappings* Maps, cTEXTMappings *Texts)
 {
     maps=Maps;
     texts=Texts;
@@ -1409,10 +1373,36 @@ cImport::cImport(const char *EPGFile, cEPGMappings* Maps, cTEXTMappings *Texts)
     isyslog("codeset is '%s'",codeset);
     conv = new cCharSetConv("UTF-8",codeset);
 
+    if (EPDir)
+    {
+        epdir=strdup(EPDir);
+        if (!epdir) return;
+        char *charset=strchr((char *) epdir,',');
+        if (charset)
+        {
+            *charset=0;
+        }
+        else
+        {
+            charset=(char *) "UTF-8";
+        }
+        cep2ascii=iconv_open(charset,"US-ASCII//TRANSLIT");
+        cutf2ascii=iconv_open("UTF-8","US-ASCII//TRANSLIT");
+    }
+    else
+    {
+        epdir=NULL;
+    }
 }
 
 cImport::~cImport()
 {
+    if (epdir)
+    {
+        free((void *) epdir);
+        iconv_close(cep2ascii);
+        iconv_close(cutf2ascii);
+    }
     if (codeset) free(codeset);
     delete conv;
 }

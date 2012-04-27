@@ -149,15 +149,17 @@ void cParse::RemoveNonAlphaNumeric(char *String)
     return;
 }
 
-bool cParse::FetchSeasonEpisode(iconv_t Conv, const char *EPDir, const char *Title,
-                                const char *ShortText, int &Season, int &Episode)
+bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const char *EPDir,
+                                const char *Title, const char *ShortText, int &Season, int &Episode)
 {
+    // Title and ShortText are always UTF8 !
     if (!EPDir) return false;
     if (!ShortText) return false;
     size_t slen=strlen(ShortText);
     if (!slen) return false;
     if (!Title) return false;
-    if (Conv==(iconv_t) -1) return false;
+    if (cEP2ASCII==(iconv_t) -1) return false;
+    if (cUTF2ASCII==(iconv_t) -1) return false;
 
     DIR *dir=opendir(EPDir);
     if (!dir) return false;
@@ -200,7 +202,7 @@ bool cParse::FetchSeasonEpisode(iconv_t Conv, const char *EPDir, const char *Tit
     char *FromPtr=(char *) ShortText;
     char *ToPtr=(char *) dshorttext;
 
-    if (iconv(Conv,&FromPtr,&slen,&ToPtr,&dlen)==(size_t) -1)
+    if (iconv(cUTF2ASCII,&FromPtr,&slen,&ToPtr,&dlen)==(size_t) -1)
     {
         free(dshorttext);
         fclose(f);
@@ -230,7 +232,7 @@ bool cParse::FetchSeasonEpisode(iconv_t Conv, const char *EPDir, const char *Tit
             dlen=sizeof(depshorttext);
             FromPtr=(char *) epshorttext;
             ToPtr=(char *) depshorttext;
-            if (iconv(Conv,&FromPtr,&slen,&ToPtr,&dlen)!=(size_t) -1)
+            if (iconv(cEP2ASCII,&FromPtr,&slen,&ToPtr,&dlen)!=(size_t) -1)
             {
                 RemoveNonAlphaNumeric(depshorttext);
                 if (!strlen(depshorttext))
@@ -541,12 +543,11 @@ bool cParse::FetchEvent(xmlNodePtr enode)
     }
 
     int season,episode;
-    if (FetchSeasonEpisode(conv,epdir,xevent.Title(),xevent.ShortText(),season,episode))
+    if (FetchSeasonEpisode(cep2ascii,cutf2ascii,epdir,xevent.Title(),xevent.ShortText(),season,episode))
     {
         xevent.SetSeason(season);
         xevent.SetEpisode(episode);
     }
-
     return xevent.HasTitle();
 }
 
@@ -757,33 +758,30 @@ void cParse::CleanupLibXML()
     xmlCleanupParser();
 }
 
-cParse::cParse(const char *EPGFile, cEPGSource *Source, cEPGMappings *Maps)
+cParse::cParse(const char *EPGFile, const char *EPDir, cEPGSource *Source, cEPGMappings *Maps)
 {
     source=Source;
     maps=Maps;
     epgfile=EPGFile;
-
-    struct passwd pwd,*pwdbuf;
-    char buf[1024];
-    getpwuid_r(getuid(),&pwd,buf,sizeof(buf),&pwdbuf);
-    if (pwdbuf)
+    if (EPDir)
     {
-        if (asprintf(&epdir,"%s/.eplists/lists",pwdbuf->pw_dir)!=-1)
+        epdir=strdup(EPDir);
+        if (!epdir) return;
+        char *charset=strchr((char *) epdir,',');
+        if (charset)
         {
-            if (access(epdir,R_OK))
-            {
-                free(epdir);
-                epdir=NULL;
-            }
-            else
-            {
-                conv=iconv_open("US-ASCII//TRANSLIT","UTF-8");
-            }
+            *charset=0;
         }
         else
         {
-            epdir=NULL;
+            charset=(char *) "UTF-8";
         }
+        cep2ascii=iconv_open(charset,"US-ASCII//TRANSLIT");
+        cutf2ascii=iconv_open("UTF-8","US-ASCII//TRANSLIT");
+    }
+    else
+    {
+        epdir=NULL;
     }
 }
 
@@ -791,7 +789,8 @@ cParse::~cParse()
 {
     if (epdir)
     {
-        free(epdir);
-        iconv_close(conv);
+        free((void *) epdir);
+        iconv_close(cep2ascii);
+        iconv_close(cutf2ascii);
     }
 }

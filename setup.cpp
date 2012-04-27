@@ -10,7 +10,6 @@
 #include <vdr/osdbase.h>
 #include <vdr/i18n.h>
 #include <time.h>
-#include <pwd.h>
 
 #define CHNUMWIDTH (numdigits(Channels.MaxNumber())+1)
 
@@ -83,18 +82,9 @@ void cMenuSetupXmltv2vdr::Output(void)
     Add(first,true);
 
     epEntry=0;
-    struct passwd *pw=getpwuid(getuid());
-    if (pw)
+    if (baseplugin->EPDir())
     {
-        char *path=NULL;
-        if (asprintf(&path,"%s/.eplists/lists",pw->pw_dir)!=-1)
-        {
-            if (!access(path,R_OK))
-            {
-                Add(new cMenuEditBoolItem(tr("add season/episode on all timers"),&epall),true);
-            }
-            free(path);
-        }
+        Add(new cMenuEditBoolItem(tr("add season/episode on all timers"),&epall),true);
     }
     Add(new cMenuEditBoolItem(tr("automatic wakeup"),&wakeup),true);
 
@@ -837,7 +827,7 @@ cMenuSetupXmltv2vdrChannelMap::cMenuSetupXmltv2vdrChannelMap(cPluginXmltv2vdr *P
     SetTitle(title);
 
     flags=map->Flags();
-    c1=c2=c3=cm=0;
+    c1=c3=cm=0;
     SetHelp(NULL,NULL,tr("Button$Reset"),tr("Button$Copy"));
     output();
 }
@@ -905,11 +895,6 @@ void cMenuSetupXmltv2vdrChannelMap::output(void)
     {
         Add(new cMyMenuEditBitItem(tr("short text"),&flags,USE_SHORTTEXT),true);
         Add(new cMyMenuEditBitItem(tr("long text"),&flags,USE_LONGTEXT),true);
-        c2=Current();
-        if ((flags & USE_LONGTEXT)==USE_LONGTEXT)
-        {
-            Add(new cMyMenuEditBitItem(tr(" merge long texts"),&flags,OPT_MERGELTEXT),true);
-        }
     }
     else
     {
@@ -939,16 +924,9 @@ void cMenuSetupXmltv2vdrChannelMap::output(void)
     Add(new cMyMenuEditBitItem(tr("video"),&flags,USE_VIDEO),true);
     Add(new cMyMenuEditBitItem(tr("audio"),&flags,USE_AUDIO),true);
 
-    struct passwd *pw=getpwuid(getuid());
-    if (pw)
+    if (baseplugin->EPDir())
     {
-        char *path=NULL;
-        if (asprintf(&path,"%s/.eplists/lists",pw->pw_dir)!=-1)
-        {
-            if (!access(path,R_OK))
-                Add(new cMyMenuEditBitItem(tr("season and episode"),&flags,USE_SEASON),true);
-            free(path);
-        }
+        Add(new cMyMenuEditBitItem(tr("season and episode"),&flags,USE_SEASON),true);
     }
 
     hasmaps=false;
@@ -1001,8 +979,7 @@ eOSState cMenuSetupXmltv2vdrChannelMap::ProcessKey(eKeys Key)
         case kLeft|k_Repeat:
         case kRight:
         case kRight|k_Repeat:
-            if ((Current()==c1) || (Current()==c2) ||
-                    (Current()==c3)) output();
+            if ((Current()==c1) || (Current()==c3)) output();
             break;
         case kDown:
         case kDown|k_Repeat:

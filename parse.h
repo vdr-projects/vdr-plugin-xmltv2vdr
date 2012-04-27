@@ -29,8 +29,9 @@ class cParse
     };
 
 private:
-    iconv_t conv;
-    char *epdir;
+    iconv_t cep2ascii;
+    iconv_t cutf2ascii;
+    const char *epdir;
     const char *epgfile;
     cEPGSource *source;
     cEPGMappings *maps;
@@ -38,12 +39,13 @@ private:
     time_t ConvertXMLTVTime2UnixTime(char *xmltvtime);
     bool FetchEvent(xmlNodePtr node);
 public:
-    cParse(const char *EPGFile, cEPGSource *Source, cEPGMappings *Maps);
+    cParse(const char *EPGFile, const char *EPDir, cEPGSource *Source, cEPGMappings *Maps);
     ~cParse();
     int Process(cEPGExecutor &myExecutor, char *buffer, int bufsize);
     static void RemoveNonAlphaNumeric(char *String);
-    static bool FetchSeasonEpisode(iconv_t Conv, const char *EPDir, const char *Title,
-                                   const char *ShortText, int &Season, int &Episode);
+    static bool FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const char *EPDir,
+                                   const char *Title, const char *ShortText, int &Season,
+                                   int &Episode);
     static void InitLibXML();
     static void CleanupLibXML();
 };

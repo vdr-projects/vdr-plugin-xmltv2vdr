@@ -40,7 +40,6 @@
 #define OPT_RATING_TEXT        0x1000000
 #define OPT_CATEGORIES_TEXT    0x2000000
 
-#define OPT_MERGELTEXT         0x10000000
 #define OPT_APPEND             0x40000000
 
 class cTEXTMapping : public cListObject
