@@ -70,8 +70,8 @@ private:
     time_t now;
     bool check4proc(cEvent *event, bool &spth, cEPGMapping **map);
 public:
-    cEPGHandler(const char *EpgFile, const char *EPDir, cEPGSources *Sources,
-                cEPGMappings *Maps, cTEXTMappings *Texts);
+    cEPGHandler(const char *EpgFile, const char *EPDir, const char *CodeSet,
+                cEPGSources *Sources, cEPGMappings *Maps, cTEXTMappings *Texts);
     void SetEPAll(bool Value)
     {
         epall=Value;
@@ -94,8 +94,8 @@ private:
     cEPGMappings *maps;
     cImport import;
 public:
-    cEPGTimer(const char *EpgFile, const char *EPDir, cEPGSources *Sources,
-              cEPGMappings *Maps,cTEXTMappings *Texts);
+    cEPGTimer(const char *EpgFile, const char *EPDir, const char *CodeSet,
+              cEPGSources *Sources, cEPGMappings *Maps,cTEXTMappings *Texts);
     bool StillRunning()
     {
         return Running();
@@ -132,6 +132,7 @@ private:
     char *confdir;
     char *epgfile;
     char *epdir;
+    char *codeset;
     char *srcorder;
     bool epall;
     bool wakeup;
@@ -165,7 +166,8 @@ public:
     }
     void ReadInEPGSources(bool Reload=false)
     {
-        epgsources.ReadIn(confdir,epgfile,epdir,&epgmappings,&textmappings,srcorder,Reload);
+        epgsources.ReadIn(confdir,epgfile,epdir,codeset,&epgmappings,
+                          &textmappings,srcorder,Reload);
     }
     bool EPGSourceMove(int From, int To);
     int EPGSourceCount()

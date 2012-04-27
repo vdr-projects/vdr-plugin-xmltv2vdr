@@ -71,7 +71,8 @@ private:
     cEPGChannels channels;
 public:
     cEPGSource(const char *Name,const char *ConfDir,const char *EPGFile,
-               const char *EPDir, cEPGMappings *Maps, cTEXTMappings *Texts);
+               const char *EPDir, const char *CodeSet, cEPGMappings *Maps,
+               cTEXTMappings *Texts);
     ~cEPGSource();
     bool Trace()
     {
@@ -157,8 +158,9 @@ class cEPGSources : public cList<cEPGSource>
 {
 public:
     void ReadIn(const char *ConfDir, const char *EpgFile, const char *EPDir,
-                cEPGMappings *EPGMappings, cTEXTMappings *TextMappings,
-                const char *SourceOrder, bool Reload=false);
+                const char *CodeSet, cEPGMappings *EPGMappings,
+                cTEXTMappings *TextMappings, const char *SourceOrder,
+                bool Reload=false);
     bool RunItNow();
     time_t NextRunTime();
     bool Exists(const char *Name);

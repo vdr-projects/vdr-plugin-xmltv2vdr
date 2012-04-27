@@ -10,6 +10,8 @@
 #include <unistd.h>
 #include <getopt.h>
 #include <stdarg.h>
+#include <locale.h>
+#include <langinfo.h>
 #include <sqlite3.h>
 #include <sys/types.h>
 #include <pwd.h>
@@ -124,8 +126,8 @@ void logger(cEPGSource *source, char logtype, const char* format, ...)
 
 // -------------------------------------------------------------
 
-cEPGHandler::cEPGHandler(const char *EpgFile, const char *EPDir, cEPGSources *Sources,
-                         cEPGMappings *Maps, cTEXTMappings *Texts) : import(EpgFile,EPDir,Maps,Texts)
+cEPGHandler::cEPGHandler(const char *EpgFile, const char *EPDir, const char *CodeSet, cEPGSources *Sources,
+                         cEPGMappings *Maps, cTEXTMappings *Texts) : import(EpgFile,EPDir,CodeSet,Maps,Texts)
 {
     epall=false;
     maps=Maps;
@@ -291,8 +293,8 @@ bool cEPGHandler::SortSchedule(cSchedule* UNUSED(Schedule))
 
 // -------------------------------------------------------------
 
-cEPGTimer::cEPGTimer(const char *EpgFile, const char *EPDir, cEPGSources *Sources, cEPGMappings *Maps,
-                     cTEXTMappings *Texts) : cThread("xmltv2vdr timer"),import(EpgFile,EPDir,Maps,Texts)
+cEPGTimer::cEPGTimer(const char *EpgFile, const char *EPDir, const char *CodeSet, cEPGSources *Sources, cEPGMappings *Maps,
+                     cTEXTMappings *Texts) : cThread("xmltv2vdr timer"),import(EpgFile,EPDir,CodeSet,Maps,Texts)
 {
     sources=Sources;
     maps=Maps;
@@ -411,6 +413,7 @@ cPluginXmltv2vdr::cPluginXmltv2vdr(void) : epgexecutor(&epgsources)
     epgtimer=NULL;
     epdir=NULL;
     housekeeping=NULL;
+    codeset=NULL;
     last_housetime_t=0;
     last_maintime_t=0;
     last_epcheck_t=0;
@@ -458,10 +461,12 @@ int cPluginXmltv2vdr::GetLastImportSource()
 
     char sql[]="select srcidx from epg where srcidx<>99 order by starttime desc limit 1";
     sqlite3_stmt *stmt;
-    if (sqlite3_prepare_v2(db,sql,strlen(sql),&stmt,NULL)!=SQLITE_OK)
+    
+    int ret=sqlite3_prepare_v2(db,sql,strlen(sql),&stmt,NULL);
+    if (ret!=SQLITE_OK)
     {
+        esyslog("%i %s (glis)",ret,sqlite3_errmsg(db));      
         sqlite3_close(db);
-        tsyslog("failed to prepare %s",sql);
         return -1;
     }
 
@@ -537,7 +542,7 @@ bool cPluginXmltv2vdr::ProcessArgs(int argc, char *argv[])
 
     int c;
     char *comma=NULL;
-    while ((c = getopt_long(argc, argv, "e:E:l:", long_options, NULL)) != -1)
+    while ((c = getopt_long(argc, argv, "l:e:E:", long_options, NULL)) != -1)
     {
         switch (c)
         {
@@ -549,7 +554,6 @@ bool cPluginXmltv2vdr::ProcessArgs(int argc, char *argv[])
             if (comma) *comma=0;
             if (access(epdir,R_OK)!=-1)
             {
-                isyslog("using dir '%s' for episodes",epdir);
                 *comma=',';
             }
             else
@@ -562,13 +566,13 @@ bool cPluginXmltv2vdr::ProcessArgs(int argc, char *argv[])
             if (epgfile) free(epgfile);
             epgfile=strdup(optarg);
             if (!epgfile) break;
-            isyslog("using file '%s' for epgdata",optarg);
+//            isyslog("using file '%s' for epgdata",optarg);
             break;
         case 'l':
             if (logfile) free(logfile);
             logfile=strdup(optarg);
             if (!logfile) break;
-            isyslog("using file '%s' for log",optarg);
+//            isyslog("using file '%s' for log",optarg);
             break;
         default:
             return false;
@@ -592,6 +596,7 @@ bool cPluginXmltv2vdr::Start(void)
     {
         if (asprintf(&epgfile,"%s/epg.db",VideoDirectory)==-1)return false;
     }
+    isyslog("using file '%s' for epg database",epgfile);
     if (!epdir)
     {
         struct passwd pwd,*pwdbuf;
@@ -608,19 +613,50 @@ bool cPluginXmltv2vdr::Start(void)
                 }
                 else
                 {
-                    isyslog("using dir '%s' for episodes",epdir);
+                    isyslog("using dir '%s' (UTF-8) for episodes",epdir);
                 }
             }
         }
     }
-    cParse::InitLibXML();
+    else
+    {
+        char *cs=strchr(epdir,',');
+        if (cs)
+        {
+            *cs=0;
+            isyslog("using dir '%s' (%s) for episodes",epdir,cs+1);
+            *cs=',';
+        }
+        else
+        {
+            isyslog("using dir '%s' (UTF-8) for episodes",epdir);
+        }
+    }
+    if (setlocale(LC_CTYPE,""))
+        codeset=strdup(nl_langinfo(CODESET));
+    else
+    {
+        char *LangEnv=getenv("LANG");
+        if (LangEnv)
+        {
+            codeset=strdup(strchr(LangEnv,'.'));
+            if (codeset)
+                codeset++; // skip dot
+        }
+    }
+    if (!codeset)
+    {
+        codeset=strdup("US-ASCII//TRANSLIT");
+    }
+    isyslog("codeset is '%s'",codeset);
 
     ReadInEPGSources();
-    epghandler = new cEPGHandler(epgfile,epdir,&epgsources,&epgmappings,&textmappings);
-    epgtimer = new cEPGTimer(epgfile,epdir,&epgsources,&epgmappings,&textmappings);
+    epghandler = new cEPGHandler(epgfile,epdir,codeset,&epgsources,&epgmappings,&textmappings);
+    epgtimer = new cEPGTimer(epgfile,epdir,codeset,&epgsources,&epgmappings,&textmappings);
     housekeeping = new cHouseKeeping(epgfile);
 
     if (sqlite3_threadsafe()==0) esyslog("sqlite3 not threadsafe!");
+    cParse::InitLibXML();
     return true;
 }
 
@@ -668,6 +704,11 @@ void cPluginXmltv2vdr::Stop(void)
     {
         free(srcorder);
         srcorder=NULL;
+    }
+    if (codeset)
+    {
+        free(codeset);
+        codeset=NULL;
     }
 }
 

@@ -15,8 +15,8 @@ See the file COPYING for more information.
 Description:
 
 Add epg info from epg sources into vdr. xmltv2vdr just imports data in
-xmltv format which must be provided by an external source (which is not
-part of this package)
+xmltv format which must be provided by an external source (please look
+into the dist directory for sources)
 
 Interface for sources:
 
@@ -28,8 +28,11 @@ pipe (binary with the same name is called by xmltv2vdr-plugin, and
 must be in the path). There can be additional fields in the first 
 line seperated with semicolons. The second option gives the time when
 the epg data will be updated from the origin, the third option informs
-the plugin, if a pin is needed for this source (0/1).
-The second line shows the maximum days which will be provieded.
+the plugin, if a pin is needed for this source (0/1), the fourth option
+is used to determine if the source is providing epgimages (files
+must be placed in /var/lib/epgsources under a directory with a name
+similar to the name of the source)
+The second line shows the maximum days which will be provided.
 The next lines are unique channelnames, provided by the source.
 There can be application dependend data after each channelname. Note,
 that the plugin/VDR must be able to read this control file.
@@ -53,7 +56,7 @@ rtl.de
 sat1.de
 prosieben.de
 
-file
+file;05:15;0;1
 7
 rtl.de;004
 sat1.de;005

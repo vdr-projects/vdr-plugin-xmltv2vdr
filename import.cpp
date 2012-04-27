@@ -8,8 +8,6 @@
 #include <sqlite3.h>
 #include <ctype.h>
 #include <time.h>
-#include <locale.h>
-#include <langinfo.h>
 #include <pcrecpp.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -905,7 +903,7 @@ cXMLTVEvent *cImport::PrepareAndReturn(sqlite3 *db, char *sql)
     int ret=sqlite3_prepare_v2(db,sql,strlen(sql),&stmt,NULL);
     if (ret!=SQLITE_OK)
     {
-        esyslog("%i %s",ret,sqlite3_errmsg(db));
+        esyslog("%i %s (par)",ret,sqlite3_errmsg(db));
         free(sql);
         return NULL;
     }
@@ -1242,10 +1240,11 @@ int cImport::Process(cEPGSource *Source, cEPGExecutor &myExecutor)
     }
 
     sqlite3_stmt *stmt;
-    if (sqlite3_prepare_v2(db,sql,strlen(sql),&stmt,NULL)!=SQLITE_OK)
+    int ret=sqlite3_prepare_v2(db,sql,strlen(sql),&stmt,NULL);
+    if (ret!=SQLITE_OK)
     {
+        esyslogs(Source,"%i %s (p)",ret,sqlite3_errmsg(db));
         sqlite3_close(db);
-        esyslogs(Source,"failed to prepare %s",sql);
         free(sql);
         delete schedulesLock;
         return 141;
@@ -1346,31 +1345,13 @@ bool cImport::DBExists()
 }
 
 
-cImport::cImport(const char *EPGFile, const char *EPDir, cEPGMappings* Maps, cTEXTMappings *Texts)
+cImport::cImport(const char *EPGFile, const char *EPDir, const char *CodeSet, cEPGMappings* Maps, cTEXTMappings *Texts)
 {
     maps=Maps;
     texts=Texts;
     pendingtransaction=false;
     epgfile=EPGFile;
-
-    codeset=NULL;
-    if (setlocale(LC_CTYPE,""))
-        codeset=strdup(nl_langinfo(CODESET));
-    else
-    {
-        char *LangEnv=getenv("LANG");
-        if (LangEnv)
-        {
-            codeset=strdup(strchr(LangEnv,'.'));
-            if (codeset)
-                codeset++; // skip dot
-        }
-    }
-    if (!codeset)
-    {
-        codeset=strdup("US-ASCII//TRANSLIT");
-    }
-    isyslog("codeset is '%s'",codeset);
+    codeset=CodeSet;
     conv = new cCharSetConv("UTF-8",codeset);
 
     if (EPDir)
@@ -1390,7 +1371,7 @@ cImport::cImport(const char *EPGFile, const char *EPDir, cEPGMappings* Maps, cTE
         cutf2ascii=iconv_open("UTF-8","US-ASCII//TRANSLIT");
     }
     else
-    {
+     {
         epdir=NULL;
     }
 }
@@ -1403,6 +1384,5 @@ cImport::~cImport()
         iconv_close(cep2ascii);
         iconv_close(cutf2ascii);
     }
-    if (codeset) free(codeset);
     delete conv;
 }

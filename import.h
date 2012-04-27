@@ -40,10 +40,10 @@ private:
     cEPGMappings *maps;
     cTEXTMappings *texts;
     cCharSetConv *conv;
-    char *codeset;
+    const char *codeset;
     iconv_t cep2ascii;
     iconv_t cutf2ascii;
-    const char *epdir;    
+    const char *epdir;
     bool pendingtransaction;
     const char *epgfile;
     char *RemoveLastCharFromDescription(char *description);
@@ -58,7 +58,7 @@ private:
     char *RemoveNonASCII(const char *src);
     cXMLTVEvent *PrepareAndReturn(sqlite3 *db, char *sql);
 public:
-    cImport(const char *EPGFile, const char *EPDir, cEPGMappings *Maps, cTEXTMappings *Texts);
+    cImport(const char *EPGFile, const char *EPDir, const char *CodeSet, cEPGMappings *Maps, cTEXTMappings *Texts);
     ~cImport();
     int Process(cEPGSource *Source, cEPGExecutor &myExecutor);
     bool Begin(cEPGSource *Source, sqlite3 *Db);
@@ -67,7 +67,7 @@ public:
     bool PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule, cEvent *Event,
                   cXMLTVEvent *xEvent, int Flags);
     bool UpdateXMLTVEvent(cEPGSource *Source, sqlite3 *Db, const cEvent *Event, cXMLTVEvent *xEvent,
-			  const char *Description);
+                          const char *Description);
     cXMLTVEvent *SearchXMLTVEvent(sqlite3 **Db, const char *ChannelID, const cEvent *Event);
     cXMLTVEvent *AddXMLTVEvent(cEPGSource *Source, sqlite3 *Db, const char *ChannelID,
                                const cEvent *Event, const char *EITDescription);
