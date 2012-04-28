@@ -619,6 +619,23 @@ int cEPGSource::Execute(cEPGExecutor &myExecutor)
     if (r_out) r_out[l_out]=0;
     if (r_err) r_err[l_err]=0;
 
+    if (r_err)
+    {
+        char *saveptr;
+        char *pch=strtok_r(r_err,"\n",&saveptr);
+        char *last=(char *) "";
+        while (pch)
+        {
+            if (strcmp(last,pch))
+            {
+                esyslogs(this,"(script) %s",pch);
+                last=pch;
+            }
+            pch=strtok_r(NULL,"\n",&saveptr);
+        }
+        free(r_err);
+    }
+
     if (usepipe)
     {
         int status;
@@ -670,23 +687,6 @@ int cEPGSource::Execute(cEPGExecutor &myExecutor)
     if (!ret)
     {
         lastretcode=ret;
-    }
-
-    if (r_err)
-    {
-        char *saveptr;
-        char *pch=strtok_r(r_err,"\n",&saveptr);
-        char *last=(char *) "";
-        while (pch)
-        {
-            if (strcmp(last,pch))
-            {
-                esyslogs(this,"%s",pch);
-                last=pch;
-            }
-            pch=strtok_r(NULL,"\n",&saveptr);
-        }
-        free(r_err);
     }
     running=false;
     return ret;
