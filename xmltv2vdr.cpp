@@ -161,7 +161,7 @@ bool cEPGHandler::check4proc(cEvent *event, bool &spth, cEPGMapping **map)
         if (!event->ShortText()) return false;
         spth=true;
     }
-    *map=t_map;
+    if (map) *map=t_map;
     return true;
 }
 
