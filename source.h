@@ -45,6 +45,7 @@ public:
 class cEPGChannels : public cList<cEPGChannel> {};
 
 class cImport;
+class cGlobals;
 
 class cEPGSource : public cListObject
 {
@@ -61,6 +62,8 @@ private:
     bool needpin;
     bool running;
     bool disabled;
+    bool haspics;
+    bool usepics;
     int daysinadvance;
     int exec_weekday;
     int exec_time;
@@ -70,9 +73,7 @@ private:
     int ReadOutput(char *&result, size_t &l);
     cEPGChannels channels;
 public:
-    cEPGSource(const char *Name,const char *ConfDir,const char *EPGFile,
-               const char *EPDir, const char *CodeSet, cEPGMappings *Maps,
-               cTEXTMappings *Texts);
+    cEPGSource(const char *Name, cGlobals *Global);
     ~cEPGSource();
     bool Trace()
     {
@@ -125,6 +126,14 @@ public:
     {
         return needpin;
     }
+    bool HasPics()
+    {
+        return haspics;
+    }
+    bool UsePics()
+    {
+        return usepics;
+    }
     const char *Name()
     {
         return name;
@@ -147,6 +156,10 @@ public:
         if (pin) free((void *) pin);
         pin=strdup(NewPin);
     }
+    void ChangePics(bool NewVal)
+    {
+        usepics=NewVal;
+    }
     void Add2Log(struct tm *Tm, const char Prefix, const char *Line);
     bool Active()
     {
@@ -157,9 +170,7 @@ public:
 class cEPGSources : public cList<cEPGSource>
 {
 public:
-    void ReadIn(const char *ConfDir, const char *EpgFile, const char *EPDir,
-                const char *CodeSet, cEPGMappings *EPGMappings,
-                cTEXTMappings *TextMappings, const char *SourceOrder,
+    void ReadIn(cGlobals *Global, const char *SourceOrder,
                 bool Reload=false);
     bool RunItNow();
     time_t NextRunTime();

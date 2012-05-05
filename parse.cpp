@@ -150,12 +150,23 @@ void cParse::RemoveNonAlphaNumeric(char *String)
 }
 
 bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const char *EPDir,
-                                const char *Title, const char *ShortText, int &Season, int &Episode)
+                                const char *Title, const char *ShortText, const char *Description,
+                                int &Season, int &Episode, int &EpisodeOverall, char **EPShortText,
+                                char **EPTitle)
 {
     // Title and ShortText are always UTF8 !
     if (!EPDir) return false;
-    if (!ShortText) return false;
-    size_t slen=strlen(ShortText);
+    if ((!ShortText) && (!Description)) return false;
+    size_t slen;
+    if (ShortText)
+    {
+        slen=strlen(ShortText);
+    }
+    else
+    {
+        slen=strlen(Description);
+        if (slen>40) slen=40;
+    }
     if (!slen) return false;
     if (!Title) return false;
     if (cEP2ASCII==(iconv_t) -1) return false;
@@ -199,11 +210,12 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
         free(epfile);
         return false;
     }
-    char *FromPtr=(char *) ShortText;
+    char *FromPtr=(char *)(ShortText ? ShortText : Description);
     char *ToPtr=(char *) dshorttext;
 
     if (iconv(cUTF2ASCII,&FromPtr,&slen,&ToPtr,&dlen)==(size_t) -1)
     {
+        tsyslog("failed to convert '%s'->'%s' (1)",ShortText,dshorttext);
         free(dshorttext);
         fclose(f);
         free(epfile);
@@ -213,7 +225,7 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
     RemoveNonAlphaNumeric(dshorttext);
     if (!strlen(dshorttext))
     {
-        strcpy(dshorttext,ShortText); // ok lets try with the original text
+        strn0cpy(dshorttext,ShortText ? ShortText : Description,slen); // ok lets try with the original text
     }
 
     char *line=NULL;
@@ -224,7 +236,7 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
         if (line[0]=='#') continue;
         char epshorttext[256]="";
         char depshorttext[1024]="";
-        if (sscanf(line,"%3d\t%3d\t%*3d\t%255c",&Season,&Episode,epshorttext)==3)
+        if (sscanf(line,"%3d\t%3d\t%5d\t%255c",&Season,&Episode,&EpisodeOverall,epshorttext)==4)
         {
             char *lf=strchr(epshorttext,'\n');
             if (lf) *lf=0;
@@ -242,13 +254,23 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
                 if (!strncasecmp(dshorttext,depshorttext,strlen(depshorttext)))
                 {
                     found=true;
+                    if (EPShortText) *EPShortText=strdup(epshorttext);
+                    if (EPTitle) *EPTitle=strdup(dirent->d_name);
                     break;
                 }
             }
+            else
+            {
+                tsyslog("failed to convert '%s'->'%s' (2)",epshorttext,depshorttext);
+            }
+        }
+        else
+        {
+            tsyslog("failed to parse '%s' in '%s'",line,dirent->d_name);
         }
     }
 
-    if (!found)
+    if ((!found) && (ShortText))
     {
         isyslog("failed to find '%s' for '%s' in eplists",ShortText,Title);
     }
@@ -260,7 +282,7 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
     return found;
 }
 
-bool cParse::FetchEvent(xmlNodePtr enode)
+bool cParse::FetchEvent(xmlNodePtr enode, bool useeptext)
 {
     char *slang=getenv("LANG");
     xmlNodePtr node=enode->xmlChildrenNode;
@@ -517,7 +539,15 @@ bool cParse::FetchEvent(xmlNodePtr enode)
                         f=src;
                     }
                     struct stat statbuf;
-                    if (stat((const char *) f,&statbuf)!=-1) xevent.SetPicExists();
+                    if (stat((const char *) f,&statbuf)!=-1)
+                    {
+                        char *file=strrchr((char *) f,'/');
+                        if (file)
+                        {
+                            file++;
+                            xevent.AddPics(file);
+                        }
+                    }
                     xmlFree(src);
                 }
 
@@ -542,11 +572,29 @@ bool cParse::FetchEvent(xmlNodePtr enode)
         node=node->next;
     }
 
-    int season,episode;
-    if (FetchSeasonEpisode(cep2ascii,cutf2ascii,epdir,xevent.Title(),xevent.ShortText(),season,episode))
+    int season,episode,episodeoverall;
+    char *epshorttext=NULL;
+    char *eptitle=NULL;
+    if (FetchSeasonEpisode(cep2ascii,cutf2ascii,epdir,xevent.Title(),xevent.ShortText(),
+                           xevent.Description(),season,episode,episodeoverall,&epshorttext,
+                           &eptitle))
     {
         xevent.SetSeason(season);
         xevent.SetEpisode(episode);
+        xevent.SetEpisodeOverall(episodeoverall);
+        if (useeptext)
+        {
+            if (epshorttext)
+            {
+                xevent.SetShortText(epshorttext);
+                free(epshorttext);
+            }
+            if (eptitle)
+            {
+                xevent.SetTitle(eptitle);
+                free(eptitle);
+            }
+        }
     }
     return xevent.HasTitle();
 }
@@ -610,8 +658,8 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
                "shorttext nvarchar(255), description text, eitdescription text, " \
                "country nvarchar(255), year int, " \
                "credits text, category text, review text, rating text, " \
-               "starrating text, video text, audio text, season int, episode int, picexists int," \
-               "srcidx int," \
+               "starrating text, video text, audio text, season int, episode int, " \
+               "episodeoverall int, pics text, srcidx int," \
                "PRIMARY KEY(src, channelid, eventid)" \
                ");" \
                "CREATE UNIQUE INDEX IF NOT EXISTS idx1 on epg (eventid, src); " \
@@ -707,9 +755,11 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
         xevent.SetStartTime(starttime);
         if (stoptime) xevent.SetDuration(stoptime-starttime);
 
-        if (!FetchEvent(node)) // sets xevent
+        if (!FetchEvent(node,(map->Flags() & OPT_SEASON_SHORTTEXT)==OPT_SEASON_SHORTTEXT)) // sets xevent
         {
-            tsyslogs(source,"failed to fetch event");
+            if (lerr!=PARSE_FETCHERR)
+                esyslogs(source,"failed to fetch event");
+            lerr=PARSE_FETCHERR;
             node=node->next;
             continue;
         }
@@ -718,7 +768,9 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
             const char *sql=xevent.GetSQL(source->Name(),source->Index(),map->ChannelIDs()[i].ToString());
             if (sqlite3_exec(db,sql,NULL,NULL,&errmsg)!=SQLITE_OK)
             {
-                tsyslogs(source,"sqlite3: %s",errmsg);
+                if (lerr!=PARSE_SQLERR)
+                    esyslogs(source,"sqlite3: %s",errmsg);
+                lerr=PARSE_SQLERR;
                 sqlite3_free(errmsg);
                 break;
             }
@@ -733,7 +785,15 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
         }
     }
 
-    dsyslogs(source,"processed %i xmltv events",cnt);
+    if (!lerr)
+    {
+        isyslogs(source,"processed %i xmltv events",cnt);
+    }
+    else
+    {
+        isyslogs(source,"processed %i xmltv events - see ERRORs above!",cnt);
+
+    }
 
     if (sqlite3_exec(db,"COMMIT; ANALYZE epg;",NULL,NULL,&errmsg)!=SQLITE_OK)
     {
@@ -758,26 +818,16 @@ void cParse::CleanupLibXML()
     xmlCleanupParser();
 }
 
-cParse::cParse(const char *EPGFile, const char *EPDir, cEPGSource *Source, cEPGMappings *Maps)
+cParse::cParse(cEPGSource *Source, cGlobals *Global)
 {
     source=Source;
-    maps=Maps;
-    epgfile=EPGFile;
-    if (EPDir)
+    maps=Global->EPGMappings();
+    epgfile=Global->EPGFile();
+    epdir=Global->EPDir();
+    if (epdir)
     {
-        epdir=strdup(EPDir);
-        if (!epdir) return;
-        char *charset=strchr((char *) epdir,',');
-        if (charset)
-        {
-            *charset=0;
-        }
-        else
-        {
-            charset=(char *) "UTF-8";
-        }
-        cep2ascii=iconv_open(charset,"US-ASCII//TRANSLIT");
-        cutf2ascii=iconv_open("UTF-8","US-ASCII//TRANSLIT");
+        cep2ascii=iconv_open("ASCII//TRANSLIT",Global->EPCodeset());
+        cutf2ascii=iconv_open("ASCII//TRANSLIT","UTF-8");
     }
     else
     {
@@ -789,7 +839,6 @@ cParse::~cParse()
 {
     if (epdir)
     {
-        free((void *) epdir);
         iconv_close(cep2ascii);
         iconv_close(cutf2ascii);
     }

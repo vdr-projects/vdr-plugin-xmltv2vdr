@@ -18,6 +18,7 @@
 
 class cEPGSource;
 class cEPGExecutor;
+class cGlobals;
 
 class cImport
 {
@@ -41,6 +42,7 @@ private:
     cTEXTMappings *texts;
     cCharSetConv *conv;
     const char *codeset;
+    const char *imgdir;
     iconv_t cep2ascii;
     iconv_t cutf2ascii;
     const char *epdir;
@@ -58,8 +60,9 @@ private:
     char *RemoveNonASCII(const char *src);
     cXMLTVEvent *PrepareAndReturn(sqlite3 *db, char *sql);
 public:
-    cImport(const char *EPGFile, const char *EPDir, const char *CodeSet, cEPGMappings *Maps, cTEXTMappings *Texts);
+    cImport(cGlobals *Global);
     ~cImport();
+    void LinkPictures(const char *Source, cXMLTVStringList *Pics, tEventID DestID);
     int Process(cEPGSource *Source, cEPGExecutor &myExecutor);
     bool Begin(cEPGSource *Source, sqlite3 *Db);
     bool Commit(cEPGSource *Source, sqlite3 *Db);
@@ -70,7 +73,7 @@ public:
                           const char *Description);
     cXMLTVEvent *SearchXMLTVEvent(sqlite3 **Db, const char *ChannelID, const cEvent *Event);
     cXMLTVEvent *AddXMLTVEvent(cEPGSource *Source, sqlite3 *Db, const char *ChannelID,
-                               const cEvent *Event, const char *EITDescription);
+                               const cEvent *Event, const char *EITDescription, bool UseEPText);
     bool WasChanged(cEvent *Event);
 };
 

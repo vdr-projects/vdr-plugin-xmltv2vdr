@@ -108,23 +108,22 @@ void cEPGExecutor::Action()
 
 // -------------------------------------------------------------
 
-cEPGSource::cEPGSource(const char *Name, const char *ConfDir, const char *EPGFile,
-                       const char *EPDir, const char *CodeSet, cEPGMappings *Maps,
-                       cTEXTMappings *Texts)
+cEPGSource::cEPGSource(const char *Name, cGlobals *Global)
 {
     if (strcmp(Name,EITSOURCE))
     {
         dsyslog("'%s' added epgsource",Name);
     }
     name=strdup(Name);
-    confdir=ConfDir;
-    epgfile=EPGFile;
+    confdir=Global->ConfDir();
+    epgfile=Global->EPGFile();
     pin=NULL;
     Log=NULL;
     loglen=0;
     usepipe=false;
     needpin=false;
     running=false;
+    haspics=usepics=false;
     daysinadvance=1;
     exec_time=10;
     exec_weekday=127; // Mon->Sun
@@ -133,8 +132,8 @@ cEPGSource::cEPGSource(const char *Name, const char *ConfDir, const char *EPGFil
     if (strcmp(Name,EITSOURCE))
     {
         ready2parse=ReadConfig();
-        parse=new cParse(EPGFile,EPDir,this, Maps);
-        import=new cImport(EPGFile,EPDir,CodeSet,Maps,Texts);
+        parse=new cParse(this,Global);
+        import=new cImport(Global);
         dsyslogs(this,"is%sready2parse",(ready2parse && parse) ? " " : " not ");
     }
     else
@@ -265,6 +264,19 @@ bool cEPGSource::ReadConfig()
                         dsyslogs(this,"is needing a pin");
                         needpin=true;
                     }
+
+                    char *pics=strchr(pn,';');
+                    if (pics)
+                    {
+                        *pics=0;
+                        pics++;
+                        pics=compactspace(pics);
+                        if (pics[0]=='1')
+                        {
+                            dsyslogs(this,"is providing pics");
+                            haspics=true;
+                        }
+                    }
                 }
             }
         }
@@ -347,9 +359,11 @@ bool cEPGSource::ReadConfig()
         }
         if (linenr==2)
         {
-            int reserve;
-            sscanf(line,"%2d;%1d;%3d;%10d",&daysinadvance,&reserve,&exec_weekday,&exec_time);
+            int l_usepics=0;
+            sscanf(line,"%2d;%1d;%3d;%10d",&daysinadvance,&l_usepics,&exec_weekday,&exec_time);
+            if (l_usepics==1) usepics=true;
             dsyslogs(this,"daysinadvance=%i",daysinadvance);
+            dsyslogs(this,"using pics=%i",l_usepics);
             dsyslogs(this,"weekdays=%s",*cTimer::PrintDay(0,exec_weekday,true));
             time_t nrt=NextRunTime();
             dsyslogs(this,"nextrun on %s",ctime(&nrt));
@@ -730,7 +744,7 @@ void cEPGSource::Store(void)
     {
         fprintf(w,"#no pin\n");
     }
-    fprintf(w,"%i;%i;%i;%i\n",daysinadvance,0,exec_weekday,exec_time);
+    fprintf(w,"%i;%i;%i;%i\n",daysinadvance,usepics,exec_weekday,exec_time);
     for (int i=0; i<ChannelList()->Count(); i++)
     {
         if (ChannelList()->Get(i)->InUse())
@@ -847,9 +861,7 @@ time_t cEPGSources::NextRunTime()
     return next;
 }
 
-void cEPGSources::ReadIn(const char *ConfDir, const char *EpgFile, const char *EPDir,
-                         const char *CodeSet, cEPGMappings *EPGMappings,
-                         cTEXTMappings *TextMappings, const char *SourceOrder,
+void cEPGSources::ReadIn(cGlobals *Global, const char *SourceOrder,
                          bool Reload)
 {
     if (Reload) Remove();
@@ -880,7 +892,7 @@ void cEPGSources::ReadIn(const char *ConfDir, const char *EpgFile, const char *E
                             id[4]=0;
                             if (!strcmp(id,"file") || !strcmp(id,"pipe"))
                             {
-                                Add(new cEPGSource(dirent->d_name,ConfDir,EpgFile,EPDir,CodeSet,EPGMappings,TextMappings));
+                                Add(new cEPGSource(dirent->d_name,Global));
                             }
                             else
                             {
@@ -906,8 +918,7 @@ void cEPGSources::ReadIn(const char *ConfDir, const char *EpgFile, const char *E
 
     if (!Exists(EITSOURCE))
     {
-        Add(new cEPGSource(EITSOURCE,ConfDir,EpgFile,EPDir,CodeSet,
-                           EPGMappings,TextMappings));
+        Add(new cEPGSource(EITSOURCE,Global));
     }
 
     if (!SourceOrder) return;

@@ -59,7 +59,7 @@ cMenuSetupXmltv2vdr::cMenuSetupXmltv2vdr(cPluginXmltv2vdr *Plugin)
     baseplugin=Plugin;
     baseplugin->SetSetupState(true);
     sourcesBegin=sourcesEnd=mappingBegin=mappingEnd=mappingEntry=0;
-    epall=(int) baseplugin->EPAll();
+    epall=(unsigned int) baseplugin->EPAll();
     wakeup=(int) baseplugin->WakeUp();
     cs=NULL;
     cm=NULL;
@@ -84,7 +84,18 @@ void cMenuSetupXmltv2vdr::Output(void)
     epEntry=0;
     if (baseplugin->EPDir())
     {
-        Add(new cMenuEditBoolItem(tr("add season/episode on all timers"),&epall),true);
+        Add(new cMyMenuEditBitItem(tr("add season/episode on all timers"),
+                                   &epall,EPLIST_USE_SEASON),true);
+        epEntry=Current();
+        if ((epall & EPLIST_USE_SEASON)==EPLIST_USE_SEASON)
+        {
+            Add(new cMyMenuEditBitItem(tr(" add shorttext/title from list"),
+                                       &epall,EPLIST_USE_TEXT),true);
+        }
+        else
+        {
+            epall=0;
+        }
     }
     Add(new cMenuEditBoolItem(tr("automatic wakeup"),&wakeup),true);
 
@@ -208,7 +219,7 @@ void cMenuSetupXmltv2vdr::Store(void)
 
     SetupStore("options.epall",epall);
     SetupStore("options.wakeup",wakeup);
-    baseplugin->SetEPAll((bool) epall);
+    baseplugin->SetEPAll(epall);
     baseplugin->SetWakeUp((bool) wakeup);
 }
 
@@ -432,9 +443,10 @@ cMenuSetupXmltv2vdrTextMap::cMenuSetupXmltv2vdrTextMap(cPluginXmltv2vdr *Plugin)
     Add(NewTitle(tr("season and episode")));
     settval(season);
     settval(episode);
+    settval(episodeoverall);
     Add(new cMenuEditStrItem("season",season,sizeof(season)));
     Add(new cMenuEditStrItem("episode",episode,sizeof(episode)));
-
+    Add(new cMenuEditStrItem("episodeoverall",episodeoverall,sizeof(episodeoverall)));
 }
 
 void cMenuSetupXmltv2vdrTextMap::Store()
@@ -473,6 +485,7 @@ void cMenuSetupXmltv2vdrTextMap::Store()
     savetval(starrating);
     savetval(season);
     savetval(episode);
+    savetval(episodeoverall);
 
     SetupStore("textmap.country",country);
     SetupStore("textmap.year",year);
@@ -498,6 +511,7 @@ void cMenuSetupXmltv2vdrTextMap::Store()
     SetupStore("textmap.starrating",starrating);
     SetupStore("textmap.season",season);
     SetupStore("textmap.episode",episode);
+    SetupStore("textmap.episodeoverall",episodeoverall);
 }
 
 // --------------------------------------------------------------------------------------------------------
@@ -709,6 +723,7 @@ cMenuSetupXmltv2vdrChannelSource::cMenuSetupXmltv2vdrChannelSource(cPluginXmltv2
 
     SetSection(cString::sprintf("%s '%s' : %s",trVDR("Plugin"), baseplugin->Name(), epgsrc->Name()));
 
+    usepics=epgsrc->UsePics();
     weekday=epgsrc->ExecWeekDay();
     start=epgsrc->ExecTime();
     days=epgsrc->DaysInAdvance();
@@ -743,6 +758,10 @@ void cMenuSetupXmltv2vdrChannelSource::output(void)
             pin[sizeof(pin)-1]=0;
         }
         Add(new cMenuEditStrItem(tr("pin"),pin,sizeof(pin)));
+    }
+    if (epgsrc->HasPics())
+    {
+        Add(new cMenuEditBoolItem(tr("download pics"),&usepics));
     }
     Add(NewTitle(tr("channels provided")));
 
@@ -795,6 +814,8 @@ void cMenuSetupXmltv2vdrChannelSource::Store(void)
     epgsrc->ChangeDaysInAdvance(days);
     if (epgsrc->NeedPin())
         epgsrc->ChangePin(pin);
+    if (epgsrc->HasPics())
+      epgsrc->ChangePics(usepics);
     epgsrc->Store();
 }
 
@@ -827,7 +848,7 @@ cMenuSetupXmltv2vdrChannelMap::cMenuSetupXmltv2vdrChannelMap(cPluginXmltv2vdr *P
     SetTitle(title);
 
     flags=map->Flags();
-    c1=c3=cm=0;
+    c1=c2=c3=c4=cm=0;
     SetHelp(NULL,NULL,tr("Button$Reset"),tr("Button$Copy"));
     output();
 }
@@ -900,13 +921,12 @@ void cMenuSetupXmltv2vdrChannelMap::output(void)
     {
         Add(option(tr("short text"),true),true);
         Add(option(tr("long text"),true),true);
-        Add(option(tr(" merge long texts"),false),true);
     }
     Add(new cMyMenuEditBitItem(tr("country and date"),&flags,USE_COUNTRYDATE),true);
     Add(new cMyMenuEditBitItem(tr("original title"),&flags,USE_ORIGTITLE),true);
     Add(new cMyMenuEditBitItem(tr("category"),&flags,USE_CATEGORIES),true);
     Add(new cMyMenuEditBitItem(tr("credits"),&flags,USE_CREDITS),true);
-    c3=Current();
+    c2=Current();
     if ((flags & USE_CREDITS)==USE_CREDITS)
     {
         Add(new cMyMenuEditBitItem(tr(" actors"),&flags,CREDITS_ACTORS),true);
@@ -917,7 +937,11 @@ void cMenuSetupXmltv2vdrChannelMap::output(void)
 
     Add(new cMyMenuEditBitItem(tr("rating"),&flags,USE_RATING),true);
 #if VDRVERSNUM >= 10711 || EPGHANDLER
-    Add(new cMyMenuEditBitItem(tr(" rating in description"),&flags,OPT_RATING_TEXT),true);
+    c3=Current();
+    if ((flags & USE_RATING)==USE_RATING)
+    {
+        Add(new cMyMenuEditBitItem(tr(" rating in description"),&flags,OPT_RATING_TEXT),true);
+    }
 #endif
     Add(new cMyMenuEditBitItem(tr("starrating"),&flags,USE_STARRATING),true);
     Add(new cMyMenuEditBitItem(tr("review"),&flags,USE_REVIEW),true);
@@ -927,6 +951,11 @@ void cMenuSetupXmltv2vdrChannelMap::output(void)
     if (baseplugin->EPDir())
     {
         Add(new cMyMenuEditBitItem(tr("season and episode"),&flags,USE_SEASON),true);
+        c4=Current();
+        if ((flags & USE_SEASON)==USE_SEASON)
+        {
+            Add(new cMyMenuEditBitItem(tr(" add shorttext from list"),&flags,OPT_SEASON_SHORTTEXT),true);
+        }
     }
 
     hasmaps=false;
@@ -979,7 +1008,7 @@ eOSState cMenuSetupXmltv2vdrChannelMap::ProcessKey(eKeys Key)
         case kLeft|k_Repeat:
         case kRight:
         case kRight|k_Repeat:
-            if ((Current()==c1) || (Current()==c3)) output();
+            if ((Current()==c1) || (Current()==c2) || (Current()==c3) || (Current()==c4)) output();
             break;
         case kDown:
         case kDown|k_Repeat:

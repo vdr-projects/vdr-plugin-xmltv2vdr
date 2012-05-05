@@ -275,18 +275,77 @@ bool cImport::WasChanged(cEvent* Event)
     return true;
 }
 
+void cImport::LinkPictures(const char *Source, cXMLTVStringList *Pics, tEventID DestID)
+{
+    // source-pics are located in /var/lib/epgsources/%SOURCE%-img/
+    // dest-pics are located in /var/cache/vdr/epgimages
+
+    for (int i=0; i<Pics->Size(); i++)
+    {
+        char *pic=(*Pics)[i];
+        char *src;
+        if (asprintf(&src,"/var/lib/epgsources/%s-img/%s",Source,pic)==-1) return;
+
+        char *ext=strrchr(pic,'.');
+        if (ext)
+        {
+            ext++;
+            char *dst;
+            int ret;
+            if (!i)
+            {
+                ret=asprintf(&dst,"%s/%i.%s",imgdir,DestID,ext);
+            }
+            else
+            {
+                ret=asprintf(&dst,"%s/%i_%i.%s",imgdir,DestID,i,ext);
+            }
+            if (ret==-1)
+            {
+                free(src);
+                return;
+            }
+            struct stat statbuf;
+            if (stat(dst,&statbuf)==-1)
+            {
+                if (symlink(src,dst)==-1)
+                {
+                    if (!i)
+                    {
+                        tsyslog("failed to link %s to %i.%s",pic,DestID,ext);
+                    }
+                    else
+                    {
+                        tsyslog("failed to link %s to %i_%i.%s",pic,DestID,i,ext);
+                    }
+                }
+                else
+                {
+                    if (!i)
+                    {
+                        tsyslog("linked %s to %i.%s",pic,DestID,ext);
+                    }
+                    else
+                    {
+                        tsyslog("linked %s to %i_%i.%s",pic,DestID,i,ext);
+                    }
+                }
+            }
+        }
+    }
+}
+
 bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
                        cEvent *Event, cXMLTVEvent *xEvent,int Flags)
 {
     if (!Source) return false;
     if (!Db) return false;
-    if (!Schedule) return false;
     if (!xEvent) return false;
 
 #define CHANGED_NOTHING     0
-#define CHANGED_SHORTTEXT   1
-#define CHANGED_DESCRIPTION 2
-#define CHANGED_ALL         3
+#define CHANGED_TITLE       1
+#define CHANGED_SHORTTEXT   2
+#define CHANGED_DESCRIPTION 4
 
     struct tm tm;
     char from[80];
@@ -301,6 +360,7 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
 
     if (append && !Event)
     {
+        if (!Schedule) return false;
         start=xEvent->StartTime();
         end=start+xEvent->Duration();
 
@@ -431,9 +491,26 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
         if (WasChanged(Event)) eitdescription=NULL; // we cannot use Event->Description() - it is already changed!
         if (!xEvent->EITEventID() || eitdescription)
         {
+            if (!xEvent->EITEventID() && xEvent->Pics()->Size() && Source->UsePics())
+            {
+                /* here's a good place to link pictures! */
+                LinkPictures(xEvent->Source(),xEvent->Pics(),Event->EventID());
+            }
             UpdateXMLTVEvent(Source,Db,Event,xEvent,eitdescription);
         }
-        if (!eitdescription && !xEvent->EITDescription()) return false;
+    }
+
+    if ((Flags & USE_TITLE)==USE_TITLE)
+    {
+        if (xEvent->Title() && (strlen(xEvent->Title())>0))
+        {
+            const char *dp=conv->Convert(xEvent->Title());
+            if (!Event->Title() || strcmp(Event->Title(),dp))
+            {
+                Event->SetTitle(dp);
+                changed|=CHANGED_TITLE; // title really changed
+            }
+        }
     }
 
     if (((Flags & USE_SHORTTEXT)==USE_SHORTTEXT) || (append))
@@ -657,6 +734,12 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
             cTEXTMapping *text=texts->GetMap("episode");
             if (text) description=Add2Description(description,text->Value(),xEvent->Episode());
         }
+
+        if (xEvent->EpisodeOverall())
+        {
+            cTEXTMapping *text=texts->GetMap("episodeoverall");
+            if (text) description=Add2Description(description,text->Value(),xEvent->EpisodeOverall());
+        }
     }
 
     if (((Flags & USE_RATING)==USE_RATING) && (xEvent->Rating()->Size()))
@@ -769,7 +852,7 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
     if (!append && changed)
     {
 
-        if ((changed==CHANGED_SHORTTEXT) && (WasChanged(Event)==false))
+        if (((changed & CHANGED_SHORTTEXT)==CHANGED_SHORTTEXT) && (WasChanged(Event)==false))
         {
             if (Event->Description()) description=strdup(Event->Description());
             if (description)
@@ -789,21 +872,17 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
             strftime(from,sizeof(from)-1,"%b %d %H:%M",&tm);
             localtime_r(&end,&tm);
             strftime(till,sizeof(till)-1,"%b %d %H:%M",&tm);
-            switch (changed)
-            {
-            case CHANGED_SHORTTEXT:
-                tsyslogs(Source,"{%i} changing stext (%s) of '%s'@%s-%s",Event->EventID(),
-                         Event->ShortText(),Event->Title(),from,till);
-                break;
-            case CHANGED_DESCRIPTION:
-                tsyslogs(Source,"{%i} changing descr of '%s'@%s-%s",Event->EventID(),
-                         Event->Title(),from,till);
-                break;
-            case CHANGED_ALL:
-                tsyslogs(Source,"{%i} changing stext (%s)+descr of '%s'@%s-%s",Event->EventID(),
-                         Event->ShortText(),Event->Title(),from,till);
-                break;
-            }
+
+            char buf[256]="";
+            if ((changed & CHANGED_TITLE)==CHANGED_TITLE) strcat(buf,"title,");
+            if ((changed & CHANGED_SHORTTEXT)==CHANGED_SHORTTEXT) strcat(buf,"stext,");
+            if ((changed & CHANGED_DESCRIPTION)==CHANGED_DESCRIPTION) strcat(buf,"descr,");
+            int len=strlen(buf);
+            if (len>0) buf[len-1]=0;
+
+            tsyslogs(Source,"{%i} changing %s of '%s'/'%s'@%s-%s",Event->EventID(),
+                     buf,Event->Title(),Event->ShortText() ? Event->ShortText() : "",
+                     from,till);
         }
         retcode=true;
     }
@@ -878,15 +957,18 @@ bool cImport::FetchXMLTVEvent(sqlite3_stmt *stmt, cXMLTVEvent *xevent)
             xevent->SetEpisode(sqlite3_column_int(stmt,col));
             break;
         case 19:
-            if (sqlite3_column_int(stmt,col)==1) xevent->SetPicExists();
+            xevent->SetEpisodeOverall(sqlite3_column_int(stmt,col));
             break;
-        case 20: // source
+        case 20:
+            xevent->SetPics((const char *) sqlite3_column_text(stmt,col));
+            break;
+        case 21: // source
             xevent->SetSource((const char *) sqlite3_column_text(stmt,col));
             break;
-        case 21: // eiteventid
+        case 22: // eiteventid
             xevent->SetEITEventID(sqlite3_column_int(stmt,col));
             break;
-        case 22: // eitdescription
+        case 23: // eitdescription
             xevent->SetEITDescription((const char *) sqlite3_column_text(stmt,col));
             break;
         }
@@ -920,18 +1002,20 @@ cXMLTVEvent *cImport::PrepareAndReturn(sqlite3 *db, char *sql)
 }
 
 cXMLTVEvent *cImport::AddXMLTVEvent(cEPGSource *Source,sqlite3 *Db, const char *ChannelID, const cEvent *Event,
-                                    const char *EITDescription)
+                                    const char *EITDescription, bool UseEPText)
 {
     if (!Db) return NULL;
     if (!Source) return NULL;
     if (!ChannelID) return NULL;
     if (!Event) return NULL;
-    if (!EITDescription) return NULL;
     if (!epdir) return NULL;
 
-    int season,episode;
+    int season,episode,episodeoverall;
+    char *epshorttext=NULL,*eptitle=NULL;
     if (!cParse::FetchSeasonEpisode(cep2ascii,cutf2ascii,epdir,Event->Title(),
-                                    Event->ShortText(),season,episode))
+                                    Event->ShortText(),Event->Description(),
+                                    season,episode,episodeoverall,&epshorttext,
+                                    &eptitle))
     {
 #ifdef VDRDEBUG
         tsyslogs(Source,"no season/episode found for '%s'/'%s'",Event->Title(),Event->ShortText());
@@ -943,19 +1027,34 @@ cXMLTVEvent *cImport::AddXMLTVEvent(cEPGSource *Source,sqlite3 *Db, const char *
     if (!xevent)
     {
         esyslogs(Source,"out of memory");
+        free(epshorttext);
+        free(eptitle);
         return NULL;
     }
 
-    xevent->SetTitle(Event->Title());
+    if (UseEPText)
+    {
+        if (eptitle) xevent->SetTitle(eptitle);
+        if (epshorttext) xevent->SetShortText(epshorttext);
+    }
+    else
+    {
+        xevent->SetTitle(Event->Title());
+        xevent->SetShortText(Event->ShortText());
+    }
     xevent->SetStartTime(Event->StartTime());
     xevent->SetDuration(Event->Duration());
-    xevent->SetShortText(Event->ShortText());
     xevent->SetEventID(Event->EventID());
     xevent->SetEITEventID(Event->EventID());
-    xevent->SetDescription(EITDescription);
-    xevent->SetEITDescription(EITDescription);
+    if (EITDescription)
+    {
+        xevent->SetDescription(EITDescription);
+        xevent->SetEITDescription(EITDescription);
+    }
     xevent->SetSeason(season);
     xevent->SetEpisode(episode);
+    xevent->SetEpisodeOverall(episodeoverall);
+    free(epshorttext);
 
     if (!Begin(Source,Db))
     {
@@ -963,7 +1062,7 @@ cXMLTVEvent *cImport::AddXMLTVEvent(cEPGSource *Source,sqlite3 *Db, const char *
         return NULL;
     }
 
-    const char *sql=xevent->GetSQL(Source->Name(),Source->Index(),ChannelID);
+    const char *sql=xevent->GetSQL(Source->Name(),99,ChannelID);
     char *errmsg;
     if (sqlite3_exec(Db,sql,NULL,NULL,&errmsg)!=SQLITE_OK)
     {
@@ -971,6 +1070,10 @@ cXMLTVEvent *cImport::AddXMLTVEvent(cEPGSource *Source,sqlite3 *Db, const char *
         sqlite3_free(errmsg);
         delete xevent;
         xevent=NULL;
+    }
+    else
+    {
+        tsyslogs(Source,"{%i} adding '%s'/'%s' to db",xevent->EventID(),xevent->Title(),xevent->ShortText());
     }
     return xevent;
 }
@@ -1089,8 +1192,8 @@ cXMLTVEvent *cImport::SearchXMLTVEvent(sqlite3 **Db,const char *ChannelID, const
     char *sql=NULL;
 
     if (asprintf(&sql,"select channelid,eventid,starttime,duration,title,origtitle,shorttext,description," \
-                 "country,year,credits,category,review,rating,starrating,video,audio,season,episode," \
-                 "picexists,src,eiteventid,eitdescription from epg where eiteventid=%li and channelid='%s' " \
+                 "country,year,credits,category,review,rating,starrating,video,audio,season,episode,episodeoverall," \
+                 "pics,src,eiteventid,eitdescription from epg where eiteventid=%li and channelid='%s' " \
                  "order by srcidx asc limit 1;",(long int) Event->EventID(),ChannelID)==-1)
     {
         esyslog("out of memory");
@@ -1127,7 +1230,7 @@ cXMLTVEvent *cImport::SearchXMLTVEvent(sqlite3 **Db,const char *ChannelID, const
 
     if (asprintf(&sql,"select channelid,eventid,starttime,duration,title,origtitle,shorttext,description," \
                  "country,year,credits,category,review,rating,starrating,video,audio,season,episode," \
-                 "picexists,src,eiteventid,eitdescription,abs(starttime-%li) as diff from epg where " \
+                 "episodeoverall,pics,src,eiteventid,eitdescription,abs(starttime-%li) as diff from epg where " \
                  " (starttime>=%li and starttime<=%li) and title='%s' and channelid='%s' " \
                  " order by diff,srcidx asc limit 1;",Event->StartTime(),Event->StartTime()-eventTimeDiff,
                  Event->StartTime()+eventTimeDiff,sqltitle,ChannelID)==-1)
@@ -1228,8 +1331,8 @@ int cImport::Process(cEPGSource *Source, cEPGExecutor &myExecutor)
 
     char *sql;
     if (asprintf(&sql,"select channelid,eventid,starttime,duration,title,origtitle,shorttext,description," \
-                 "country,year,credits,category,review,rating,starrating,video,audio,season,episode," \
-                 "picexists,src,eiteventid,eitdescription from epg where (starttime > %li or " \
+                 "country,year,credits,category,review,rating,starrating,video,audio,season,episode,episodeoverall," \
+                 "pics,src,eiteventid,eitdescription from epg where (starttime > %li or " \
                  " (starttime + duration) > %li) and (starttime + duration) < %li "\
                  " and src='%s';",begin,begin,end,Source->Name())==-1)
     {
@@ -1321,11 +1424,25 @@ int cImport::Process(cEPGSource *Source, cEPGExecutor &myExecutor)
     {
         if (cnt)
         {
-            dsyslogs(Source,"processed %i vdr events",cnt);
+            if (!lerr)
+            {
+                isyslogs(Source,"processed %i vdr events",cnt);
+            }
+            else
+            {
+                isyslogs(Source,"processed %i vdr events - see ERRORs above!",cnt);
+            }
         }
         else
         {
-            dsyslogs(Source,"processed no vdr events - all up to date?");
+            if (!lerr)
+            {
+                isyslogs(Source,"processed no vdr events - all up to date?");
+            }
+            else
+            {
+                isyslogs(Source,"processed no vdr events - see ERRORs above!");
+            }
         }
     }
 
@@ -1344,34 +1461,24 @@ bool cImport::DBExists()
     return true;
 }
 
-
-cImport::cImport(const char *EPGFile, const char *EPDir, const char *CodeSet, cEPGMappings* Maps, cTEXTMappings *Texts)
+cImport::cImport(cGlobals *Global)
 {
-    maps=Maps;
-    texts=Texts;
-    pendingtransaction=false;
-    epgfile=EPGFile;
-    codeset=CodeSet;
+    maps=Global->EPGMappings();
+    texts=Global->TEXTMappings();
+    epgfile=Global->EPGFile();
+    codeset=Global->Codeset();
+    imgdir=Global->ImgDir();
+    pendingtransaction=false;    
     conv = new cCharSetConv("UTF-8",codeset);
 
-    if (EPDir)
+    epdir=Global->EPDir();
+    if (epdir)
     {
-        epdir=strdup(EPDir);
-        if (!epdir) return;
-        char *charset=strchr((char *) epdir,',');
-        if (charset)
-        {
-            *charset=0;
-        }
-        else
-        {
-            charset=(char *) "UTF-8";
-        }
-        cep2ascii=iconv_open(charset,"US-ASCII//TRANSLIT");
-        cutf2ascii=iconv_open("UTF-8","US-ASCII//TRANSLIT");
+        cep2ascii=iconv_open("ASCII//TRANSLIT",Global->EPCodeset());
+        cutf2ascii=iconv_open("ASCII//TRANSLIT","UTF-8");
     }
     else
-     {
+    {
         epdir=NULL;
     }
 }
@@ -1380,7 +1487,6 @@ cImport::~cImport()
 {
     if (epdir)
     {
-        free((void *) epdir);
         iconv_close(cep2ascii);
         iconv_close(cutf2ascii);
     }

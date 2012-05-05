@@ -42,12 +42,12 @@ private:
     char *sql;
     char *channelid;
     char *source;
-    bool picexists;
     int year;
     time_t starttime;
     int duration;
     int season;
     int episode;
+    int episodeoverall;
     tEventID eventid;
     tEventID eiteventid;
     cXMLTVStringList video;
@@ -56,6 +56,7 @@ private:
     cXMLTVStringList review;
     cXMLTVStringList rating;
     cXMLTVStringList starrating;
+    cXMLTVStringList pics;
     int parentalRating;
     uchar contents[MaxEventContents];
 public:
@@ -77,12 +78,14 @@ public:
     void AddReview(const char *Review);
     void AddRating(const char *System, const char *Rating);
     void AddStarRating(const char *System, const char *Rating);
+    void AddPics(const char *Pic);
     void SetCredits(const char *Credits);
     void SetCategory(const char *Category);
     void SetReview(const char *Review);
     void SetRating(const char *Rating);
     void SetStarRating(const char *StarRating);
     void SetVideo(const char *Video);
+    void SetPics(const char *Pics);
     const char *GetSQL(const char *Source, int SrcIdx, const char *ChannelID);
     cXMLTVStringList *Credits()
     {
@@ -108,6 +111,10 @@ public:
     {
         return &video;
     }
+    cXMLTVStringList *Pics()
+    {
+        return &pics;
+    }
     void SetSeason(int Season)
     {
         season=Season;
@@ -115,6 +122,10 @@ public:
     void SetEpisode(int Episode)
     {
         episode=Episode;
+    }
+    void SetEpisodeOverall(int EpisodeOverall)
+    {
+        episodeoverall=EpisodeOverall;
     }
     void SetYear(int Year)
     {
@@ -135,10 +146,6 @@ public:
     void SetEITEventID(tEventID EventID)
     {
         eiteventid=EventID;
-    }
-    void SetPicExists(void)
-    {
-        picexists=true;
     }
     int ParentalRating() const
     {
@@ -212,9 +219,9 @@ public:
     {
         return episode;
     }
-    bool PicExists(void)
+    int EpisodeOverall(void)
     {
-        return picexists;
+        return episodeoverall;
     }
 };
 

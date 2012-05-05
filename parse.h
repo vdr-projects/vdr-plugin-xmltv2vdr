@@ -17,6 +17,8 @@
 
 class cEPGExecutor;
 class cEPGSource;
+class cEPGMappings;
+class cGlobals;
 
 class cParse
 {
@@ -25,7 +27,9 @@ class cParse
         PARSE_NOERROR=0,
         PARSE_XMLTVERR,
         PARSE_NOMAPPING,
-        PARSE_NOCHANNELID
+        PARSE_NOCHANNELID,
+        PARSE_FETCHERR,
+        PARSE_SQLERR
     };
 
 private:
@@ -37,15 +41,16 @@ private:
     cEPGMappings *maps;
     cXMLTVEvent xevent;
     time_t ConvertXMLTVTime2UnixTime(char *xmltvtime);
-    bool FetchEvent(xmlNodePtr node);
+    bool FetchEvent(xmlNodePtr node, bool useeptext);
 public:
-    cParse(const char *EPGFile, const char *EPDir, cEPGSource *Source, cEPGMappings *Maps);
+    cParse(cEPGSource *Source, cGlobals *Global);
     ~cParse();
     int Process(cEPGExecutor &myExecutor, char *buffer, int bufsize);
     static void RemoveNonAlphaNumeric(char *String);
     static bool FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const char *EPDir,
-                                   const char *Title, const char *ShortText, int &Season,
-                                   int &Episode);
+                                   const char *Title, const char *ShortText, const char *Description,
+                                   int &Season, int &Episode, int &EpisodeOverall, char **EPShortText,
+                                   char **EPTitle);
     static void InitLibXML();
     static void CleanupLibXML();
 };

@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: vdr\n"
 "Report-Msgid-Bugs-To: <see README>\n"
-"POT-Creation-Date: 2012-04-14 18:03+0200\n"
+"POT-Creation-Date: 2012-05-04 18:58+0200\n"
 "PO-Revision-Date: 2010-12-23 23:59+0100\n"
 "Last-Translator: Jochen Dolze <vdr@dolze.de>\n"
 "Language-Team: <vdr@linuxtv.org>\n"
@@ -18,6 +18,9 @@ msgstr "Optionen"
 
 msgid "add season/episode on all timers"
 msgstr "Staffel/Episode an alle Timer anhängen"
+
+msgid " add shorttext/title from list"
+msgstr " Kurztext/Titel von Liste übernehmen"
 
 msgid "automatic wakeup"
 msgstr "automatisch Aufwachen"
@@ -118,6 +121,9 @@ msgstr "Anzahl Tage"
 msgid "pin"
 msgstr "Pin"
 
+msgid "download pics"
+msgstr ""
+
 msgid "channels provided"
 msgstr "Verfügbare Kanäle"
 
@@ -148,9 +154,6 @@ msgstr "Kurztext"
 msgid "long text"
 msgstr "Langtext"
 
-msgid " merge long texts"
-msgstr " Langtexte zusammenführen"
-
 msgid " actors"
 msgstr " Darsteller"
 
@@ -180,6 +183,9 @@ msgstr "Video"
 
 msgid "audio"
 msgstr "Audio"
+
+msgid " add shorttext from list"
+msgstr " Kurztext von Liste übernehmen"
 
 msgid "epg source channel mappings"
 msgstr "EPG Quellkanalzuordnungen"
@@ -259,9 +265,11 @@ msgstr "Staffel"
 msgid "episode"
 msgstr "Episode"
 
+msgid "episodeoverall"
+msgstr "Folge"
+
 msgid "xmltv2vdr plugin still working"
 msgstr "xmltv2vdr plugin ist noch aktiv"
 
 msgid "Imports xmltv epg into vdr"
 msgstr "Importiert xmltv epg in den VDR"
-

@@ -13,6 +13,7 @@
 #include <locale.h>
 #include <langinfo.h>
 #include <sqlite3.h>
+#include <time.h>
 #include <sys/types.h>
 #include <pwd.h>
 
@@ -126,14 +127,116 @@ void logger(cEPGSource *source, char logtype, const char* format, ...)
 
 // -------------------------------------------------------------
 
-cEPGHandler::cEPGHandler(const char *EpgFile, const char *EPDir, const char *CodeSet, cEPGSources *Sources,
-                         cEPGMappings *Maps, cTEXTMappings *Texts) : import(EpgFile,EPDir,CodeSet,Maps,Texts)
+cGlobals::cGlobals()
 {
-    epall=false;
-    maps=Maps;
-    sources=Sources;
+    confdir=NULL;
+    epgfile=NULL;
+    epdir=NULL;
+    epcodeset=NULL;
+    imgdir=NULL;
+    codeset=NULL;
+
+    if (asprintf(&epgfile,"%s/epg.db",VideoDirectory)==-1) {};
+    if (asprintf(&imgdir,"%s","/var/cache/vdr/epgimages")==-1) {};
+    if (access(imgdir,R_OK|W_OK)==-1)
+    {
+        free(imgdir);
+        imgdir=NULL;
+    }
+
+    if (setlocale(LC_CTYPE,""))
+        codeset=strdup(nl_langinfo(CODESET));
+    else
+    {
+        char *LangEnv=getenv("LANG");
+        if (LangEnv)
+        {
+            codeset=strdup(strchr(LangEnv,'.'));
+            if (codeset)
+                codeset++; // skip dot
+        }
+    }
+    if (!codeset)
+    {
+        codeset=strdup("ASCII//TRANSLIT");
+    }
+
+    struct passwd pwd,*pwdbuf;
+    char buf[1024];
+    getpwuid_r(getuid(),&pwd,buf,sizeof(buf),&pwdbuf);
+    if (pwdbuf)
+    {
+        if (asprintf(&epdir,"%s/.eplists/lists",pwdbuf->pw_dir)!=-1)
+        {
+            if (access(epdir,R_OK))
+            {
+                free(epdir);
+                epdir=NULL;
+            }
+            else
+            {
+                epcodeset=codeset;
+            }
+        }
+    }
+}
+
+cGlobals::~cGlobals()
+{
+    free(confdir);
+    free(epgfile);
+    free(epdir);
+    free(imgdir);
+    free(codeset);
+    epgsources.Remove();
+    epgmappings.Remove();
+    textmappings.Remove();
+}
+
+void cGlobals::SetImgDir(const char* ImgDir)
+{
+    if (!ImgDir) return;
+    if (access(ImgDir,R_OK|W_OK)==-1)
+    {
+        esyslog("cannot access %s",ImgDir);
+        return;
+    }
+    free(imgdir);
+    imgdir=strdup(ImgDir);
+}
+
+
+void cGlobals::SetEPDir(const char* EPDir)
+{
+    if (!EPDir) return;
+    if (access(EPDir,R_OK)==-1)
+    {
+        esyslog("cannot access %s",EPDir);
+        return;
+    }
+    free(epdir);
+    epdir=strdup(EPDir);
+    if (!epdir) return;
+    epcodeset=strchr((char *) epdir,',');
+    if (epcodeset)
+    {
+        *epcodeset=0;
+    }
+    else
+    {
+        epcodeset=(char *) codeset;
+    }
+}
+
+// -------------------------------------------------------------
+
+cEPGHandler::cEPGHandler(cGlobals* Global): import(Global)
+{
+    epall=0;
+    maps=Global->EPGMappings();
+    sources=Global->EPGSources();
     db=NULL;
-    now=time(NULL);
+    now=0;
 }
 
 bool cEPGHandler::IgnoreChannel(const cChannel* Channel)
@@ -165,6 +268,25 @@ bool cEPGHandler::check4proc(cEvent *event, bool &spth, cEPGMapping **map)
     return true;
 }
 
+bool cEPGHandler::SetTitle(cEvent* Event, const char* UNUSED(Title))
+{
+    if (!Event->Title()) return false; // no title? new event! let VDR handle this..
+    bool seth;
+    if (!check4proc(Event,seth,NULL)) return false;
+
+    if (import.WasChanged(Event))
+    {
+#ifdef VDRDEBUG
+        // ok we already changed this event!
+        tsyslog("{%i} %salready seen title '%s'",Event->EventID(),seth ? "*" : "",
+                Event->Title());
+#endif
+        return true;
+    }
+    return false;
+}
+
+
 bool cEPGHandler::SetShortText(cEvent* Event, const char* ShortText)
 {
     bool seth;
@@ -172,8 +294,8 @@ bool cEPGHandler::SetShortText(cEvent* Event, const char* ShortText)
 
     if (import.WasChanged(Event))
     {
-        // ok we already changed this event!
 #ifdef VDRDEBUG
+        // ok we already changed this event!
         tsyslog("{%i} %salready seen stext '%s'",Event->EventID(),seth ? "*" : "",
                 Event->Title());
 #endif
@@ -200,6 +322,7 @@ bool cEPGHandler::SetDescription(cEvent* Event, const char* Description)
         // ok we already changed this event!
         if (!Description) return true; // prevent setting nothing to description
         int len=strlen(Description);
+        if (!len) return true; // prevent setting nothing to description
         if (strncasecmp(Event->Description(),Description,len))
         {
             // eit description changed -> set it
@@ -235,7 +358,7 @@ bool cEPGHandler::HandleEvent(cEvent* Event)
     }
     else
     {
-        // map is always set if seth is not set
+        // map is always set if seth==false
         Flags=map->Flags();
     }
 
@@ -255,7 +378,9 @@ bool cEPGHandler::HandleEvent(cEvent* Event)
         }
         source=sources->GetSource(EITSOURCE);
         if (!source) tsyslog("no source for %s",EITSOURCE);
-        xevent=import.AddXMLTVEvent(source,db,ChannelID,Event,Event->Description());
+        bool useeptext=((epall & EPLIST_USE_TEXT)==EPLIST_USE_TEXT);
+        if (useeptext) Flags|=(USE_SHORTTEXT|USE_TITLE);
+        xevent=import.AddXMLTVEvent(source,db,ChannelID,Event,Event->Description(),useeptext);
         if (!xevent)
         {
             free((void*)ChannelID);
@@ -274,7 +399,7 @@ bool cEPGHandler::HandleEvent(cEvent* Event)
         return false;
     }
 
-    import.PutEvent(source,db,(cSchedule *) Event->Schedule(),Event,xevent,Flags);
+    import.PutEvent(source,db,NULL,Event,xevent,Flags);
     delete xevent;
     return false; // let other handlers change this event
 }
@@ -290,14 +415,14 @@ bool cEPGHandler::SortSchedule(cSchedule* UNUSED(Schedule))
     return false; // we dont sort!
 }
 
-
 // -------------------------------------------------------------
 
-cEPGTimer::cEPGTimer(const char *EpgFile, const char *EPDir, const char *CodeSet, cEPGSources *Sources, cEPGMappings *Maps,
-                     cTEXTMappings *Texts) : cThread("xmltv2vdr timer"),import(EpgFile,EPDir,CodeSet,Maps,Texts)
+cEPGTimer::cEPGTimer(cGlobals *Global) :
+        cThread("xmltv2vdr timer"),import(Global)
 {
-    sources=Sources;
-    maps=Maps;
+    sources=Global->EPGSources();
+    maps=Global->EPGMappings();
+    epall=0;
 }
 
 void cEPGTimer::Action()
@@ -318,22 +443,27 @@ void cEPGTimer::Action()
 
     sqlite3 *db=NULL;
     cEPGSource *source=sources->GetSource(EITSOURCE);
+    bool useeptext=((epall & EPLIST_USE_TEXT)==EPLIST_USE_TEXT);
+    int Flags=USE_SEASON;
+    if (useeptext) Flags|=(USE_SHORTTEXT|USE_TITLE);
+    bool changed=false;
     for (cTimer *Timer = Timers.First(); Timer; Timer = Timers.Next(Timer))
     {
+        if (Timer->Recording()) continue; // to late ;)
         cEvent *event=(cEvent *) Timer->Event();
         if (!event) continue;
-        if (!event->ShortText()) continue; // no short text -> no episode
-        if (!strlen(event->ShortText())) continue; // empty short text -> no episode
+        if (!event->ShortText() && !event->Description()) continue; // no text -> no episode
+        if (event->ShortText() && event->Description())
+        {
+            if ((strlen(event->ShortText())+strlen(event->Description()))==0) continue; // no text -> no episode
+        }
         if (maps->ProcessChannel(event->ChannelID())) continue; // already processed by xmltv2vdr
 
-        cChannel *chan=Channels.GetByChannelID(event->ChannelID());
-        if (!chan) continue;
         const char *ChannelID=strdup(*event->ChannelID().ToString());
-
         cXMLTVEvent *xevent=import.SearchXMLTVEvent(&db,ChannelID,event);
         if (!xevent)
         {
-            xevent=import.AddXMLTVEvent(source,db,ChannelID,event,event->Description());
+            xevent=import.AddXMLTVEvent(source,db,ChannelID,event,event->Description(),useeptext);
             if (!xevent)
             {
                 free((void*)ChannelID);
@@ -342,11 +472,7 @@ void cEPGTimer::Action()
         }
         free((void*)ChannelID);
 
-        cSchedule* schedule = (cSchedule *) schedules->GetSchedule(chan,false);
-        if (schedule)
-        {
-            import.PutEvent(source,db,schedule,event,xevent,USE_SEASON);
-        }
+        if (import.PutEvent(source,db,NULL,event,xevent,Flags)) changed=true;
         delete xevent;
     }
     if (db)
@@ -355,14 +481,14 @@ void cEPGTimer::Action()
         sqlite3_close(db);
     }
     Timers.DecBeingEdited();
-    cSchedules::Cleanup(true);
+    if (changed) cSchedules::Cleanup(true);
 }
 
 // -------------------------------------------------------------
 
-cHouseKeeping::cHouseKeeping(const char *EPGFile): cThread("xmltv2vdr housekeeping")
+cHouseKeeping::cHouseKeeping(cGlobals *Global): cThread("xmltv2vdr housekeeping")
 {
-    epgfile=EPGFile;
+    epgfile=Global->EPGFile();
 }
 
 void cHouseKeeping::Action()
@@ -400,26 +526,33 @@ void cHouseKeeping::Action()
 
 // -------------------------------------------------------------
 
-cPluginXmltv2vdr::cPluginXmltv2vdr(void) : epgexecutor(&epgsources)
+cEPGSeasonEpisode::cEPGSeasonEpisode(cGlobals *Global): cThread("xmltv2vdr seasonepisode")
+{
+    epgfile=Global->EPGFile();
+}
+
+void cEPGSeasonEpisode::Action()
+{
+    // TODO: update season, episode, episodeoverall fields in db
+}
+
+// -------------------------------------------------------------
+
+cPluginXmltv2vdr::cPluginXmltv2vdr(void) : housekeeping(&g),epgexecutor(g.EPGSources())
 {
     // Initialize any member variables here.
     // DON'T DO ANYTHING ELSE THAT MAY HAVE SIDE EFFECTS, REQUIRE GLOBAL
     // VDR OBJECTS TO EXIST OR PRODUCE ANY OUTPUT!
-    confdir=NULL;
-    epgfile=NULL;
     logfile=NULL;
     srcorder=NULL;
     epghandler=NULL;
     epgtimer=NULL;
-    epdir=NULL;
-    housekeeping=NULL;
-    codeset=NULL;
-    last_housetime_t=0;
+    epgseasonepisode=NULL;
     last_maintime_t=0;
-    last_epcheck_t=0;
+    last_timer_t=last_epcheck_t=last_housetime_t=time(NULL); // start this threads later!
     wakeup=0;
     insetup=false;
-    SetEPAll(false);
+    SetEPAll(0);
     TEXTMappingAdd(new cTEXTMapping("country",tr("country")));
     TEXTMappingAdd(new cTEXTMapping("year",tr("year")));
     TEXTMappingAdd(new cTEXTMapping("originaltitle",tr("originaltitle")));
@@ -444,6 +577,7 @@ cPluginXmltv2vdr::cPluginXmltv2vdr(void) : epgexecutor(&epgsources)
     TEXTMappingAdd(new cTEXTMapping("starrating",tr("starrating")));
     TEXTMappingAdd(new cTEXTMapping("season",tr("season")));
     TEXTMappingAdd(new cTEXTMapping("episode",tr("episode")));
+    TEXTMappingAdd(new cTEXTMapping("episodeoverall",tr("episodeoverall")));
 }
 
 cPluginXmltv2vdr::~cPluginXmltv2vdr()
@@ -457,15 +591,15 @@ cPluginXmltv2vdr::~cPluginXmltv2vdr()
 int cPluginXmltv2vdr::GetLastImportSource()
 {
     sqlite3 *db=NULL;
-    if (sqlite3_open_v2(epgfile,&db,SQLITE_OPEN_READWRITE,NULL)!=SQLITE_OK) return -1;
+    if (sqlite3_open_v2(g.EPGFile(),&db,SQLITE_OPEN_READWRITE,NULL)!=SQLITE_OK) return -1;
 
     char sql[]="select srcidx from epg where srcidx<>99 order by starttime desc limit 1";
     sqlite3_stmt *stmt;
-    
+
     int ret=sqlite3_prepare_v2(db,sql,strlen(sql),&stmt,NULL);
     if (ret!=SQLITE_OK)
     {
-        esyslog("%i %s (glis)",ret,sqlite3_errmsg(db));      
+        esyslog("%i %s (glis)",ret,sqlite3_errmsg(db));
         sqlite3_close(db);
         return -1;
     }
@@ -481,14 +615,12 @@ int cPluginXmltv2vdr::GetLastImportSource()
     return idx;
 }
 
-
-
 bool cPluginXmltv2vdr::EPGSourceMove(int From, int To)
 {
     if (From==To) return false;
 
     sqlite3 *db=NULL;
-    if (sqlite3_open_v2(epgfile,&db,SQLITE_OPEN_READWRITE,NULL)==SQLITE_OK)
+    if (sqlite3_open_v2(g.EPGFile(),&db,SQLITE_OPEN_READWRITE,NULL)==SQLITE_OK)
     {
         char *sql=NULL;
         if (asprintf(&sql,"BEGIN TRANSACTION;" \
@@ -508,8 +640,12 @@ bool cPluginXmltv2vdr::EPGSourceMove(int From, int To)
         }
         free(sql);
     }
+    else
+    {
+        return false;
+    }
     sqlite3_close(db);
-    epgsources.Move(From,To);
+    g.EPGSources()->Move(From,To);
     return true;
 }
 
@@ -518,12 +654,14 @@ const char *cPluginXmltv2vdr::CommandLineHelp(void)
 {
     // Return a string that describes all known command line options.
     return "  -e DIR,   --episodes=DIR location of episode files: VDRSeriesTimer .episodes\n"
-           "                           or TheTVDB .xml (default is ~/.eplists/lists,UTF8)\n"
+           "                           or TheTVDB .xml (default is ~/.eplists/lists)\n"
            "                           Add UTF-8 or ISO8859-15 to the path to specify the\n"
            "                           charset used in the files, e.g. /vdr/myepisodes,UTF8\n"
            "  -E FILE,  --epgfile=FILE write the EPG data into the given FILE (default is\n"
            "                           'epg.db' in the video directory) - best performance\n"
            "                           if located on a ramdisk\n"
+           "  -i DIR    --images=DIR   location of epgimages\n"
+           "                           (default is /var/cache/vdr/epgimages)\n"
            "  -l FILE   --logfile=FILE write trace logs into the given FILE (default is\n"
            "                           no trace log\n";
 
@@ -536,43 +674,27 @@ bool cPluginXmltv2vdr::ProcessArgs(int argc, char *argv[])
     {
         { "episodes",     required_argument, NULL, 'e'},
         { "epgfile",      required_argument, NULL, 'E'},
+        { "images",       required_argument, NULL, 'i'},
         { "logfile",      required_argument, NULL, 'l'},
         { 0,0,0,0 }
     };
 
     int c;
-    char *comma=NULL;
-    while ((c = getopt_long(argc, argv, "l:e:E:", long_options, NULL)) != -1)
+    while ((c = getopt_long(argc, argv, "l:e:E:i:", long_options, NULL)) != -1)
     {
         switch (c)
         {
         case 'e':
-            if (epdir) free(epdir);
-            epdir=strdup(optarg);
-            if (!epdir) break;
-            comma=strchr(epdir,',');
-            if (comma) *comma=0;
-            if (access(epdir,R_OK)!=-1)
-            {
-                *comma=',';
-            }
-            else
-            {
-                free(epdir);
-                epdir=NULL;
-            }
+            g.SetEPDir(optarg);
             break;
         case 'E':
-            if (epgfile) free(epgfile);
-            epgfile=strdup(optarg);
-            if (!epgfile) break;
-//            isyslog("using file '%s' for epgdata",optarg);
+            g.SetEPGFile(optarg);
             break;
+        case 'i':
+            g.SetImgDir(optarg);
         case 'l':
             if (logfile) free(logfile);
             logfile=strdup(optarg);
-            if (!logfile) break;
-//            isyslog("using file '%s' for log",optarg);
             break;
         default:
             return false;
@@ -590,73 +712,23 @@ bool cPluginXmltv2vdr::Initialize(void)
 bool cPluginXmltv2vdr::Start(void)
 {
     // Start any background activities the plugin shall perform.
-    if (confdir) free(confdir);
-    confdir=strdup(ConfigDirectory(PLUGIN_NAME_I18N)); // creates internally the confdir!
-    if (!epgfile)
+    g.SetConfDir(ConfigDirectory(PLUGIN_NAME_I18N));
+
+    isyslog("using codeset '%s'",g.Codeset());
+    isyslog("using file '%s' for epg database",g.EPGFile());
+    if (g.EPDir())
     {
-        if (asprintf(&epgfile,"%s/epg.db",VideoDirectory)==-1)return false;
+        isyslog("using dir '%s' (%s) for episodes",g.EPDir(),g.EPCodeset());
+        epgtimer = new cEPGTimer(&g);
+        epgseasonepisode = new cEPGSeasonEpisode(&g);
     }
-    isyslog("using file '%s' for epg database",epgfile);
-    if (!epdir)
-    {
-        struct passwd pwd,*pwdbuf;
-        char buf[1024];
-        getpwuid_r(getuid(),&pwd,buf,sizeof(buf),&pwdbuf);
-        if (pwdbuf)
-        {
-            if (asprintf(&epdir,"%s/.eplists/lists",pwdbuf->pw_dir)!=-1)
-            {
-                if (access(epdir,R_OK))
-                {
-                    free(epdir);
-                    epdir=NULL;
-                }
-                else
-                {
-                    isyslog("using dir '%s' (UTF-8) for episodes",epdir);
-                }
-            }
-        }
-    }
-    else
-    {
-        char *cs=strchr(epdir,',');
-        if (cs)
-        {
-            *cs=0;
-            isyslog("using dir '%s' (%s) for episodes",epdir,cs+1);
-            *cs=',';
-        }
-        else
-        {
-            isyslog("using dir '%s' (UTF-8) for episodes",epdir);
-        }
-    }
-    if (setlocale(LC_CTYPE,""))
-        codeset=strdup(nl_langinfo(CODESET));
-    else
-    {
-        char *LangEnv=getenv("LANG");
-        if (LangEnv)
-        {
-            codeset=strdup(strchr(LangEnv,'.'));
-            if (codeset)
-                codeset++; // skip dot
-        }
-    }
-    if (!codeset)
-    {
-        codeset=strdup("US-ASCII//TRANSLIT");
-    }
-    isyslog("codeset is '%s'",codeset);
+    if (g.ImgDir()) isyslog("using dir '%s' for epgimages",g.ImgDir());
 
     ReadInEPGSources();
-    epghandler = new cEPGHandler(epgfile,epdir,codeset,&epgsources,&epgmappings,&textmappings);
-    epgtimer = new cEPGTimer(epgfile,epdir,codeset,&epgsources,&epgmappings,&textmappings);
-    housekeeping = new cHouseKeeping(epgfile);
-
+    epghandler = new cEPGHandler(&g);
     if (sqlite3_threadsafe()==0) esyslog("sqlite3 not threadsafe!");
     cParse::InitLibXML();
+    SetEPAll(epall);
     return true;
 }
 
@@ -664,37 +736,21 @@ void cPluginXmltv2vdr::Stop(void)
 {
     // Stop any background activities the plugin is performing.
     cSchedules::Cleanup(true);
-    epgtimer->Stop();
     if (epgtimer)
     {
+        epgtimer->Stop();
         delete epgtimer;
         epgtimer=NULL;
     }
-    if (housekeeping)
+    if (epgseasonepisode)
     {
-        delete housekeeping;
-        housekeeping=NULL;
+        epgseasonepisode->Stop();
+        delete epgseasonepisode;
+        epgseasonepisode=NULL;
     }
     epgexecutor.Stop();
-    epgsources.Remove();
-    epgmappings.Remove();
-    textmappings.Remove();
+    housekeeping.Stop();
     cParse::CleanupLibXML();
-    if (confdir)
-    {
-        free(confdir);
-        confdir=NULL;
-    }
-    if (epgfile)
-    {
-        free(epgfile);
-        epgfile=NULL;
-    }
-    if (epdir)
-    {
-        free(epdir);
-        epdir=NULL;
-    }
     if (logfile)
     {
         free(logfile);
@@ -705,11 +761,6 @@ void cPluginXmltv2vdr::Stop(void)
         free(srcorder);
         srcorder=NULL;
     }
-    if (codeset)
-    {
-        free(codeset);
-        codeset=NULL;
-    }
 }
 
 void cPluginXmltv2vdr::Housekeeping(void)
@@ -718,14 +769,14 @@ void cPluginXmltv2vdr::Housekeeping(void)
     time_t now=time(NULL);
     if (now>(last_housetime_t+3600))
     {
-        if (housekeeping)
+        if (!housekeeping.Active())
         {
             struct stat statbuf;
-            if (stat(epgfile,&statbuf)!=-1)
+            if (stat(g.EPGFile(),&statbuf)!=-1)
             {
                 if (statbuf.st_size)
                 {
-                    housekeeping->Start();
+                    housekeeping.Start();
                 }
             }
         }
@@ -742,16 +793,26 @@ void cPluginXmltv2vdr::MainThreadHook(void)
     {
         if (!epgexecutor.Active())
         {
-            if (epgsources.RunItNow()) epgexecutor.Start();
+            if (g.EPGSources()->RunItNow()) epgexecutor.Start();
         }
         last_maintime_t=(now/60)*60;
     }
-    if (epall)
+    if (g.EPDir())
     {
-        if (now>=(last_epcheck_t+600))
+        /*
+          if (now>=(last_epcheck_t+900))
+          {
+              if (epgseasonepisode) epgseasonepisode->Start();
+              last_epcheck_t=(now/900)*900;
+          }
+          */
+        if (epall)
         {
-            epgtimer->Start();
-            last_epcheck_t=(now/600)*600;
+            if (now>=(last_timer_t+600))
+            {
+                if (epgtimer) epgtimer->Start();
+                last_timer_t=(now/600)*600;
+            }
         }
     }
 }
@@ -770,7 +831,7 @@ time_t cPluginXmltv2vdr::WakeupTime(void)
 {
     // Return custom wakeup time for shutdown script
     if (!wakeup) return (time_t) 0;
-    time_t nextruntime=epgsources.NextRunTime();
+    time_t nextruntime=g.EPGSources()->NextRunTime();
     if (nextruntime) nextruntime-=(time_t) 180;
     tsyslog("reporting wakeuptime %s",ctime(&nextruntime));
     return nextruntime;
@@ -800,7 +861,7 @@ bool cPluginXmltv2vdr::SetupParse(const char *Name, const char *Value)
     if (!strncasecmp(Name,"channel",7))
     {
         if (strlen(Name)<10) return false;
-        epgmappings.Add(new cEPGMapping(&Name[8],Value));
+        g.EPGMappings()->Add(new cEPGMapping(&Name[8],Value));
     }
     else if (!strncasecmp(Name,"textmap",7))
     {
@@ -812,12 +873,12 @@ bool cPluginXmltv2vdr::SetupParse(const char *Name, const char *Value)
         }
         else
         {
-            textmappings.Add(new cTEXTMapping(&Name[8],Value));
+            g.TEXTMappings()->Add(new cTEXTMapping(&Name[8],Value));
         }
     }
     else if (!strcasecmp(Name,"options.epall"))
     {
-        SetEPAll((bool) atoi(Value));
+        epall=atoi(Value); // set value later again in Start()
     }
     else if (!strcasecmp(Name,"options.wakeup"))
     {
@@ -843,7 +904,9 @@ const char **cPluginXmltv2vdr::SVDRPHelpPages(void)
     static const char *HelpPages[]=
     {
         "UPDT [force]\n"
-        "    Start epg update from db, with force download data before",
+        "    Start epg update from db, with force download data before\n",
+        "DELD\n"
+        "    Delete xmltv2vdr epg database (triggers update)\n",
         NULL
     };
     return HelpPages;
@@ -856,7 +919,7 @@ cString cPluginXmltv2vdr::SVDRPCommand(const char *Command, const char *Option, 
     cString output;
     if (!strcasecmp(Command,"UPDT"))
     {
-        if (!epgsources.Count())
+        if (!g.EPGSources()->Count())
         {
             ReplyCode=550;
             output="No epg sources installed\n";
@@ -892,9 +955,31 @@ cString cPluginXmltv2vdr::SVDRPCommand(const char *Command, const char *Option, 
         }
     }
     else
-    {
-        return NULL;
-    }
+        if (!strcasecmp(Command,"DELD"))
+        {
+            if (g.EPGFile())
+            {
+                if (unlink(g.EPGFile())==-1)
+                {
+                    ReplyCode=550;
+                    output="failed to delete database\n";
+                }
+                else
+                {
+                    ReplyCode=250;
+                    output="database deleted\n";
+                }
+            }
+            else
+            {
+                ReplyCode=550;
+                output="epgfile parameter not set\n";
+            }
+        }
+        else
+        {
+            return NULL;
+        }
     return output;
 }
 

@@ -188,6 +188,22 @@ void cXMLTVEvent::SetVideo(const char *Video)
     free(c);
 }
 
+void cXMLTVEvent::SetPics(const char* Pics)
+{
+    if (!Pics) return;
+    char *c=strdup(Pics);
+    if (!c) return;
+    char *sp,*tok;
+    char delim[]="@";
+    tok=strtok_r(c,delim,&sp);
+    while (tok)
+    {
+        pics.Append(strdup(tok));
+        tok=strtok_r(NULL,delim,&sp);
+    }
+    free(c);
+}
+
 void cXMLTVEvent::SetStarRating(const char *StarRating)
 {
     if (!StarRating) return;
@@ -208,6 +224,11 @@ void cXMLTVEvent::SetStarRating(const char *StarRating)
 void cXMLTVEvent::AddReview(const char *Review)
 {
     review.Append(compactspace(strdup(Review)));
+}
+
+void cXMLTVEvent::AddPics(const char* Pic)
+{
+    pics.Append(compactspace(strdup(Pic)));
 }
 
 void cXMLTVEvent::AddVideo(const char *VType, const char *VContent)
@@ -272,18 +293,19 @@ const char *cXMLTVEvent::GetSQL(const char *Source, int SrcIdx, const char *Chan
     const char *ra=rating.toString();
     const char *sr=starrating.toString();
     const char *vi=video.toString();
+    const char *pi=pics.toString();
 
     if (asprintf(&sql,"INSERT OR IGNORE INTO epg (src,channelid,eventid,starttime,duration,"\
                  "title,origtitle,shorttext,description,country,year,credits,category,"\
-                 "review,rating,starrating,video,audio,season,episode,picexists,srcidx) "\
+                 "review,rating,starrating,video,audio,season,episode,episodeoverall,pics,srcidx) "\
                  "VALUES (^%s^,^%s^,%i,%li,%i,"\
                  "^%s^,^%s^,^%s^,^%s^,^%s^,%i,^%s^,^%s^,"\
-                 "^%s^,^%s^,^%s^,^%s^,^%s^,%i,%i,%i,%i);"\
+                 "^%s^,^%s^,^%s^,^%s^,^%s^,%i,%i,%i,^%s^,%i);"\
 
                  "UPDATE epg SET duration=%i,starttime=%li,title=^%s^,origtitle=^%s^,"\
                  "shorttext=^%s^,description=^%s^,country=^%s^,year=%i,credits=^%s^,category=^%s^,"\
                  "review=^%s^,rating=^%s^,starrating=^%s^,video=^%s^,audio=^%s^,season=%i,episode=%i, "\
-                 "picexists=%i,srcidx=%i " \
+                 "episodeoverall=%i,pics=^%s^,srcidx=%i " \
                  " where changes()=0 and src=^%s^ and channelid=^%s^ and eventid=%i"
                  ,
                  Source,ChannelID,eventid,starttime,duration,title,
@@ -294,7 +316,7 @@ const char *cXMLTVEvent::GetSQL(const char *Source, int SrcIdx, const char *Chan
                  year,
                  cr,ca,re,ra,sr,vi,
                  audio ? audio : "NULL",
-                 season, episode, picexists, SrcIdx,
+                 season, episode, episodeoverall, pi, SrcIdx,
 
                  duration,starttime,title,
                  origtitle ? origtitle : "NULL",
@@ -304,7 +326,7 @@ const char *cXMLTVEvent::GetSQL(const char *Source, int SrcIdx, const char *Chan
                  year,
                  cr,ca,re,ra,sr,vi,
                  audio ? audio : "NULL",
-                 season, episode, picexists, SrcIdx,
+                 season, episode, episodeoverall, pi, SrcIdx,
 
                  Source,ChannelID,eventid
 
@@ -386,11 +408,12 @@ void cXMLTVEvent::Clear()
     review.Clear();
     rating.Clear();
     starrating.Clear();
+    pics.Clear();
     season=0;
     episode=0;
+    episodeoverall=0;
     parentalRating=0;
     memset(&contents,0,sizeof(contents));
-    picexists=false;
 }
 
 cXMLTVEvent::cXMLTVEvent()

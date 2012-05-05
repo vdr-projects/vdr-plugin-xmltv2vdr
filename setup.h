@@ -40,7 +40,7 @@ private:
     int epEntry;
     eOSState edit(void);
     void generatesumchannellist();
-    int epall;
+    unsigned int epall;
     int wakeup;
 public:
     void Output(void);
@@ -85,6 +85,7 @@ private:
     char category[255];
     char season[255];
     char episode[255];
+    char episodeoverall[255];    
     char starrating[255];
     char audio[255];
     char video[255];
@@ -108,6 +109,7 @@ private:
     time_t day;
     int weekday,start;
     int days;
+    int usepics;
     char pin[255];
     void output(void);
 public:
@@ -136,7 +138,7 @@ private:
     int getdaysmax();
     cOsdItem *option(const char *s, bool yesno);
     void epgmappingreplace(cEPGMapping *newmapping);
-    int c1,c3,cm;
+    int c1,c2,c3,c4,cm;
 public:
     cMenuSetupXmltv2vdrChannelMap(cPluginXmltv2vdr *Plugin, cMenuSetupXmltv2vdr *Menu, int Index);
     ~cMenuSetupXmltv2vdrChannelMap();

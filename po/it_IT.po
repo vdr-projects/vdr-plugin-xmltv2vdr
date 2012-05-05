@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: vdr\n"
 "Report-Msgid-Bugs-To: <see README>\n"
-"POT-Creation-Date: 2012-04-14 18:03+0200\n"
+"POT-Creation-Date: 2012-05-04 18:58+0200\n"
 "PO-Revision-Date: 2011-03-05 15:45+0100\n"
 "Last-Translator: Diego Pierotto <vdr-italian@tiscali.it>\n"
 "Language-Team:  <vdr@linuxtv.org>\n"
@@ -20,6 +20,9 @@ msgid "options"
 msgstr "Opzioni"
 
 msgid "add season/episode on all timers"
+msgstr ""
+
+msgid " add shorttext/title from list"
 msgstr ""
 
 msgid "automatic wakeup"
@@ -121,6 +124,9 @@ msgstr "Giorni in anticipo"
 msgid "pin"
 msgstr "Pin"
 
+msgid "download pics"
+msgstr ""
+
 msgid "channels provided"
 msgstr "Canali forniti"
 
@@ -151,9 +157,6 @@ msgstr "Testo breve"
 msgid "long text"
 msgstr "Testo completo"
 
-msgid " merge long texts"
-msgstr " Unisci testi completi"
-
 msgid " actors"
 msgstr " Attore"
 
@@ -183,6 +186,9 @@ msgstr "Video"
 
 msgid "audio"
 msgstr "Audio"
+
+msgid " add shorttext from list"
+msgstr ""
 
 msgid "epg source channel mappings"
 msgstr "Mappature canali sorgente EPG"
@@ -260,6 +266,9 @@ msgid "season"
 msgstr ""
 
 msgid "episode"
+msgstr ""
+
+msgid "episodeoverall"
 msgstr ""
 
 msgid "xmltv2vdr plugin still working"

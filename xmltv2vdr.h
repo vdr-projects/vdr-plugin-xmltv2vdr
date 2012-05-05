@@ -21,10 +21,76 @@
 #define UNUSED(x) x
 #endif
 
-static const char *VERSION        = "0.1.1pre";
+static const char *VERSION        = "0.1.1";
 static const char *DESCRIPTION    = trNOOP("Imports xmltv epg into vdr");
 
 int ioprio_set(int which, int who, int ioprio);
+
+class cGlobals
+{
+private:
+    char *confdir;
+    char *epgfile;
+    char *epdir;
+    char *epcodeset;
+    char *imgdir;
+    char *codeset;
+    cEPGMappings epgmappings;
+    cTEXTMappings textmappings;
+    cEPGSources epgsources;
+public:
+
+    cGlobals();
+    ~cGlobals();
+    cEPGMappings *EPGMappings()
+    {
+        return &epgmappings;
+    }
+    cTEXTMappings *TEXTMappings()
+    {
+        return &textmappings;
+    }
+    cEPGSources *EPGSources()
+    {
+        return &epgsources;
+    }
+    void SetConfDir(const char *ConfDir)
+    {
+        free(confdir);
+        confdir=strdup(ConfDir);
+    }
+    const char *ConfDir()
+    {
+        return confdir;
+    }
+    void SetEPGFile(const char *EPGFile)
+    {
+        free(epgfile);
+        epgfile=strdup(EPGFile);
+    }
+    const char *EPGFile()
+    {
+        return epgfile;
+    }
+    void SetEPDir(const char *EPDir);
+    const char *EPDir()
+    {
+        return epdir;
+    }
+    const char *EPCodeset()
+    {
+        return epcodeset;
+    }
+    const char *Codeset()
+    {
+        return codeset;
+    }
+    void SetImgDir(const char *ImgDir);
+    const char *ImgDir()
+    {
+        return imgdir;
+    }
+};
 
 #if VDRVERSNUM < 10726 && !EPGHANDLER
 class cEpgHandler : public cListObject
@@ -33,6 +99,10 @@ public:
     cEpgHandler(void) {}
     virtual ~cEpgHandler() {}
     virtual bool IgnoreChannel(const cChannel *UNUSED(Channel))
+    {
+        return false;
+    }
+    virtual bool SetTitle(cEvent *UNUSED(Event), const char *UNUSED(Title))
     {
         return false;
     }
@@ -65,14 +135,13 @@ private:
     cEPGMappings *maps;
     cEPGSources *sources;
     cImport import;
-    bool epall;
+    int epall;
     sqlite3 *db;
     time_t now;
     bool check4proc(cEvent *event, bool &spth, cEPGMapping **map);
 public:
-    cEPGHandler(const char *EpgFile, const char *EPDir, const char *CodeSet,
-                cEPGSources *Sources, cEPGMappings *Maps, cTEXTMappings *Texts);
-    void SetEPAll(bool Value)
+    cEPGHandler(cGlobals *Global);
+    void SetEPAll(int Value)
     {
         epall=Value;
     }
@@ -81,6 +150,7 @@ public:
         return (db!=NULL);
     }
     virtual bool IgnoreChannel(const cChannel *Channel);
+    virtual bool SetTitle(cEvent *Event,const char *Title);
     virtual bool SetShortText(cEvent *Event,const char *ShortText);
     virtual bool SetDescription(cEvent *Event,const char *Description);
     virtual bool HandleEvent(cEvent *Event);
@@ -93,16 +163,16 @@ private:
     cEPGSources *sources;
     cEPGMappings *maps;
     cImport import;
+    int epall;
 public:
-    cEPGTimer(const char *EpgFile, const char *EPDir, const char *CodeSet,
-              cEPGSources *Sources, cEPGMappings *Maps,cTEXTMappings *Texts);
-    bool StillRunning()
-    {
-        return Running();
-    }
+    cEPGTimer(cGlobals *Global);
     void Stop()
     {
         Cancel(3);
+    }
+    void SetEPAll(int Value)
+    {
+        epall=Value;
     }
     virtual void Action();
 };
@@ -112,29 +182,42 @@ class cHouseKeeping : public cThread
 private:
     const char *epgfile;
 public:
-    cHouseKeeping(const char *EPGFile);
+    cHouseKeeping(cGlobals *Global);
+    void Stop()
+    {
+        Cancel(3);
+    }
+    virtual void Action();
+};
+
+class cEPGSeasonEpisode : public cThread
+{
+private:
+    const char *epgfile;
+public:
+    cEPGSeasonEpisode(cGlobals *Global);
+    void Stop()
+    {
+        Cancel(3);
+    }
     virtual void Action();
 };
 
 class cPluginXmltv2vdr : public cPlugin
 {
 private:
+    cGlobals g;
     cEPGHandler *epghandler;
     cEPGTimer *epgtimer;
-    cHouseKeeping *housekeeping;
+    cEPGSeasonEpisode *epgseasonepisode;
+    cHouseKeeping housekeeping;
     cEPGExecutor epgexecutor;
-    cEPGMappings epgmappings;
-    cEPGSources epgsources;
-    cTEXTMappings textmappings;
     time_t last_housetime_t;
     time_t last_maintime_t;
+    time_t last_timer_t;
     time_t last_epcheck_t;
-    char *confdir;
-    char *epgfile;
-    char *epdir;
-    char *codeset;
     char *srcorder;
-    bool epall;
+    int epall;
     bool wakeup;
     bool insetup;
     int GetLastImportSource();
@@ -143,12 +226,13 @@ public:
     {
         insetup=Value;
     }
-    void SetEPAll(bool Value)
+    void SetEPAll(int Value)
     {
         epall=Value;
         if (epghandler) epghandler->SetEPAll(Value);
+        if (epgtimer) epgtimer->SetEPAll(Value);
     }
-    bool EPAll()
+    int EPAll()
     {
         return epall;
     }
@@ -162,46 +246,45 @@ public:
     }
     const char *EPDir()
     {
-        return epdir;
+        return g.EPDir();
     }
     void ReadInEPGSources(bool Reload=false)
     {
-        epgsources.ReadIn(confdir,epgfile,epdir,codeset,&epgmappings,
-                          &textmappings,srcorder,Reload);
+        g.EPGSources()->ReadIn(&g,srcorder,Reload);
     }
     bool EPGSourceMove(int From, int To);
     int EPGSourceCount()
     {
-        if (!epgsources.Count()) return 0;
-        return epgsources.Count()-1;
+        if (!g.EPGSources()->Count()) return 0;
+        return g.EPGSources()->Count()-1;
     }
     cEPGSource *EPGSource(int Index)
     {
-        return epgsources.Get(Index);
+        return g.EPGSources()->Get(Index);
     }
     int EPGMappingCount()
     {
-        return epgmappings.Count();
+        return g.EPGMappings()->Count();
     }
     cEPGMapping *EPGMapping(int Index)
     {
-        return epgmappings.Get(Index);
+        return g.EPGMappings()->Get(Index);
     }
     cEPGMapping *EPGMapping(const char *ChannelName)
     {
-        return epgmappings.GetMap(ChannelName);
+        return g.EPGMappings()->GetMap(ChannelName);
     }
     void EPGMappingAdd(cEPGMapping *Map)
     {
-        epgmappings.Add(Map);
+        g.EPGMappings()->Add(Map);
     }
     cTEXTMapping *TEXTMapping(const char *Name)
     {
-        return textmappings.GetMap(Name);
+        return g.TEXTMappings()->GetMap(Name);
     }
     void TEXTMappingAdd(cTEXTMapping *TextMap)
     {
-        textmappings.Add(TextMap);
+        g.TEXTMappings()->Add(TextMap);
     }
     cPluginXmltv2vdr(void);
     virtual ~cPluginXmltv2vdr();
