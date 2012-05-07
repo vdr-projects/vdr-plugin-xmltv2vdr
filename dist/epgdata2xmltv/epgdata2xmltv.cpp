@@ -212,8 +212,8 @@ int cepgdata2xmltv::Fetch(const char *dest, const char *pin, int day)
     }
     if (ret==-63)
     {
-      esyslog("filesize exceeded, please report this!");
-      return 1;
+        esyslog("filesize exceeded, please report this!");
+        return 1;
     }
     return 0;
 }
@@ -247,7 +247,7 @@ int cepgdata2xmltv::Process(int argc, char *argv[])
     }
     char *line=NULL,*lptr=NULL;
     size_t size;
-    if (getline(&line,&size,f)==(ssize_t) -1) 
+    if (getline(&line,&size,f)==(ssize_t) -1)
     {
         fclose(f);
         esyslog("failed to read epgdata2xmltv config");
@@ -280,6 +280,8 @@ int cepgdata2xmltv::Process(int argc, char *argv[])
     char *xmlmem=NULL;
 
     time_t t=time(NULL);
+
+    int carg=3;
 
     for (int day=0; day<=daysinadvance; day++)
     {
@@ -466,6 +468,50 @@ int cepgdata2xmltv::Process(int argc, char *argv[])
                     }
                 }
             }
+
+            if (!strcmp(argv[3],"1")) {
+                carg++;
+                int entries=zip_get_num_files(zip);
+                for (int i=0; i<entries; i++)
+                {
+                    const char *name=zip_get_name(zip,i,0);
+                    if (strstr(name,"jpg")) {
+
+                        char *destjpg;
+                        if (asprintf(&destjpg,"/var/lib/epgsources/epgdata2xmltv-img/%s",name)!=-1) {
+                            //FILE *f=fopen("/var/lib/epgsources/epgdata2xmltv","r");
+                            struct stat statbuf;
+                            if (stat(destjpg,&statbuf)==-1) {
+                                struct zip_file *zfile=zip_fopen_index(zip,i,0);
+                                if (zfile)
+                                {
+                                    struct zip_stat sb;
+                                    memset(&sb,0,sizeof(sb));
+                                    if (zip_stat_index(zip,i,ZIP_FL_UNCHANGED,&sb)!=-1) {
+                                        if (sizeof(sb.size>4)) sb.size &= 0x00FFFFFF; // just to be sure
+                                        char *jpg=(char *) malloc(sb.size+1);
+                                        if (jpg) {
+                                            int size=zip_fread(zfile,jpg,sb.size);
+                                            if (size==sb.size) {
+                                                FILE *j=fopen(destjpg,"w+");
+                                                if (j) {
+                                                    fwrite(jpg,size,1,j);
+                                                    fclose(j);
+                                                }
+                                            }
+                                        }
+                                    }
+                                    zip_fclose(zfile);
+                                }
+                            }
+                            free(destjpg);
+                        }
+                    }
+                }
+            } else {
+                if (!strcmp(argv[3],"0")) carg++;
+            }
+
             zip_close(zip);
             if (!ok)
             {
@@ -545,7 +591,7 @@ int cepgdata2xmltv::Process(int argc, char *argv[])
             if (sc) *sc=0;
 
             bool use=false;
-            for (int i=3; i<argc; i++)
+            for (int i=carg; i<argc; i++)
             {
                 if (!strcasecmp(lptr,argv[i]))
                 {
@@ -561,7 +607,7 @@ int cepgdata2xmltv::Process(int argc, char *argv[])
                     printf("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n");
                     printf("<tv generator-info-name=\"epgdata2xmltv\">\n");
 
-                    for (int i=3; i<argc; i++)
+                    for (int i=carg; i<argc; i++)
                     {
                         printf("<channel id=\"%s\">\n",argv[i]);
                         printf("<display-name lang=\"de\">%s</display-name>\n",argv[i]);

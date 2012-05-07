@@ -1,109 +1,100 @@
-pipe;00:00;1
+pipe;00:00;1;1
 17
-ard.de;71
-zdf.de;37
-arte.de;58
+13th-street.de;471
 3sat.de;56
-br-alpha.de;104
-einsmuxx.de;475
-einsfestival.de;146
-einsextra.de;100
-zdfinfo.de;276
-zdf-theaterkanal.de;275
-zdfneo.de;659
-phoenix.de;194
+animax.de;539
+ard.de;71
+arte.de;58
+atvplus.at;115
+axntv.de;468
 bayern3.de;51
-hessen3.de;49
-rbb.de;52
-swr.de;50
-wdr.de;46
-ndr.de;47
-kika.de;57
-mdr.de;48
-rtl.de;38
-sat1.de;39
-rtl2.de;41
-prosieben.de;40
-superrtl.de;43
-kabel1.de;44
-vox.de;42
-sixx.de;694
-das-vierte.de;486
-tele5.de;277
-9live.de;1179
-ntv.de;66
-euronews.de;68
-n24.de;175
-bloombergtv.de;127
-cnn.de;69
-eurosport.de;65
-dsf.de;64
-nickcomedy.de;589
-dmax.de;507
-hse24.de;159
-qvc.de;208
+beate-uhse-tv.de;123
 bibeltv.de;280
-timm.de;588
+bloombergtv.de;127
+boomerang-tv.de;493
+br-alpha.de;104
+cartoon-network.de;132
+classica.de;133
+cnn.de;69
+das-vierte.de;486
+discovery-channel.de;138
+disney-channel.de;139
+dmax.de;507
+dsf.de;64
+einsextra.de;100
+einsfestival.de;146
+einsmuxx.de;475
+espn-classic-sport.com;591
+euronews.de;68
+eurosport-2.de;504
+eurosport.de;65
+fashiontv.fr;455
+focus-gesundheit.de;476
+fox-channel.de;565
+goldstar-tv.de;152
+gotv.at;391
+heimatkanal.de;154
+hessen3.de;49
+history-channel.de;452
+hse24.de;159
+junior.de;160
+kabel1.de;44
+kabel-eins-classics.de;492
+kika.de;57
+kinowelt-tv.de;450
+mdr.de;48
+mgm.de;630
+motorvision-tv.de;627
+mtv.de;70
+mtv-entertainment.de;553
+n24.de;175
+national-geographic.de;453
+national-geographic-wild.de;626
+ndr.de;47
+nickcomedy.de;589
+ntv.de;66
 orf1.at;54
 orf2.at;55
-atvplus.at;115
+phoenix.de;194
+playhouse-disney.de;460
+prosieben.de;40
+qvc.de;208
+rbb.de;52
+romance-tv.de;552
+rtl2.de;41
+rtl-crime.de;527
+rtl.de;38
+rtl-living.de;528
+rtl-passion.de;529
+sat1-comedy.de;491
+sat1.de;39
+sci-fi.de;472
+sixx.de;694
+sky-action.de;613
+sky-cinema-1.de;611
+sky-cinema-24.de;612
+sky-cinema.de;610
+sky-cinema-hits.de;618
+sky-comedy.de;617
+sky-emotion.de;616
+sky-krimi.de;615
+sky-nostalgie.de;614
+sky-select.de;628
+sky-sport-austria.at;622
+spiegel-geschichte.de;625
+superrtl.de;43
+swr.de;50
+tele5.de;277
+the-biography-channel.de;536
+timm.de;588
+tnt-film.de;633
+tnt-serie.de;590
 tw1.at;265
+vh1-classic.eu;496
 viva.de;266
-mtv.de;70
-gotv.at;391
-fashiontv.fr;455
-
- Sky Deutschland
-610 = S19.2E-133-2-10       Sky Cinema,Cinema;SKY
-611 = S19.2E-133-2-11       Sky Cinema +1,Cinema1;SKY
-612 = S19.2E-133-2-43       Sky Cinema +24,Cinema24;SKY
-613 = S19.2E-133-2-9        Sky Action,Action;SKY
-617 = S19.2E-133-2-8        Sky Comedy,Comedy;SKY
-616 = S19.2E-133-2-20       Sky Emotion,Emotion;SKY
-614 = S19.2E-133-3-516          Sky Nostalgie,Nostalgie;SKY
-618 = S19.2E-133-3-41       Sky Cinema Hits,CineHits;SKY
-630 = S19.2E-133-3-25       Disney Cinemagic,Cinemagic;SKY
-1196 = S19.2E-133-3-515         MGM;SKY
-138 = S19.2E-133-4-14       Discovery Channel,Discovery;SKY
-453 = S19.2E-133-4-13       National Geographic,NatGeo;SKY
-626 = S19.2E-133-4-12       NatGeo Wild,NG Wild;SKY
-625 = S19.2E-133-4-52       Spiegel Geschichte,SpiegelG;SKY
-627 = S19.2E-133-1-168          Motorvision TV,Motorvis;SKY
-476 = S19.2E-133-4-15       Focus Gesundheit,Focus;SKY
-615 = S19.2E-133-1-23       Sky Krimi,SkyKrimi;SKY
-527 = S19.2E-133-1-27       RTL Crime,RTLCrime;SKY
-471 = S19.2E-133-1-42       13th Street,13Street;SKY
-472 = S19.2E-133-17-36          SciFi;SKY
-565 = S19.2E-133-1-16       Fox Serie,Fox;SKY
-590 = S19.2E-133-1-50       TNT Serie,TNTSerie;SKY
-529 = S19.2E-133-1-29       RTL Passion,Passion;SKY
-154 = S19.2E-133-17-22          Heimatkanal,Heimat;SKY
-139 = S19.2E-133-17-34          Disney Channel,Disney;SKY
-460 = S19.2E-133-17-26          Playhouse Disney,Playhouse;SKY ???
-160 = S19.2E-133-17-19          Junior;SKY
- = S19.2E-133-17-28         Disney XD,DisneyXD;SKY ???
-152 = S19.2E-133-17-518         Goldstar TV,Goldstar;SKY
-133 = S19.2E-133-17-24          Classica;SKY
-123 = S19.2E-133-17-21          Beate-Uhse.TV,BeateU;SKY
-491 = S19.2E-1-1107-17505       Sat.1 Comedy;ProSiebenSat.1
-468 = S19.2E-133-9-62         AXN Action,AXN;arena/SKY
-633 = S19.2E-133-9-61       TNT Film (TCM),TNT Film;arena/SKY
-492 = S19.2E-1-1107-17506       kabel eins classics;ProSiebenSat.1
-450 = S19.2E-133-9-60       Kinowelt TV,Kinowelt;SKY ???
-552 = S19.2E-133-9-63       Romance TV,Romance;SKY ???
-551 = S19.2E-1-1078-28682       NICK PREMIUM (S);MTV Networks Europe ???
-493 = S19.2E-133-9-66       Boomerang;arena/SKY ???
-132 = S19.2E-1-1102-13204       Cartoon Network (a/S);arena/SKY
-452 = S19.2E-133-9-68       History;SKY
-536 = S19.2E-1-1102-13208       Biography Channel;arena/SKY ???
-528 = S19.2E-1-1102-13207       RTL Living;arena/SKY
- = S19.2E-133-9-67          e.clips;SKY ???
-539 = S19.2E-1-1102-13203       ANIMAX;arena/SKY
-553 = S19.2E-1-1078-28681       MTV ENTERTAINMENT (S);MTV Networks Europe ???
-496 = S19.2E-1-1066-28657       VH1 Classic;MTV Networks Europe ???
-504 = S19.2E-1-1102-13205       EuroSport 2 (a/S);arena/SKY
-591 = S19.2E-1-1115-13105       ESPN America (S);SKY
-622 = S19.2E-133-7-53      Sky Sport Austria,SportAut;SKY
-628 = S19.2E-133-4-18      Sky Select,SkySel;SKY
-
- Musik
+vox.de;42
+wdr.de;46
+zdf.de;37
+zdfinfo.de;276
+zdfkultur.de;275
+zdfneo.de;659

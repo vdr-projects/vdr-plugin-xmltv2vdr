@@ -32,8 +32,28 @@
 G <xsl:value-of select="d25"/>
 </xsl:variable>
 
-<xsl:variable name="CREW">
+<xsl:variable name="PICS">
+<xsl:if test="string-length(d38)">
+<xsl:element name="icon">
+<xsl:attribute name="src">file:///var/lib/epgsources/epgdata2xmltv-img/<xsl:value-of select="d38"/></xsl:attribute>
+</xsl:element>
+<xsl:text>&#x0A;</xsl:text>
+</xsl:if>
+<xsl:if test="string-length(d39)">
+<xsl:element name="icon">
+<xsl:attribute name="src">file:///var/lib/epgsources/epgdata2xmltv-img/<xsl:value-of select="d39"/></xsl:attribute>
+</xsl:element>
+<xsl:text>&#x0A;</xsl:text>
+</xsl:if>
+<xsl:if test="string-length(d40)">
+<xsl:element name="icon">
+<xsl:attribute name="src">file:///var/lib/epgsources/epgdata2xmltv-img/<xsl:value-of select="d40"/></xsl:attribute>
+</xsl:element>
+<xsl:text>&#x0A;</xsl:text>
+</xsl:if>
+</xsl:variable>
 
+<xsl:variable name="CREW">
 <xsl:if test="string-length(d36)">
 <xsl:call-template name="output-tokens">
 <xsl:with-param name="list"><xsl:value-of select="d36"/></xsl:with-param>
@@ -69,11 +89,38 @@ G <xsl:value-of select="d25"/>
 </xsl:variable>
 
 <xsl:variable name="VIDEO">
+
+<xsl:if test="d29='1'">
+<aspect>16:9</aspect><xsl:text>&#x0A;</xsl:text>
+</xsl:if>
+
+<xsl:if test="d11='1'">
+<colour>no</colour><xsl:text>&#x0A;</xsl:text>
+</xsl:if>
+
 </xsl:variable>
 
 <xsl:variable name="AUDIO">
+<xsl:choose>
+<xsl:when test="d28='1'">
+    <xsl:text>dolby digital</xsl:text>
+</xsl:when>
+<!--
+<xsl:when test="d12='1'">
+    <xsl:text>bilingual</xsl:text>
+</xsl:when>
+-->
+<xsl:when test="d27='1'">
+    <xsl:text>stereo</xsl:text>
+</xsl:when>
+</xsl:choose>
 </xsl:variable>
 
+<xsl:variable name="STARRATING">
+<xsl:if test="d30 &gt; 0">
+<star-rating><value><xsl:value-of select="d30"/><xsl:text>/5</xsl:text></value></star-rating><xsl:text>&#x0A;</xsl:text>
+</xsl:if>
+</xsl:variable>
 
 <xsl:variable name="vps_iso8601">
 <xsl:if test="string-length(d8)">
@@ -148,6 +195,9 @@ G <xsl:value-of select="d25"/>
 <xsl:if test="string-length($EVENTID)">
 <category lang="de"><xsl:value-of select="$EVENTID"/></category><xsl:text>&#x0A;</xsl:text>
 </xsl:if>
+<xsl:if test="string-length($PICS)">
+<xsl:copy-of select="$PICS"/>
+</xsl:if>
 <xsl:if test="string-length($LAND)">
 <country><xsl:value-of select="$LAND"/></country><xsl:text>&#x0A;</xsl:text>
 </xsl:if>
@@ -156,6 +206,10 @@ G <xsl:value-of select="d25"/>
 </xsl:if>
 <xsl:if test="string-length($AUDIO)">
 <audio><xsl:text>&#x0A;</xsl:text><stereo><xsl:value-of select="$AUDIO"/></stereo><xsl:text>&#x0A;</xsl:text></audio><xsl:text>&#x0A;</xsl:text>
+</xsl:if>
+
+<xsl:if test="string-length($STARRATING)">
+<xsl:copy-of select="$STARRATING"/>
 </xsl:if>
 
 </xsl:element>

@@ -67,7 +67,9 @@ install: epgdata2xmltv
 	@cp epgdata2xmltv $(INSTALL)
 	$(STRIP) $(INSTALL)/epgdata2xmltv
 	@mkdir -p /var/lib/epgsources
+	@mkdir -p /var/lib/epgsources/epgdata2xmltv-img
 	@cp epgdata2xmltv.dist /var/lib/epgsources/epgdata2xmltv
+	@chown -R vdr.vdr /var/lib/epgsources
 
 dist: clean
 	@-rm -rf $(TMPDIR)/epgdata2xmltv
@@ -77,7 +79,7 @@ dist: clean
 	@-rm -rf $(TMPDIR)/epgdata2xmltv 
 
 clean:
-	@-rm -f $(OBJS) $(DEPFILE) epgdata2xmltv epgdata2xmltv_xsl.h
+	@-rm -f $(OBJS) $(DEPFILE) *.*~ epgdata2xmltv epgdata2xmltv_xsl.h
 
 distclean: clean
 	@-rm -f *~ *.tgz
