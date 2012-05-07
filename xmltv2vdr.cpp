@@ -833,7 +833,9 @@ time_t cPluginXmltv2vdr::WakeupTime(void)
     if (!wakeup) return (time_t) 0;
     time_t nextruntime=g.EPGSources()->NextRunTime();
     if (nextruntime) nextruntime-=(time_t) 180;
+    #ifdef VDRDBG
     tsyslog("reporting wakeuptime %s",ctime(&nextruntime));
+    #endif
     return nextruntime;
 }
 

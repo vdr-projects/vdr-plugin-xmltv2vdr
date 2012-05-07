@@ -1,5 +1,9 @@
 VDR Plugin 'xmltv2vdr' Revision History
 ---------------------------------------
+2012-05-05: Version 0.1.1
+
+- Lots of updates
+
 2012-04-01: Version 0.1.0
 
 - Added EpgHandler support

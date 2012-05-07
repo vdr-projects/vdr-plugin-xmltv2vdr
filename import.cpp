@@ -548,7 +548,7 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
         description=strdup(xEvent->EITDescription());
     }
 
-    if (description) description=Add2Description(description,"\n");
+    description=Add2Description(description,"\n");
 
     if ((Flags & USE_CREDITS)==USE_CREDITS)
     {
