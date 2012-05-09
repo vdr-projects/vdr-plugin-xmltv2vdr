@@ -42,6 +42,7 @@ private:
     void generatesumchannellist();
     unsigned int epall;
     int wakeup;
+    int imgdelafter;
 public:
     void Output(void);
     static cOsdItem *NewTitle(const char *s);

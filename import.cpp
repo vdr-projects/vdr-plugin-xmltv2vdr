@@ -278,7 +278,7 @@ bool cImport::WasChanged(cEvent* Event)
 void cImport::LinkPictures(const char *Source, cXMLTVStringList *Pics, tEventID DestID)
 {
     // source-pics are located in /var/lib/epgsources/%SOURCE%-img/
-    // dest-pics are located in /var/cache/vdr/epgimages
+    // dest-pics are located in imgdir (default /var/cache/vdr/epgimages)
 
     for (int i=0; i<Pics->Size(); i++)
     {
@@ -1468,7 +1468,7 @@ cImport::cImport(cGlobals *Global)
     epgfile=Global->EPGFile();
     codeset=Global->Codeset();
     imgdir=Global->ImgDir();
-    pendingtransaction=false;    
+    pendingtransaction=false;
     conv = new cCharSetConv("UTF-8",codeset);
 
     epdir=Global->EPDir();

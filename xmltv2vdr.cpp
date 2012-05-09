@@ -135,6 +135,7 @@ cGlobals::cGlobals()
     epcodeset=NULL;
     imgdir=NULL;
     codeset=NULL;
+    imgdelafter=30;
 
     if (asprintf(&epgfile,"%s/epg.db",VideoDirectory)==-1) {};
     if (asprintf(&imgdir,"%s","/var/cache/vdr/epgimages")==-1) {};
@@ -215,6 +216,7 @@ void cGlobals::SetEPDir(const char* EPDir)
         return;
     }
     free(epdir);
+    epcodeset=codeset;
     epdir=strdup(EPDir);
     if (!epdir) return;
     epcodeset=strchr((char *) epdir,',');
@@ -226,6 +228,15 @@ void cGlobals::SetEPDir(const char* EPDir)
     {
         epcodeset=(char *) codeset;
     }
+}
+
+bool cGlobals::DBExists()
+{
+    if (!epgfile) return true; // is this safe?
+    struct stat statbuf;
+    if (stat(epgfile,&statbuf)==-1) return false; // no database
+    if (!statbuf.st_size) return false; // no database
+    return true;
 }
 
 // -------------------------------------------------------------
@@ -488,17 +499,87 @@ void cEPGTimer::Action()
 
 cHouseKeeping::cHouseKeeping(cGlobals *Global): cThread("xmltv2vdr housekeeping")
 {
-    epgfile=Global->EPGFile();
+    global=Global;
+}
+
+int cHouseKeeping::checkdir(const char* imgdir, int age)
+{
+    if (age<=0) return 0;
+    DIR *dir=opendir(imgdir);
+    if (!dir) return 0;
+    time_t tmin=time(NULL);
+    tmin-=(age*86400);
+    struct dirent dirent_buf,*dirent;
+    int cnt=0;
+    while (readdir_r(dir,&dirent_buf,&dirent)==0)
+    {
+        if (!dirent) break;
+        if (dirent->d_name[0]=='.') continue;
+        if ((dirent->d_type==DT_LNK) || (dirent->d_type==DT_REG))
+        {
+            struct stat statbuf;
+            char *fpath;
+            if (asprintf(&fpath,"%s/%s",imgdir,dirent->d_name)!=-1)
+            {
+                if (stat(fpath,&statbuf)!=-1)
+                {
+                    if (statbuf.st_mtime<tmin)
+                    {
+                        if (unlink(fpath)!=-1) cnt++;
+                    }
+                }
+                free(fpath);
+            }
+        }
+    }
+    closedir(dir);
+    return cnt;
+}
+
+int sd_select(const dirent* dirent)
+{
+    if (!dirent) return 0;
+    if (strstr(dirent->d_name,"-img"))
+    {
+        if (dirent->d_type==DT_DIR) return 1;
+    }
+    return 0;
 }
 
 void cHouseKeeping::Action()
 {
+    if (global->ImgDelAfter())
+    {
+        int cnt=checkdir(global->ImgDir(),global->ImgDelAfter());
+        struct dirent **names;
+        int ret=scandir("/var/lib/epgsources",&names,sd_select,alphasort);
+        if (ret>0)
+        {
+            for (int i=0; i<ret; i++)
+            {
+                char *newdir;
+                if (asprintf(&newdir,"/var/lib/epgsources/%s",names[i]->d_name)!=-1)
+                {
+                    cnt+=checkdir(newdir,global->ImgDelAfter());
+                    free(newdir);
+                }
+            }
+            free(names);
+        }
+        if (cnt)
+        {
+            isyslog("removed %i pics/links",cnt);
+        }
+    }
+
+    if (!global->DBExists()) return;
+
     cSchedulesLock schedulesLock(true,10); // wait 10ms for lock!
     const cSchedules *schedules = cSchedules::Schedules(schedulesLock);
     if (!schedules) return;
 
     sqlite3 *db=NULL;
-    if (sqlite3_open_v2(epgfile,&db,SQLITE_OPEN_READWRITE,NULL)==SQLITE_OK)
+    if (sqlite3_open_v2(global->EPGFile(),&db,SQLITE_OPEN_READWRITE,NULL)==SQLITE_OK)
     {
         char *sql;
         if (asprintf(&sql,"delete from epg where ((starttime+duration) < %li)",time(NULL))!=-1)
@@ -722,7 +803,7 @@ bool cPluginXmltv2vdr::Start(void)
         epgtimer = new cEPGTimer(&g);
         epgseasonepisode = new cEPGSeasonEpisode(&g);
     }
-    if (g.ImgDir()) isyslog("using dir '%s' for epgimages",g.ImgDir());
+    if (g.ImgDir()) isyslog("using dir '%s' for epgimages (%i)",g.ImgDir(),g.ImgDelAfter());
 
     ReadInEPGSources();
     epghandler = new cEPGHandler(&g);
@@ -771,14 +852,7 @@ void cPluginXmltv2vdr::Housekeeping(void)
     {
         if (!housekeeping.Active())
         {
-            struct stat statbuf;
-            if (stat(g.EPGFile(),&statbuf)!=-1)
-            {
-                if (statbuf.st_size)
-                {
-                    housekeeping.Start();
-                }
-            }
+            housekeeping.Start();
         }
         last_housetime_t=(now / 3600)*3600;
     }
@@ -833,9 +907,9 @@ time_t cPluginXmltv2vdr::WakeupTime(void)
     if (!wakeup) return (time_t) 0;
     time_t nextruntime=g.EPGSources()->NextRunTime();
     if (nextruntime) nextruntime-=(time_t) 180;
-    #ifdef VDRDBG
+#ifdef VDRDBG
     tsyslog("reporting wakeuptime %s",ctime(&nextruntime));
-    #endif
+#endif
     return nextruntime;
 }
 
@@ -886,6 +960,10 @@ bool cPluginXmltv2vdr::SetupParse(const char *Name, const char *Value)
     {
         wakeup=(bool) atoi(Value);
     }
+    else if (!strcasecmp(Name,"options.imgdelafter"))
+    {
+        SetImgDelAfter(atoi(Value));
+    }
     else if (!strcasecmp(Name,"source.order"))
     {
         srcorder=strdup(Value);
@@ -909,6 +987,8 @@ const char **cPluginXmltv2vdr::SVDRPHelpPages(void)
         "    Start epg update from db, with force download data before\n",
         "DELD\n"
         "    Delete xmltv2vdr epg database (triggers update)\n",
+        "HOUS\n"
+        "    Start housekeeping manually\n",
         NULL
     };
     return HelpPages;
@@ -918,20 +998,20 @@ cString cPluginXmltv2vdr::SVDRPCommand(const char *Command, const char *Option, 
 {
     // Process SVDRP commands
 
-    cString output;
+    cString output=NULL;
     if (!strcasecmp(Command,"UPDT"))
     {
         if (!g.EPGSources()->Count())
         {
             ReplyCode=550;
-            output="No epg sources installed\n";
+            output="no epg sources installed\n";
         }
         else
         {
             if (epgexecutor.Active())
             {
                 ReplyCode=550;
-                output="Update already running\n";
+                output="update already running\n";
             }
             else
             {
@@ -946,42 +1026,52 @@ cString cPluginXmltv2vdr::SVDRPCommand(const char *Command, const char *Option, 
                 if (epgexecutor.Start())
                 {
                     ReplyCode=250;
-                    output="Update started\n";
+                    output="update started\n";
                 }
                 else
                 {
                     ReplyCode=550;
-                    output="Failed to start update\n";
+                    output="failed to start update\n";
                 }
             }
         }
     }
-    else
-        if (!strcasecmp(Command,"DELD"))
+    if (!strcasecmp(Command,"DELD"))
+    {
+        if (g.EPGFile())
         {
-            if (g.EPGFile())
+            if (unlink(g.EPGFile())==-1)
             {
-                if (unlink(g.EPGFile())==-1)
-                {
-                    ReplyCode=550;
-                    output="failed to delete database\n";
-                }
-                else
-                {
-                    ReplyCode=250;
-                    output="database deleted\n";
-                }
+                ReplyCode=550;
+                output="failed to delete database\n";
             }
             else
             {
-                ReplyCode=550;
-                output="epgfile parameter not set\n";
+                ReplyCode=250;
+                output="database deleted\n";
             }
         }
         else
         {
-            return NULL;
+            ReplyCode=550;
+            output="epgfile parameter not set\n";
         }
+    }
+    if (!strcasecmp(Command,"HOUS"))
+    {
+        if (!epgexecutor.Active() && !housekeeping.Active())
+        {
+            housekeeping.Start();
+            last_housetime_t=(time(NULL) / 3600)*3600;
+            ReplyCode=250;
+            output="housekeeping started\n";
+        }
+        else
+        {
+            ReplyCode=550;
+            output="system busy\n";
+        }
+    }
     return output;
 }
 

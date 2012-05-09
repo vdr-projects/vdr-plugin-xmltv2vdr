@@ -101,7 +101,7 @@ void cParse::RemoveNonAlphaNumeric(char *String)
 {
     if (!String) return;
 
-    // remove " Teil "
+    // remove " Teil " (special for .episodes files)
     int len=strlen(String);
     char *p=strstr(String," Teil ");
     if (p)

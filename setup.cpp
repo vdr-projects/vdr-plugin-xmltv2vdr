@@ -61,6 +61,7 @@ cMenuSetupXmltv2vdr::cMenuSetupXmltv2vdr(cPluginXmltv2vdr *Plugin)
     sourcesBegin=sourcesEnd=mappingBegin=mappingEnd=mappingEntry=0;
     epall=(unsigned int) baseplugin->EPAll();
     wakeup=(int) baseplugin->WakeUp();
+    imgdelafter=baseplugin->ImgDelAfter();
     cs=NULL;
     cm=NULL;
     Output();
@@ -98,6 +99,10 @@ void cMenuSetupXmltv2vdr::Output(void)
         }
     }
     Add(new cMenuEditBoolItem(tr("automatic wakeup"),&wakeup),true);
+    if (baseplugin->ImgDir())
+    {
+        Add(new cMenuEditIntItem(tr("delete pics after (days)"),&imgdelafter,0,365,tr("never")),true);
+    }
 
     Add(new cOsdItem(tr("text mapping")),true);
     mappingEntry=Current();
@@ -219,8 +224,10 @@ void cMenuSetupXmltv2vdr::Store(void)
 
     SetupStore("options.epall",epall);
     SetupStore("options.wakeup",wakeup);
+    SetupStore("options.imgdelafter",imgdelafter);
     baseplugin->SetEPAll(epall);
     baseplugin->SetWakeUp((bool) wakeup);
+    baseplugin->SetImgDelAfter(imgdelafter);
 }
 
 eOSState cMenuSetupXmltv2vdr::edit()
@@ -815,7 +822,7 @@ void cMenuSetupXmltv2vdrChannelSource::Store(void)
     if (epgsrc->NeedPin())
         epgsrc->ChangePin(pin);
     if (epgsrc->HasPics())
-      epgsrc->ChangePics(usepics);
+        epgsrc->ChangePics(usepics);
     epgsrc->Store();
 }
 

@@ -21,7 +21,7 @@
 #define UNUSED(x) x
 #endif
 
-static const char *VERSION        = "0.1.1";
+static const char *VERSION        = "0.2.0pre";
 static const char *DESCRIPTION    = trNOOP("Imports xmltv epg into vdr");
 
 int ioprio_set(int which, int who, int ioprio);
@@ -35,13 +35,14 @@ private:
     char *epcodeset;
     char *imgdir;
     char *codeset;
+    int imgdelafter;
     cEPGMappings epgmappings;
     cTEXTMappings textmappings;
     cEPGSources epgsources;
 public:
-
     cGlobals();
     ~cGlobals();
+    bool DBExists();
     cEPGMappings *EPGMappings()
     {
         return &epgmappings;
@@ -89,6 +90,14 @@ public:
     const char *ImgDir()
     {
         return imgdir;
+    }
+    void SetImgDelAfter(int Value)
+    {
+        imgdelafter=Value;
+    }
+    int ImgDelAfter()
+    {
+        return imgdelafter;
     }
 };
 
@@ -180,7 +189,8 @@ public:
 class cHouseKeeping : public cThread
 {
 private:
-    const char *epgfile;
+    cGlobals *global;
+    int checkdir(const char *imgdir, int age);
 public:
     cHouseKeeping(cGlobals *Global);
     void Stop()
@@ -243,6 +253,18 @@ public:
     bool WakeUp()
     {
         return wakeup;
+    }
+    void SetImgDelAfter(int Value)
+    {
+        g.SetImgDelAfter(Value);
+    }
+    int ImgDelAfter()
+    {
+        return g.ImgDelAfter();
+    }
+    const char *ImgDir()
+    {
+        return g.ImgDir();
     }
     const char *EPDir()
     {
