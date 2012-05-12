@@ -190,7 +190,7 @@ class cHouseKeeping : public cThread
 {
 private:
     cGlobals *global;
-    int checkdir(const char *imgdir, int age);
+    void checkdir(const char *imgdir, int age, int &cnt, int &lcnt);
 public:
     cHouseKeeping(cGlobals *Global);
     void Stop()

@@ -858,7 +858,7 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
             if (description)
             {
                 description=AddEOT2Description(description,true);
-                tsyslogs(Source,"{%i} adding EOT to '%s'",Event->EventID(),Event->Title());
+                tsyslogs(Source,"{%5i} adding EOT to '%s'",Event->EventID(),Event->Title());
                 Event->SetDescription(description);
                 free(description);
             }
@@ -880,7 +880,7 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
             int len=strlen(buf);
             if (len>0) buf[len-1]=0;
 
-            tsyslogs(Source,"{%i} changing %s of '%s'/'%s'@%s-%s",Event->EventID(),
+            tsyslogs(Source,"{%5i} changing %s of '%s'/'%s'@%s-%s",Event->EventID(),
                      buf,Event->Title(),Event->ShortText() ? Event->ShortText() : "",
                      from,till);
         }
@@ -1073,7 +1073,7 @@ cXMLTVEvent *cImport::AddXMLTVEvent(cEPGSource *Source,sqlite3 *Db, const char *
     }
     else
     {
-        tsyslogs(Source,"{%i} adding '%s'/'%s' to db",xevent->EventID(),xevent->Title(),xevent->ShortText());
+        tsyslogs(Source,"{%5i} adding '%s'/'%s' to db",xevent->EventID(),xevent->Title(),xevent->ShortText());
     }
     return xevent;
 }
@@ -1156,7 +1156,7 @@ bool cImport::UpdateXMLTVEvent(cEPGSource *Source, sqlite3 *Db, const cEvent *Ev
             strcat(buf,"eiteventid");
         }
 
-        tsyslogs(Source,"{%i} updating %s of '%s' in db",Event->EventID(),buf,
+        tsyslogs(Source,"{%5i} updating %s of '%s' in db",Event->EventID(),buf,
                  Event->Title());
     }
 

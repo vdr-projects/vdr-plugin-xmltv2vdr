@@ -282,45 +282,24 @@ bool cEPGHandler::check4proc(cEvent *event, bool &spth, cEPGMapping **map)
 bool cEPGHandler::SetTitle(cEvent* Event, const char* UNUSED(Title))
 {
     if (!Event->Title()) return false; // no title? new event! let VDR handle this..
-    bool seth;
-    if (!check4proc(Event,seth,NULL)) return false;
-
-    if (import.WasChanged(Event))
-    {
-#ifdef VDRDEBUG
-        // ok we already changed this event!
-        tsyslog("{%i} %salready seen title '%s'",Event->EventID(),seth ? "*" : "",
-                Event->Title());
-#endif
-        return true;
-    }
-    return false;
+    return true;
 }
-
 
 bool cEPGHandler::SetShortText(cEvent* Event, const char* ShortText)
 {
-    bool seth;
-    if (!check4proc(Event,seth,NULL)) return false;
-
-    if (import.WasChanged(Event))
-    {
-#ifdef VDRDEBUG
-        // ok we already changed this event!
-        tsyslog("{%i} %salready seen stext '%s'",Event->EventID(),seth ? "*" : "",
-                Event->Title());
-#endif
-        return true;
-    }
     // prevent setting empty shorttext
     if (!ShortText) return true;
     // prevent setting empty shorttext
     if (!strlen(ShortText)) return true;
     // prevent setting shorttext equal to title
     if (Event->Title() && !strcasecmp(Event->Title(),ShortText)) return true;
-    tsyslog("{%i} %ssetting stext (%s) of '%s'",Event->EventID(),seth ? "*" : "",
-            ShortText,Event->Title());
-    return false;
+    if (!Event->ShortText())
+    {
+        tsyslog("{%5i} setting stext (%s) of '%s'",Event->EventID(),
+                ShortText,Event->Title());
+        return false; // no shorttext? new event! let VDR handle this..
+    }
+    return true;
 }
 
 bool cEPGHandler::SetDescription(cEvent* Event, const char* Description)
@@ -337,17 +316,17 @@ bool cEPGHandler::SetDescription(cEvent* Event, const char* Description)
         if (strncasecmp(Event->Description(),Description,len))
         {
             // eit description changed -> set it
-            tsyslog("{%i} %schanging descr of '%s'",Event->EventID(),seth ? "*" : "",
+            tsyslog("{%5i} %schanging descr of '%s'",Event->EventID(),seth ? "*" : "",
                     Event->Title());
             return false;
         }
 #ifdef VDRDEBUG
-        tsyslog("{%i} %salready seen descr '%s'",Event->EventID(),seth ? "*" : "",
+        tsyslog("{%5i} %salready seen descr '%s'",Event->EventID(),seth ? "*" : "",
                 Event->Title());
 #endif
         return true;
     }
-    tsyslog("{%i} %ssetting descr of '%s'",Event->EventID(),seth ? "*" : "",
+    tsyslog("{%5i} %ssetting descr of '%s'",Event->EventID(),seth ? "*" : "",
             Event->Title());
     return false;
 }
@@ -502,15 +481,15 @@ cHouseKeeping::cHouseKeeping(cGlobals *Global): cThread("xmltv2vdr housekeeping"
     global=Global;
 }
 
-int cHouseKeeping::checkdir(const char* imgdir, int age)
+void cHouseKeeping::checkdir(const char* imgdir, int age, int &cnt, int &lcnt)
 {
-    if (age<=0) return 0;
+    if (age<=0) return;
     DIR *dir=opendir(imgdir);
-    if (!dir) return 0;
+    if (!dir) return;
     time_t tmin=time(NULL);
     tmin-=(age*86400);
     struct dirent dirent_buf,*dirent;
-    int cnt=0;
+
     while (readdir_r(dir,&dirent_buf,&dirent)==0)
     {
         if (!dirent) break;
@@ -525,7 +504,11 @@ int cHouseKeeping::checkdir(const char* imgdir, int age)
                 {
                     if (statbuf.st_mtime<tmin)
                     {
-                        if (unlink(fpath)!=-1) cnt++;
+                        if (unlink(fpath)!=-1)
+                        {
+                            if (dirent->d_type==DT_LNK) lcnt++;
+                            if (dirent->d_type==DT_REG) cnt++;
+                        }
                     }
                 }
                 free(fpath);
@@ -533,7 +516,7 @@ int cHouseKeeping::checkdir(const char* imgdir, int age)
         }
     }
     closedir(dir);
-    return cnt;
+    return;
 }
 
 int sd_select(const dirent* dirent)
@@ -548,9 +531,10 @@ int sd_select(const dirent* dirent)
 
 void cHouseKeeping::Action()
 {
-    if (global->ImgDelAfter())
+    if (global->ImgDelAfter() && global->ImgDir())
     {
-        int cnt=checkdir(global->ImgDir(),global->ImgDelAfter());
+        int cnt=0,lcnt=0;
+        checkdir(global->ImgDir(),global->ImgDelAfter(),cnt,lcnt);
         struct dirent **names;
         int ret=scandir("/var/lib/epgsources",&names,sd_select,alphasort);
         if (ret>0)
@@ -560,15 +544,19 @@ void cHouseKeeping::Action()
                 char *newdir;
                 if (asprintf(&newdir,"/var/lib/epgsources/%s",names[i]->d_name)!=-1)
                 {
-                    cnt+=checkdir(newdir,global->ImgDelAfter());
+                    checkdir(newdir,global->ImgDelAfter(),cnt,lcnt);
                     free(newdir);
                 }
             }
             free(names);
         }
+        if (lcnt)
+        {
+            isyslog("removed %i links",lcnt);
+        }
         if (cnt)
         {
-            isyslog("removed %i pics/links",cnt);
+            isyslog("removed %i pics",cnt);
         }
     }
 
