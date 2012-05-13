@@ -250,7 +250,7 @@ char *cImport::AddEOT2Description(char *description, bool checkutf8)
         }
         else
         {
-            if (strncasecmp(codeset,"UTF-8",5))
+            if (strncasecmp(codeset,"UTF-8",5) || strncasecmp(codeset,"UTF8",4))
             {
                 description=strcatrealloc(description,nbsp);
             }
@@ -275,7 +275,7 @@ bool cImport::WasChanged(cEvent* Event)
     return true;
 }
 
-void cImport::LinkPictures(const char *Source, cXMLTVStringList *Pics, tEventID DestID)
+void cImport::LinkPictures(const char *Source, cXMLTVStringList *Pics, tEventID DestID, tChannelID ChanID)
 {
     // source-pics are located in /var/lib/epgsources/%SOURCE%-img/
     // dest-pics are located in imgdir (default /var/cache/vdr/epgimages)
@@ -290,25 +290,41 @@ void cImport::LinkPictures(const char *Source, cXMLTVStringList *Pics, tEventID 
         if (ext)
         {
             ext++;
-            char *dst;
+            char *dst,*dstold;
             int ret;
             if (!i)
             {
-                ret=asprintf(&dst,"%s/%i.%s",imgdir,DestID,ext);
+                ret=asprintf(&dstold,"%s/%i.%s",imgdir,DestID,ext);
             }
             else
             {
-                ret=asprintf(&dst,"%s/%i_%i.%s",imgdir,DestID,i,ext);
+                ret=asprintf(&dstold,"%s/%i_%i.%s",imgdir,DestID,i,ext);
             }
             if (ret==-1)
             {
                 free(src);
                 return;
             }
-            struct stat statbuf;
-            if (stat(dst,&statbuf)==-1)
+
+            if (!i)
             {
-                if (symlink(src,dst)==-1)
+                ret=asprintf(&dst,"%s/%s_%i.%s",imgdir,*ChanID.ToString(),DestID,ext);
+            }
+            else
+            {
+                ret=asprintf(&dst,"%s/%s_%i_%i.%s",imgdir,*ChanID.ToString(),DestID,i,ext);
+            }
+            if (ret==-1)
+            {
+                free(src);
+                free(dstold);
+                return;
+            }
+
+            struct stat statbuf;
+            if (stat(dstold,&statbuf)==-1)
+            {
+                if (symlink(src,dstold)==-1)
                 {
                     if (!i)
                     {
@@ -331,6 +347,32 @@ void cImport::LinkPictures(const char *Source, cXMLTVStringList *Pics, tEventID 
                     }
                 }
             }
+  
+            if (stat(dst,&statbuf)==-1)
+            {
+                if (symlink(src,dst)==-1)
+                {
+                    if (!i)
+                    {
+                        tsyslog("failed to link %s to %s_%i.%s",pic,*ChanID.ToString(),DestID,ext);
+                    }
+                    else
+                    {
+                        tsyslog("failed to link %s to %s_%i_%i.%s",pic,*ChanID.ToString(),DestID,i,ext);
+                    }
+                }
+                else
+                {
+                    if (!i)
+                    {
+                        tsyslog("linked %s to %s_%i.%s",pic,*ChanID.ToString(),DestID,ext);
+                    }
+                    else
+                    {
+                        tsyslog("linked %s to %s_%i_%i.%s",pic,*ChanID.ToString(),DestID,i,ext);
+                    }
+                }
+            }  
         }
     }
 }
@@ -494,7 +536,7 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
             if (!xEvent->EITEventID() && xEvent->Pics()->Size() && Source->UsePics())
             {
                 /* here's a good place to link pictures! */
-                LinkPictures(xEvent->Source(),xEvent->Pics(),Event->EventID());
+                LinkPictures(xEvent->Source(),xEvent->Pics(),Event->EventID(),Event->ChannelID());
             }
             UpdateXMLTVEvent(Source,Db,Event,xEvent,eitdescription);
         }

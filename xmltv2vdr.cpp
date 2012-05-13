@@ -295,8 +295,10 @@ bool cEPGHandler::SetShortText(cEvent* Event, const char* ShortText)
     if (Event->Title() && !strcasecmp(Event->Title(),ShortText)) return true;
     if (!Event->ShortText())
     {
+#if VDRDEBUG
         tsyslog("{%5i} setting stext (%s) of '%s'",Event->EventID(),
                 ShortText,Event->Title());
+#endif
         return false; // no shorttext? new event! let VDR handle this..
     }
     return true;

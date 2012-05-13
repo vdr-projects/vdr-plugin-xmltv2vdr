@@ -464,7 +464,7 @@ int cEPGSource::Execute(cEPGExecutor &myExecutor)
     }
 
     char *cmd=NULL;
-    if (asprintf(&cmd,"%s %i '%s'",name,daysinadvance,pin ? pin : "")==-1)
+    if (asprintf(&cmd,"%s %i '%s' %i ",name,daysinadvance,pin ? pin : "",usepics)==-1)
     {
         esyslogs(this,"out of memory");
         return 134;
