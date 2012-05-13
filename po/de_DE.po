@@ -209,7 +209,7 @@ msgid "Copy to all mapped channels?"
 msgstr "Auf zugewiesene Kanäle kopieren?"
 
 msgid "Reset all channel settings?"
-msgstr "Kanaleinstellungen zurücksetzen?"
+msgstr "Alle Kanaleinstellungen zurücksetzen?"
 
 msgid "Button$Choose"
 msgstr "auswählen"

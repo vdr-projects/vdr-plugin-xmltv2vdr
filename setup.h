@@ -130,15 +130,15 @@ protected:
 private:
     cPluginXmltv2vdr *baseplugin;
     cMenuSetupXmltv2vdr *menu;
-    cEPGMapping *map;
+    cEPGMapping *lmap;
     bool hasmaps;
     uint flags;
     void output(void);
     cString title;
-    const char *channel;
-    int getdaysmax();
+    //const char *channel;
     cOsdItem *option(const char *s, bool yesno);
     void epgmappingreplace(cEPGMapping *newmapping);
+    void Store(cEPGMapping *newmapping, bool replacemapping=true);    
     int c1,c2,c3,c4,cm;
 public:
     cMenuSetupXmltv2vdrChannelMap(cPluginXmltv2vdr *Plugin, cMenuSetupXmltv2vdr *Menu, int Index);
