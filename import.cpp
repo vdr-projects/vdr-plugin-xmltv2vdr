@@ -347,7 +347,7 @@ void cImport::LinkPictures(const char *Source, cXMLTVStringList *Pics, tEventID 
                     }
                 }
             }
-  
+
             if (stat(dst,&statbuf)==-1)
             {
                 if (symlink(src,dst)==-1)
@@ -372,7 +372,7 @@ void cImport::LinkPictures(const char *Source, cXMLTVStringList *Pics, tEventID 
                         tsyslog("linked %s to %s_%i_%i.%s",pic,*ChanID.ToString(),DestID,i,ext);
                     }
                 }
-            }  
+            }
         }
     }
 }
@@ -510,6 +510,11 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
         Event->SetTableID(0);
         Schedule->AddEvent(Event);
         Schedule->Sort();
+        if (xEvent->Pics()->Size() && Source->UsePics())
+        {
+            /* here's a good place to link pictures! */
+            LinkPictures(xEvent->Source(),xEvent->Pics(),Event->EventID(),Event->ChannelID());
+        }
         if (Source->Trace())
         {
             localtime_r(&start,&tm);
@@ -519,10 +524,6 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
             tsyslogs(Source,"adding '%s'@%s-%s",xEvent->Title(),from,till);
         }
         retcode=true;
-    }
-    else
-    {
-        append=false;
     }
 
     if (!Event) return false;
@@ -1443,10 +1444,11 @@ int cImport::Process(cEPGSource *Source, cEPGExecutor &myExecutor)
 
                     if (addevents && event && (event->EventID() != xevent.EventID()))
                     {
-                        esyslogs(Source,"found another event with different eventid");
-                        int newflags=map->Flags();
-                        newflags &=~OPT_APPEND;
-                        map->ChangeFlags(newflags);
+                        xevent.SetEITEventID(event->EventID()); // that's only a guess!
+                        tsyslogs(Source,"{%5i} changing existing eventid to {%5i}",event->EventID(),xevent.EventID());
+                        event->SetEventID(xevent.EventID());
+                        event->SetVersion(0);
+                        event->SetTableID(0);
                     }
 
 #if VDRVERSNUM < 10726 && (!EPGHANDLER)

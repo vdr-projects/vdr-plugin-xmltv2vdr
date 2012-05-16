@@ -135,7 +135,6 @@ private:
     uint flags;
     void output(void);
     cString title;
-    //const char *channel;
     cOsdItem *option(const char *s, bool yesno);
     void epgmappingreplace(cEPGMapping *newmapping);
     void Store(cEPGMapping *newmapping, bool replacemapping=true);    
