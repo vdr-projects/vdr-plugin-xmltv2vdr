@@ -295,6 +295,8 @@ const char *cXMLTVEvent::GetSQL(const char *Source, int SrcIdx, const char *Chan
     const char *vi=video.toString();
     const char *pi=pics.toString();
 
+    if (!eventid) eventid=starttime; // that's very weak!
+    
     if (asprintf(&sql,"INSERT OR IGNORE INTO epg (src,channelid,eventid,starttime,duration,"\
                  "title,origtitle,shorttext,description,country,year,credits,category,"\
                  "review,rating,starrating,video,audio,season,episode,episodeoverall,pics,srcidx) "\

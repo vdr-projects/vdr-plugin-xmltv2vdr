@@ -173,6 +173,10 @@ G <xsl:value-of select="d25"/>
 </xsl:attribute>
 <xsl:text>&#x0A;</xsl:text>
 
+<xsl:if test="string-length($EVENTID)">
+<xsl:comment> pid = <xsl:value-of select="$EVENTID"/><xsl:text> </xsl:text></xsl:comment><xsl:text>&#x0A;</xsl:text>
+</xsl:if>
+
 <title lang="de"><xsl:value-of select="d19"/></title><xsl:text>&#x0A;</xsl:text>
 <xsl:if test="string-length(d20)">
 <sub-title lang="de"><xsl:value-of select="d20"/></sub-title><xsl:text>&#x0A;</xsl:text>
@@ -191,9 +195,6 @@ G <xsl:value-of select="d25"/>
 </xsl:if>
 <xsl:if test="string-length($GENRE)">
 <category lang="de"><xsl:value-of select="$GENRE"/></category><xsl:text>&#x0A;</xsl:text>
-</xsl:if>
-<xsl:if test="string-length($EVENTID)">
-<category lang="de"><xsl:value-of select="$EVENTID"/></category><xsl:text>&#x0A;</xsl:text>
 </xsl:if>
 <xsl:if test="string-length($PICS)">
 <xsl:copy-of select="$PICS"/>

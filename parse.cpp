@@ -288,6 +288,17 @@ bool cParse::FetchEvent(xmlNodePtr enode, bool useeptext)
     xmlNodePtr node=enode->xmlChildrenNode;
     while (node)
     {
+        if (node->type==XML_COMMENT_NODE)
+        {
+            if (const xmlChar *pid=xmlStrstr(node->content,(const xmlChar *) "pid"))
+            {
+                char *eq=strchr((char *) pid,'=');
+                if (eq)
+                {
+                    xevent.SetEventID(atol(eq+6));
+                }
+            }
+        }
         if (node->type==XML_ELEMENT_NODE)
         {
             if ((!xmlStrcasecmp(node->name, (const xmlChar *) "title")))
@@ -383,7 +394,7 @@ bool cParse::FetchEvent(xmlNodePtr enode, bool useeptext)
                 {
                     if (isdigit(content[0]))
                     {
-                        xevent.SetEventID(atoi((const char *) content));
+                        xevent.SetEventID(atol((const char *) content));
                     }
                     else
                     {
@@ -763,6 +774,14 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
             node=node->next;
             continue;
         }
+
+        if (!xevent.EventID())
+        {
+            if (lerr!=PARSE_NOEVENTID)
+                isyslogs(source,"event without id, using weak id!");
+            lerr=PARSE_NOEVENTID;
+        }
+
         for (int i=0; i<map->NumChannelIDs(); i++)
         {
             const char *sql=xevent.GetSQL(source->Name(),source->Index(),map->ChannelIDs()[i].ToString());

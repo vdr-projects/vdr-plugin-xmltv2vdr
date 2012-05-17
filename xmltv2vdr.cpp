@@ -438,7 +438,6 @@ void cEPGTimer::Action()
     bool useeptext=((epall & EPLIST_USE_TEXT)==EPLIST_USE_TEXT);
     int Flags=USE_SEASON;
     if (useeptext) Flags|=(USE_SHORTTEXT|USE_TITLE);
-    bool changed=false;
     for (cTimer *Timer = Timers.First(); Timer; Timer = Timers.Next(Timer))
     {
         if (Timer->Recording()) continue; // to late ;)
@@ -464,7 +463,7 @@ void cEPGTimer::Action()
         }
         free((void*)ChannelID);
 
-        if (import.PutEvent(source,db,NULL,event,xevent,Flags)) changed=true;
+        import.PutEvent(source,db,NULL,event,xevent,Flags);
         delete xevent;
     }
     if (db)
@@ -473,7 +472,6 @@ void cEPGTimer::Action()
         sqlite3_close(db);
     }
     Timers.DecBeingEdited();
-    if (changed) cSchedules::Cleanup(true);
 }
 
 // -------------------------------------------------------------

@@ -78,7 +78,7 @@ void cEPGExecutor::Action()
                     }
                     retries++;
                 }
-                if ((retries==2) || (!ret)) break;
+                if ((retries==2 || (ret==127)) || (!ret)) break;
             }
             if (retries>=2) esyslogs(epgs,"skipping after %i retries",retries);
         }
@@ -101,7 +101,6 @@ void cEPGExecutor::Action()
             }
         }
     }
-    if (!ret) cSchedules::Cleanup(true);
     forceimportsrc=-1;
     forcedownload=false;
 }

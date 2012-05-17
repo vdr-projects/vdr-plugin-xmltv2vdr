@@ -29,7 +29,8 @@ class cParse
         PARSE_NOMAPPING,
         PARSE_NOCHANNELID,
         PARSE_FETCHERR,
-        PARSE_SQLERR
+        PARSE_SQLERR,
+        PARSE_NOEVENTID
     };
 
 private:
