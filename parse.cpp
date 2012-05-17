@@ -575,6 +575,18 @@ bool cParse::FetchEvent(xmlNodePtr enode, bool useeptext)
             {
                 // info about subtitles -> just ignore (till now)
             }
+            else if ((!xmlStrcasecmp(node->name, (const xmlChar *) "new")))
+            {
+                // info if it's new -> just ignore (till now)
+            }
+            else if ((!xmlStrcasecmp(node->name, (const xmlChar *) "premiere")))
+            {
+                // premiere info -> just ignore (till now)
+            }
+            else if ((!xmlStrcasecmp(node->name, (const xmlChar *) "previously-shown")))
+            {
+                // info if it's old ;) -> just ignore (till now)
+            }
             else
             {
                 esyslogs(source,"unknown element %s, please report!",node->name);
