@@ -90,16 +90,24 @@ cEvent *cImport::SearchVDREvent(cEPGSource *source, cSchedule* schedule, cXMLTVE
     // try to find an event,
     // 1st with our own EventID
     if (xevent->EITEventID()) f=(cEvent *) schedule->GetEvent(xevent->EITEventID());
-    if (f) return f;
+    if (f)
+    {
+        return f;
+    }
 
     if (xevent->EventID() && append) f=(cEvent *) schedule->GetEvent(xevent->EventID());
-    if (f) return f;
+    if (f)
+    {
+        return f;
+    }
+
+    const char *cxTitle=conv->Convert(xevent->Title());
 
     // 2nd with StartTime
     f=(cEvent *) schedule->GetEvent((tEventID) 0,xevent->StartTime());
     if (f)
     {
-        if (!strcmp(f->Title(),conv->Convert(xevent->Title())))
+        if (!strcmp(f->Title(),cxTitle))
         {
             return f;
         }
@@ -108,7 +116,8 @@ cEvent *cImport::SearchVDREvent(cEPGSource *source, cSchedule* schedule, cXMLTVE
     int maxdiff=INT_MAX;
     int eventTimeDiff=0;
     if (xevent->Duration()) eventTimeDiff=xevent->Duration()/4;
-    if (eventTimeDiff<780) eventTimeDiff=780;
+    if (eventTimeDiff<100) eventTimeDiff=100;
+    if (eventTimeDiff>780) eventTimeDiff=780;
 
     for (cEvent *p = schedule->Events()->First(); p; p = schedule->Events()->Next(p))
     {
@@ -116,7 +125,7 @@ cEvent *cImport::SearchVDREvent(cEPGSource *source, cSchedule* schedule, cXMLTVE
         if (diff<=eventTimeDiff)
         {
             // found event with exact the same title
-            if (!strcmp(p->Title(),conv->Convert(xevent->Title())))
+            if (!strcmp(p->Title(),cxTitle))
             {
                 if (diff<=maxdiff)
                 {
@@ -136,7 +145,7 @@ cEvent *cImport::SearchVDREvent(cEPGSource *source, cSchedule* schedule, cXMLTVE
                 // 0x20,0x30-0x39,0x41-0x5A,0x61-0x7A
                 int wfound=0;
                 char *s1=RemoveNonASCII(p->Title());
-                char *s2=RemoveNonASCII(conv->Convert(xevent->Title()));
+                char *s2=RemoveNonASCII(cxTitle);
                 if (s1 && s2)
                 {
                     if (!strcmp(s1,s2))
@@ -170,7 +179,7 @@ cEvent *cImport::SearchVDREvent(cEPGSource *source, cSchedule* schedule, cXMLTVE
                     if (diff<=maxdiff)
                     {
                         if (!WasChanged(p))
-                            tsyslogs(source,"found '%s' for '%s'",p->Title(),conv->Convert(xevent->Title()));
+                            tsyslogs(source,"found '%s' for '%s'",p->Title(),cxTitle);
                         f=p;
                         maxdiff=diff;
                     }

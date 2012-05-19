@@ -706,8 +706,9 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
     time_t begin=time(NULL)-7200;
     xmlNodePtr node=rootnode->xmlChildrenNode;
 
-    int lerr=0;
-    int cnt=0;
+    int lerr=0,lweak=0;
+    xmlChar *lastchannelid=NULL;
+    int skipped=0;
     while (node)
     {
         if (node->type!=XML_ELEMENT_NODE)
@@ -727,18 +728,24 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
                 esyslogs(source,"missing channelid in xmltv file");
             lerr=PARSE_NOCHANNELID;
             node=node->next;
+            skipped++;
             continue;
         }
         cEPGMapping *map=maps->GetMap((const char *) channelid);
         if (!map)
         {
-            if (lerr!=PARSE_NOMAPPING)
+            if ((lerr!=PARSE_NOMAPPING) || (lastchannelid && xmlStrcmp(channelid,lastchannelid)))
                 esyslogs(source,"no mapping for channelid %s",channelid);
             lerr=PARSE_NOMAPPING;
+            if (lastchannelid) xmlFree(lastchannelid);
+            lastchannelid=xmlStrdup(channelid);
             xmlFree(channelid);
             node=node->next;
+            skipped++;
             continue;
         }
+        if (lastchannelid) xmlFree(lastchannelid);
+        lastchannelid=xmlStrdup(channelid);
         xmlFree(channelid);
 
         xmlChar *start,*stop;
@@ -766,12 +773,14 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
                 esyslogs(source,"no starttime, check xmltv file");
             lerr=PARSE_XMLTVERR;
             node=node->next;
+            skipped++;
             continue;
         }
 
         if (starttime<begin)
         {
             node=node->next;
+            skipped++;
             continue;
         }
         xevent.Clear();
@@ -784,14 +793,20 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
                 esyslogs(source,"failed to fetch event");
             lerr=PARSE_FETCHERR;
             node=node->next;
+            skipped++;
             continue;
+        }
+        xmlErrorPtr xmlerr=xmlGetLastError();
+        if (xmlerr && xmlerr->code)
+        {
+            esyslogs(source,"%s",xmlerr->message);
         }
 
         if (!xevent.EventID())
         {
-            if (lerr!=PARSE_NOEVENTID)
-                isyslogs(source,"event without id, using weak id!");
-            lerr=PARSE_NOEVENTID;
+            if (lweak!=PARSE_NOEVENTID)
+                isyslogs(source,"event without id, using starttime as id (weak)!");
+            lweak=PARSE_NOEVENTID;
         }
 
         for (int i=0; i<map->NumChannelIDs(); i++)
@@ -806,8 +821,6 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
                 break;
             }
         }
-        cnt++;
-
         node=node->next;
         if (!myExecutor.StillRunning())
         {
@@ -816,6 +829,17 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
         }
     }
 
+    if (sqlite3_exec(db,"COMMIT",NULL,NULL,&errmsg)!=SQLITE_OK)
+    {
+        esyslogs(source,"sqlite3: %s",errmsg);
+        sqlite3_free(errmsg);
+    }
+
+    int cnt=sqlite3_total_changes(db);
+
+    if (skipped)
+        isyslogs(source,"skipped %i xmltv events",skipped);
+
     if (!lerr)
     {
         isyslogs(source,"processed %i xmltv events",cnt);
@@ -823,10 +847,9 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
     else
     {
         isyslogs(source,"processed %i xmltv events - see ERRORs above!",cnt);
-
     }
 
-    if (sqlite3_exec(db,"COMMIT; ANALYZE epg;",NULL,NULL,&errmsg)!=SQLITE_OK)
+    if (sqlite3_exec(db,"ANALYZE epg;",NULL,NULL,&errmsg)!=SQLITE_OK)
     {
         esyslogs(source,"sqlite3: %s",errmsg);
         sqlite3_free(errmsg);

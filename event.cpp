@@ -300,7 +300,7 @@ const char *cXMLTVEvent::GetSQL(const char *Source, int SrcIdx, const char *Chan
     if (asprintf(&sql,"INSERT OR IGNORE INTO epg (src,channelid,eventid,starttime,duration,"\
                  "title,origtitle,shorttext,description,country,year,credits,category,"\
                  "review,rating,starrating,video,audio,season,episode,episodeoverall,pics,srcidx) "\
-                 "VALUES (^%s^,^%s^,%i,%li,%i,"\
+                 "VALUES (^%s^,^%s^,%u,%li,%i,"\
                  "^%s^,^%s^,^%s^,^%s^,^%s^,%i,^%s^,^%s^,"\
                  "^%s^,^%s^,^%s^,^%s^,^%s^,%i,%i,%i,^%s^,%i);"\
 
@@ -308,7 +308,7 @@ const char *cXMLTVEvent::GetSQL(const char *Source, int SrcIdx, const char *Chan
                  "shorttext=^%s^,description=^%s^,country=^%s^,year=%i,credits=^%s^,category=^%s^,"\
                  "review=^%s^,rating=^%s^,starrating=^%s^,video=^%s^,audio=^%s^,season=%i,episode=%i, "\
                  "episodeoverall=%i,pics=^%s^,srcidx=%i " \
-                 " where changes()=0 and src=^%s^ and channelid=^%s^ and eventid=%i"
+                 " where changes()=0 and src=^%s^ and channelid=^%s^ and eventid=%u"
                  ,
                  Source,ChannelID,eventid,starttime,duration,title,
                  origtitle ? origtitle : "NULL",

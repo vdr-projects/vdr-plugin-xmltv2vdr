@@ -804,7 +804,6 @@ bool cPluginXmltv2vdr::Start(void)
 void cPluginXmltv2vdr::Stop(void)
 {
     // Stop any background activities the plugin is performing.
-    cSchedules::Cleanup(true);
     if (epgtimer)
     {
         epgtimer->Stop();

@@ -147,7 +147,19 @@ void cMenuSetupXmltv2vdr::Output(void)
         cEPGMapping *map=baseplugin->EPGMapping(channels[i]);
         if (map)
         {
-            if (map->NumChannelIDs()) mapped=true;
+            for (int x=0; x<map->NumChannelIDs(); x++)
+            {
+                cChannel *chan=Channels.GetByChannelID(map->ChannelIDs()[x]);
+                if (chan)
+                {
+                    mapped=true;
+                }
+                else
+                {
+                    // invalid channelid? remove from list
+                    map->RemoveChannel(map->ChannelIDs()[x],true);
+                }
+            }
         }
         cString buffer = cString::sprintf("%s:\t%s",channels[i],mapped ? tr("mapped") : "");
         Add(new cOsdItem(buffer),true);
