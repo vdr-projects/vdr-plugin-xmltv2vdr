@@ -150,12 +150,12 @@ int cepgdata2xmltv::Fetch(const char *dest, const char *pin, int day)
 
     if (asprintf (&filename, "%i&pin=%s",day,pin)==-1)
     {
-        esyslog("failed to allocate string");
+        esyslog("failed to allocate string (%i)",day);
         return 1;
     }
     if (asprintf (&url, EPGDATA2XMLTV_URL, filename) == -1)
     {
-        esyslog("failed to allocate string");
+        esyslog("failed to allocate string (%i)",day);
         free(filename);
         return 1;
     }
@@ -164,7 +164,7 @@ int cepgdata2xmltv::Fetch(const char *dest, const char *pin, int day)
     data.fd=open(dest,O_CREAT|O_TRUNC|O_WRONLY,0664);
     if (data.fd==-1)
     {
-        esyslog("failed to open %s",dest);
+        esyslog("failed to open %s (%i)",dest,day);
         return 1;
     }
 
@@ -181,38 +181,38 @@ int cepgdata2xmltv::Fetch(const char *dest, const char *pin, int day)
     // -22 not found
     if (ret==-40)
     {
-        esyslog("fatal curl error");
+        esyslog("fatal curl error (%i)",day);
         return 1;
     }
     if (ret==-28)
     {
-        esyslog("timeout");
+        esyslog("timeout (%i)",day);
         return 1;
     }
     if (ret==-10)
     {
-        esyslog("wrong proxy auth");
+        esyslog("wrong proxy auth (%i)",day);
         return 1;
     }
     if (ret==-7)
     {
-        esyslog("failed to connect");
+        esyslog("failed to connect (%i)",day);
         return 2;
     }
     if (ret==-6)
     {
-        esyslog("failed to resolve host");
+        esyslog("failed to resolve host (%i)",day);
         return 2;
     }
     if (ret==-22)
     {
-        esyslog("wrong pin");
+        esyslog("wrong pin (%i)",day);
         return 1;
 
     }
     if (ret==-63)
     {
-        esyslog("filesize exceeded, please report this!");
+        esyslog("filesize exceeded, please report this! (%i)",day);
         return 1;
     }
     return 0;
@@ -282,6 +282,7 @@ int cepgdata2xmltv::Process(int argc, char *argv[])
     time_t t=time(NULL);
 
     int carg=3;
+    if (!strcmp(argv[3],"1") || !strcmp(argv[3],"0"))  carg++;
 
     for (int day=0; day<=daysinadvance; day++)
     {
@@ -470,7 +471,6 @@ int cepgdata2xmltv::Process(int argc, char *argv[])
             }
 
             if (!strcmp(argv[3],"1")) {
-                carg++;
                 int entries=zip_get_num_files(zip);
                 for (int i=0; i<entries; i++)
                 {
@@ -479,7 +479,6 @@ int cepgdata2xmltv::Process(int argc, char *argv[])
 
                         char *destjpg;
                         if (asprintf(&destjpg,"/var/lib/epgsources/epgdata2xmltv-img/%s",name)!=-1) {
-                            //FILE *f=fopen("/var/lib/epgsources/epgdata2xmltv","r");
                             struct stat statbuf;
                             if (stat(destjpg,&statbuf)==-1) {
                                 struct zip_file *zfile=zip_fopen_index(zip,i,0);
@@ -508,8 +507,6 @@ int cepgdata2xmltv::Process(int argc, char *argv[])
                         }
                     }
                 }
-            } else {
-                if (!strcmp(argv[3],"0")) carg++;
             }
 
             zip_close(zip);

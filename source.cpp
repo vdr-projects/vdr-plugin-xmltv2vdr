@@ -84,11 +84,10 @@ void cEPGExecutor::Action()
         }
     }
 
-    int ret=1;
     if (forceimportsrc>=0)
     {
         cEPGSource *epgs=sources->Get(forceimportsrc);
-        if (epgs) ret=epgs->Import(*this);
+        if (epgs) epgs->Import(*this);
     }
     else
     {
@@ -96,7 +95,7 @@ void cEPGExecutor::Action()
         {
             if (!epgs->LastRetCode())
             {
-                ret=epgs->Import(*this);
+                epgs->Import(*this);
                 break; // only import from the first successful source!
             }
         }
