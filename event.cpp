@@ -283,9 +283,43 @@ void cXMLTVEvent::AddCredits(const char *CreditType, const char *Credit, const c
     credits.Sort();
 }
 
-const char *cXMLTVEvent::GetSQL(const char *Source, int SrcIdx, const char *ChannelID)
+void cXMLTVEvent::CreateEventID(time_t StartTime)
 {
-    if (sql) free(sql);
+    if (eventid) return;
+    // create own 16bit eventid
+    struct tm tm;
+    if (!localtime_r(&StartTime,&tm)) return;
+
+    // this id cycles every 31 days, so if we have
+    // 4 weeks programme in advance the id will
+    // occupy already existing entries
+    // till now, i'm only aware of 2 weeks
+    // programme in advance
+    int newid=((tm.tm_mday) & 0x1F)<<11;
+    newid|=((tm.tm_hour & 0x1F)<<6);
+    newid|=(tm.tm_min & 0x3F);
+
+    eventid=newid & 0xFFFF;
+}
+
+void cXMLTVEvent::GetSQL(const char *Source, int SrcIdx, const char *ChannelID, char **Insert, char **Update)
+{
+    if (sql_insert)
+    {
+        free(sql_insert);
+        sql_insert=NULL;
+    }
+    if (sql_update)
+    {
+        free(sql_update);
+        sql_update=NULL;
+    }
+
+    if (!Insert) return;
+    if (!Update) return;
+
+    *Insert=NULL;
+    *Update=NULL;
 
     const char *cr=credits.toString();
     const char *ca=category.toString();
@@ -295,20 +329,15 @@ const char *cXMLTVEvent::GetSQL(const char *Source, int SrcIdx, const char *Chan
     const char *vi=video.toString();
     const char *pi=pics.toString();
 
-    if (!eventid) eventid=starttime; // that's very weak!
-    
-    if (asprintf(&sql,"INSERT OR IGNORE INTO epg (src,channelid,eventid,starttime,duration,"\
+    if (!eventid) return;
+
+    if (asprintf(&sql_insert,
+                 "INSERT OR FAIL INTO epg (src,channelid,eventid,starttime,duration,"\
                  "title,origtitle,shorttext,description,country,year,credits,category,"\
                  "review,rating,starrating,video,audio,season,episode,episodeoverall,pics,srcidx) "\
                  "VALUES (^%s^,^%s^,%u,%li,%i,"\
                  "^%s^,^%s^,^%s^,^%s^,^%s^,%i,^%s^,^%s^,"\
-                 "^%s^,^%s^,^%s^,^%s^,^%s^,%i,%i,%i,^%s^,%i);"\
-
-                 "UPDATE epg SET duration=%i,starttime=%li,title=^%s^,origtitle=^%s^,"\
-                 "shorttext=^%s^,description=^%s^,country=^%s^,year=%i,credits=^%s^,category=^%s^,"\
-                 "review=^%s^,rating=^%s^,starrating=^%s^,video=^%s^,audio=^%s^,season=%i,episode=%i, "\
-                 "episodeoverall=%i,pics=^%s^,srcidx=%i " \
-                 " where changes()=0 and src=^%s^ and channelid=^%s^ and eventid=%u"
+                 "^%s^,^%s^,^%s^,^%s^,^%s^,%i,%i,%i,^%s^,%i);"
                  ,
                  Source,ChannelID,eventid,starttime,duration,title,
                  origtitle ? origtitle : "NULL",
@@ -318,8 +347,20 @@ const char *cXMLTVEvent::GetSQL(const char *Source, int SrcIdx, const char *Chan
                  year,
                  cr,ca,re,ra,sr,vi,
                  audio ? audio : "NULL",
-                 season, episode, episodeoverall, pi, SrcIdx,
+                 season, episode, episodeoverall, pi, SrcIdx
+                )==-1)
+    {
+        sql_insert=NULL;
+        return;
+    }
 
+    if (asprintf(&sql_update,
+                 "UPDATE epg SET duration=%i,starttime=%li,title=^%s^,origtitle=^%s^,"\
+                 "shorttext=^%s^,description=^%s^,country=^%s^,year=%i,credits=^%s^,category=^%s^,"\
+                 "review=^%s^,rating=^%s^,starrating=^%s^,video=^%s^,audio=^%s^,season=%i,episode=%i, "\
+                 "episodeoverall=%i,pics=^%s^,srcidx=%i " \
+                 " where src=^%s^ and channelid=^%s^ and eventid=%u"
+                 ,
                  duration,starttime,title,
                  origtitle ? origtitle : "NULL",
                  shorttext ? shorttext : "NULL",
@@ -329,23 +370,36 @@ const char *cXMLTVEvent::GetSQL(const char *Source, int SrcIdx, const char *Chan
                  cr,ca,re,ra,sr,vi,
                  audio ? audio : "NULL",
                  season, episode, episodeoverall, pi, SrcIdx,
-
                  Source,ChannelID,eventid
-
-                )==-1) return NULL;
-
-    string s=sql;
-
-    int reps;
-    reps=pcrecpp::RE("'").GlobalReplace("''",&s);
-    reps+=pcrecpp::RE("\\^").GlobalReplace("'",&s);
-    reps+=pcrecpp::RE("'NULL'").GlobalReplace("NULL",&s);
-    if (reps)
+                )==-1)
     {
-        sql=(char *) realloc(sql,s.size()+1);
-        strcpy(sql,s.c_str());
+        sql_update=NULL;
+        return;
     }
-    return sql;
+
+    string si=sql_insert;
+    int ireps;
+    ireps=pcrecpp::RE("'").GlobalReplace("''",&si);
+    ireps+=pcrecpp::RE("\\^").GlobalReplace("'",&si);
+    ireps+=pcrecpp::RE("'NULL'").GlobalReplace("NULL",&si);
+    if (ireps)
+    {
+        sql_insert=(char *) realloc(sql_insert,si.size()+1);
+        strcpy(sql_insert,si.c_str());
+    }
+    *Insert=sql_insert;
+
+    string su=sql_update;
+    int ureps;
+    ureps=pcrecpp::RE("'").GlobalReplace("''",&su);
+    ureps+=pcrecpp::RE("\\^").GlobalReplace("'",&su);
+    ureps+=pcrecpp::RE("'NULL'").GlobalReplace("NULL",&su);
+    if (ureps)
+    {
+        sql_update=(char *) realloc(sql_update,su.size()+1);
+        strcpy(sql_update,su.c_str());
+    }
+    *Update=sql_update;
 }
 
 void cXMLTVEvent::Clear()
@@ -355,10 +409,15 @@ void cXMLTVEvent::Clear()
         free(source);
         source=NULL;
     }
-    if (sql)
+    if (sql_insert)
     {
-        free(sql);
-        sql=NULL;
+        free(sql_insert);
+        sql_insert=NULL;
+    }
+    if (sql_update)
+    {
+        free(sql_update);
+        sql_update=NULL;
     }
     if (title)
     {
@@ -420,7 +479,8 @@ void cXMLTVEvent::Clear()
 
 cXMLTVEvent::cXMLTVEvent()
 {
-    sql=NULL;
+    sql_insert=NULL;
+    sql_update=NULL;
     source=NULL;
     channelid=NULL;
     title=NULL;

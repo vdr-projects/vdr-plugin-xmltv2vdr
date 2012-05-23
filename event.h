@@ -39,7 +39,8 @@ private:
     char *country;
     char *origtitle;
     char *audio;
-    char *sql;
+    char *sql_insert;
+    char *sql_update;
     char *channelid;
     char *source;
     int year;
@@ -86,7 +87,8 @@ public:
     void SetStarRating(const char *StarRating);
     void SetVideo(const char *Video);
     void SetPics(const char *Pics);
-    const char *GetSQL(const char *Source, int SrcIdx, const char *ChannelID);
+    void CreateEventID(time_t StartTime);
+    void GetSQL(const char *Source, int SrcIdx, const char *ChannelID, char **Insert, char **Update);
     cXMLTVStringList *Credits()
     {
         return &credits;

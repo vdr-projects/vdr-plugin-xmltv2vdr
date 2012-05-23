@@ -685,11 +685,10 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
                "episodeoverall int, pics text, srcidx int," \
                "PRIMARY KEY(src, channelid, eventid)" \
                ");" \
-               "CREATE UNIQUE INDEX IF NOT EXISTS idx1 on epg (eventid, src); " \
-               "CREATE UNIQUE INDEX IF NOT EXISTS idx2 on epg (eventid, channelid); " \
-               "CREATE UNIQUE INDEX IF NOT EXISTS idx3 on epg (eventid, channelid, src); " \
-               "CREATE INDEX IF NOT EXISTS idx4 on epg (starttime, title, channelid); " \
-               "CREATE INDEX IF NOT EXISTS idx5 on epg (starttime, src); " \
+               "CREATE INDEX IF NOT EXISTS idx1 on epg (eventid, channelid); " \
+               "CREATE INDEX IF NOT EXISTS idx2 on epg (eventid, src); " \
+               "CREATE INDEX IF NOT EXISTS idx3 on epg (starttime, title, channelid); " \
+               "CREATE INDEX IF NOT EXISTS idx4 on epg (starttime, src); " \
                "BEGIN";
 
     char *errmsg;
@@ -748,7 +747,7 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
         lastchannelid=xmlStrdup(channelid);
         xmlFree(channelid);
 
-        xmlChar *start,*stop;
+        xmlChar *start=NULL,*stop=NULL;
         time_t starttime=(time_t) 0;
         time_t stoptime=(time_t) 0;
         start=xmlGetProp(node,(const xmlChar *) "start");
@@ -761,10 +760,8 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
                 if (stop)
                 {
                     stoptime=ConvertXMLTVTime2UnixTime((char *) stop);
-                    xmlFree(stop);
                 }
             }
-            xmlFree(start);
         }
 
         if (!starttime)
@@ -774,18 +771,38 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
             lerr=PARSE_XMLTVERR;
             node=node->next;
             skipped++;
+            if (start) xmlFree(start);
+            if (stop) xmlFree(stop);
             continue;
         }
 
         if (starttime<begin)
         {
             node=node->next;
-            skipped++;
+            if (start) xmlFree(start);
+            if (stop) xmlFree(stop);
             continue;
         }
         xevent.Clear();
         xevent.SetStartTime(starttime);
-        if (stoptime) xevent.SetDuration(stoptime-starttime);
+        if (stoptime)
+        {
+            if (stoptime<starttime)
+            {
+                if (lerr!=PARSE_XMLTVERR)
+                    esyslogs(source,"stoptime (%s) < starttime(%s), check xmltv file", stop, start);
+                lerr=PARSE_XMLTVERR;
+                node=node->next;
+                skipped++;
+                if (start) xmlFree(start);
+                if (stop) xmlFree(stop);
+                continue;
+            }
+            xevent.SetDuration(stoptime-starttime);
+        }
+
+        if (start) xmlFree(start);
+        if (stop) xmlFree(stop);
 
         if (!FetchEvent(node,(map->Flags() & OPT_SEASON_SHORTTEXT)==OPT_SEASON_SHORTTEXT)) // sets xevent
         {
@@ -807,18 +824,32 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
             if (lweak!=PARSE_NOEVENTID)
                 isyslogs(source,"event without id, using starttime as id (weak)!");
             lweak=PARSE_NOEVENTID;
+            xevent.CreateEventID(xevent.StartTime());
         }
 
         for (int i=0; i<map->NumChannelIDs(); i++)
         {
-            const char *sql=xevent.GetSQL(source->Name(),source->Index(),map->ChannelIDs()[i].ToString());
-            if (sqlite3_exec(db,sql,NULL,NULL,&errmsg)!=SQLITE_OK)
+            char *isql,*usql;
+            xevent.GetSQL(source->Name(),source->Index(),map->ChannelIDs()[i].ToString(),&isql,&usql);
+            if (isql && usql)
             {
-                if (lerr!=PARSE_SQLERR)
-                    esyslogs(source,"sqlite3: %s",errmsg);
-                lerr=PARSE_SQLERR;
-                sqlite3_free(errmsg);
-                break;
+                int ret=sqlite3_exec(db,isql,NULL,NULL,&errmsg);
+                if (ret!=SQLITE_OK)
+                {
+                    if (ret==SQLITE_CONSTRAINT)
+                    {
+                        sqlite3_free(errmsg);
+                        ret=sqlite3_exec(db,usql,NULL,NULL,&errmsg);
+                    }
+                    if (ret!=SQLITE_OK)
+                    {
+                        if (lerr!=PARSE_SQLERR)
+                            esyslogs(source,"sqlite3: %s",errmsg);
+                        lerr=PARSE_SQLERR;
+                        sqlite3_free(errmsg);
+                        break;
+                    }
+                }
             }
         }
         node=node->next;

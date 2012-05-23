@@ -406,6 +406,7 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
     int changed=CHANGED_NOTHING;
     bool append=false;
     bool retcode=false;
+    bool added=false;
 
     if ((Flags & OPT_APPEND)==OPT_APPEND) append=true;
 
@@ -474,6 +475,14 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
                     }
                 }
             }
+            else
+            {
+                // no next event, check for gaps
+                if (prev->EndTime()!=start)
+                {
+                    tsyslogs(Source,"detected gap of %lis",(long int)(start-prev->EndTime()));
+                }
+            }
 
             if (prev->EndTime()>start)
             {
@@ -519,6 +528,7 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
         Event->SetTableID(0);
         Schedule->AddEvent(Event);
         Schedule->Sort();
+        added=true;
         if (xEvent->Pics()->Size() && Source->UsePics())
         {
             /* here's a good place to link pictures! */
@@ -530,7 +540,8 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
             strftime(from,sizeof(from)-1,"%b %d %H:%M",&tm);
             localtime_r(&end,&tm);
             strftime(till,sizeof(till)-1,"%b %d %H:%M",&tm);
-            tsyslogs(Source,"adding '%s'@%s-%s",xEvent->Title(),from,till);
+            tsyslogs(Source,"{%5i} adding '%s'/'%s'@%s-%s",xEvent->EventID(),xEvent->Title(),
+                     xEvent->ShortText(),from,till);
         }
         retcode=true;
     }
@@ -901,7 +912,7 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
     event->SetTableID(0); // prevent EIT EPG to update this event
 #endif
 
-    if (!append && changed)
+    if (!added && changed)
     {
 
         if (((changed & CHANGED_SHORTTEXT)==CHANGED_SHORTTEXT) && (WasChanged(Event)==false))
@@ -1114,18 +1125,32 @@ cXMLTVEvent *cImport::AddXMLTVEvent(cEPGSource *Source,sqlite3 *Db, const char *
         return NULL;
     }
 
-    const char *sql=xevent->GetSQL(Source->Name(),99,ChannelID);
-    char *errmsg;
-    if (sqlite3_exec(Db,sql,NULL,NULL,&errmsg)!=SQLITE_OK)
+    char *isql,*usql;
+    xevent->GetSQL(Source->Name(),99,ChannelID,&isql,&usql);
+    if (isql && usql)
     {
-        esyslogs(Source,"%s",errmsg);
-        sqlite3_free(errmsg);
-        delete xevent;
-        xevent=NULL;
-    }
-    else
-    {
-        tsyslogs(Source,"{%5i} adding '%s'/'%s' to db",xevent->EventID(),xevent->Title(),xevent->ShortText());
+        char *errmsg;
+        int ret=sqlite3_exec(Db,isql,NULL,NULL,&errmsg);
+        if (ret!=SQLITE_OK)
+        {
+            if (ret==SQLITE_CONSTRAINT)
+            {
+                sqlite3_free(errmsg);
+                ret=sqlite3_exec(Db,usql,NULL,NULL,&errmsg);
+            }
+            if (ret!=SQLITE_OK)
+            {
+                esyslogs(Source,"sqlite3: %s",errmsg);
+                sqlite3_free(errmsg);
+                delete xevent;
+                return NULL;
+            }
+        }
+        if (ret==SQLITE_OK)
+        {
+            tsyslogs(Source,"{%5i} adding '%s'/'%s' to db",xevent->EventID(),
+                     xevent->Title(),xevent->ShortText());
+        }
     }
     return xevent;
 }
@@ -1257,7 +1282,8 @@ cXMLTVEvent *cImport::SearchXMLTVEvent(sqlite3 **Db,const char *ChannelID, const
 
     int eventTimeDiff=0;
     if (Event->Duration()) eventTimeDiff=Event->Duration()/4;
-    if (eventTimeDiff<780) eventTimeDiff=780;
+    if (eventTimeDiff<100) eventTimeDiff=100;
+    if (eventTimeDiff>780) eventTimeDiff=780;
 
     char *sqltitle=strdup(Event->Title());
     if (!sqltitle)
@@ -1453,7 +1479,6 @@ int cImport::Process(cEPGSource *Source, cEPGExecutor &myExecutor)
 
                     if (addevents && event && (event->EventID() != xevent.EventID()))
                     {
-                        xevent.SetEITEventID(event->EventID()); // that's only a guess!
                         tsyslogs(Source,"{%5i} changing existing eventid to {%5i}",event->EventID(),xevent.EventID());
                         event->SetEventID(xevent.EventID());
                         event->SetVersion(0);
