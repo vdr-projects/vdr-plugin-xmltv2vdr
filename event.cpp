@@ -300,6 +300,7 @@ void cXMLTVEvent::CreateEventID(time_t StartTime)
     newid|=(tm.tm_min & 0x3F);
 
     eventid=newid & 0xFFFF;
+    weakid=true;
 }
 
 void cXMLTVEvent::GetSQL(const char *Source, int SrcIdx, const char *ChannelID, char **Insert, char **Update)
@@ -474,6 +475,7 @@ void cXMLTVEvent::Clear()
     episode=0;
     episodeoverall=0;
     parentalRating=0;
+    weakid=false;
     memset(&contents,0,sizeof(contents));
 }
 

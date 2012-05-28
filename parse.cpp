@@ -844,7 +844,20 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
                     if (ret!=SQLITE_OK)
                     {
                         if (lerr!=PARSE_SQLERR)
-                            esyslogs(source,"sqlite3: %s",errmsg);
+                        {
+                            if (!xevent.WeakID())
+                            {
+                                esyslogs(source,"sqlite3: %s (%u@%i)",errmsg,xevent.EventID(),node->line);
+                                tsyslogs(source,"sqlite3: %s",isql);
+                                tsyslogs(source,"sqlite3: %s",usql);
+                            }
+                            else
+                            {
+                                esyslogs(source,"sqlite3: %s ('%s'@%i)",errmsg,xevent.Title(),node->line);
+                                tsyslogs(source,"sqlite3: %s",isql);
+                                tsyslogs(source,"sqlite3: %s",usql);
+                            }
+                        }
                         lerr=PARSE_SQLERR;
                         sqlite3_free(errmsg);
                         break;

@@ -49,6 +49,7 @@ private:
     int season;
     int episode;
     int episodeoverall;
+    bool weakid;
     tEventID eventid;
     tEventID eiteventid;
     cXMLTVStringList video;
@@ -89,6 +90,10 @@ public:
     void SetPics(const char *Pics);
     void CreateEventID(time_t StartTime);
     void GetSQL(const char *Source, int SrcIdx, const char *ChannelID, char **Insert, char **Update);
+    bool WeakID()
+    {
+        return weakid;
+    }
     cXMLTVStringList *Credits()
     {
         return &credits;
