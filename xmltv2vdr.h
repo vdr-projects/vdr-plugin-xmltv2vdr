@@ -26,6 +26,14 @@ static const char *DESCRIPTION    = trNOOP("Imports xmltv epg into vdr");
 
 int ioprio_set(int which, int who, int ioprio);
 
+class cSVDRPMsg
+{
+private:
+    bool readreply(int fd);
+public:
+    bool Send(const char *format, ...);
+};
+
 class cGlobals
 {
 private:
@@ -35,6 +43,7 @@ private:
     char *epcodeset;
     char *imgdir;
     char *codeset;
+    bool epgsearchexists;    
     int imgdelafter;
     cEPGMappings epgmappings;
     cTEXTMappings textmappings;
@@ -98,6 +107,10 @@ public:
     int ImgDelAfter()
     {
         return imgdelafter;
+    }
+    bool EPGSearchExists()
+    {
+      return epgsearchexists;
     }
 };
 

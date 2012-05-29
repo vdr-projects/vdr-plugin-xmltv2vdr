@@ -169,7 +169,10 @@ public:
 
 class cEPGSources : public cList<cEPGSource>
 {
+private:
+    bool epgsearchexists;
 public:
+    cEPGSources();
     void ReadIn(cGlobals *Global, const char *SourceOrder,
                 bool Reload=false);
     bool RunItNow();
@@ -179,6 +182,10 @@ public:
     cEPGSource *GetSourceDB(const char *EpgFile);
     int GetSourceIdx(const char *Name);
     void Remove();
+    bool EPGSearchExists()
+    {
+        return epgsearchexists;
+    }
 };
 
 class cPluginXmltv2vdr;

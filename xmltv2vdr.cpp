@@ -16,6 +16,7 @@
 #include <time.h>
 #include <sys/types.h>
 #include <pwd.h>
+#include <netdb.h>
 
 #include "setup.h"
 #include "xmltv2vdr.h"
@@ -127,6 +128,95 @@ void logger(cEPGSource *source, char logtype, const char* format, ...)
 
 // -------------------------------------------------------------
 
+bool cSVDRPMsg::readreply(int fd)
+{
+    usleep(400000);
+    char c=' ';
+    do
+    {
+        struct pollfd fds;
+        fds.fd=fd;
+        fds.events=POLLIN;
+        fds.revents=0;
+        int ret=poll(&fds,1,600);
+
+        if (ret<=0) return false;
+        if (fds.revents!=POLLIN) return false;
+        if (read(fd,&c,1)<0) return false;
+    }
+    while (c!='\n');
+    return true;
+}
+
+bool cSVDRPMsg::Send(const char *format, ...)
+{
+    char *msg;
+    va_list ap;
+    va_start(ap, format);
+    if (vasprintf(&msg,format,ap)==-1) return false;
+    va_end(ap);
+
+    int port;
+    struct servent *serv=getservbyname("svdrp","tcp");
+    if (serv)
+    {
+        port=htons(serv->s_port);
+    }
+    else
+    {
+#if VDRVERSNUM < 10715
+        port=2001;
+#else
+        port=6419;
+#endif
+    }
+
+    struct sockaddr_in name;
+    name.sin_family = AF_INET;
+    name.sin_port = htons(port);
+    name.sin_addr.s_addr=inet_addr("127.0.0.1");
+    uint size = sizeof(name);
+
+    int sock;
+    sock=socket(PF_INET, SOCK_STREAM, 0);
+    if (sock<0) return false;
+
+    if (connect(sock, (struct sockaddr *)&name,size)!=0)
+    {
+        close(sock);
+        free(msg);
+        return false;
+    }
+
+    if (!readreply(sock))
+    {
+        close(sock);
+        free(msg);
+        return false;
+    }
+
+    ssize_t ret;
+    ret=write(sock,"PLUG epgsearch ",15);
+    if (ret!=(ssize_t)-1) ret=write(sock,msg,strlen(msg));
+    if (ret!=(ssize_t)-1) ret=write(sock,"\r\n",2);
+
+    if (!readreply(sock) || (ret==(ssize_t)-1))
+    {
+        close(sock);
+        free(msg);
+        return false;
+    }
+
+    ret=write(sock,"QUIT\r\n",6);
+
+    if (ret!=(ssize_t)-1) readreply(sock);
+    close(sock);
+    free(msg);
+    return true;
+}
+
+// -------------------------------------------------------------
+
 cGlobals::cGlobals()
 {
     confdir=NULL;
@@ -135,6 +225,7 @@ cGlobals::cGlobals()
     epcodeset=NULL;
     imgdir=NULL;
     codeset=NULL;
+    epgsearchexists=(cPluginManager::GetPlugin("epgsearch")!=NULL);
     imgdelafter=30;
 
     if (asprintf(&epgfile,"%s/epg.db",VideoDirectory)==-1) {};
