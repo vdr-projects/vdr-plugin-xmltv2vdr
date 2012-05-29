@@ -860,6 +860,7 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
                         }
                         lerr=PARSE_SQLERR;
                         sqlite3_free(errmsg);
+                        skipped++;
                         break;
                     }
                 }
@@ -875,7 +876,7 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
 
     if (sqlite3_exec(db,"COMMIT",NULL,NULL,&errmsg)!=SQLITE_OK)
     {
-        esyslogs(source,"sqlite3: %s",errmsg);
+        esyslogs(source,"sqlite3: COMMIT %s",errmsg);
         sqlite3_free(errmsg);
     }
 
@@ -895,7 +896,7 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
 
     if (sqlite3_exec(db,"ANALYZE epg;",NULL,NULL,&errmsg)!=SQLITE_OK)
     {
-        esyslogs(source,"sqlite3: %s",errmsg);
+        esyslogs(source,"sqlite3: ANALYZE %s",errmsg);
         sqlite3_free(errmsg);
     }
 
