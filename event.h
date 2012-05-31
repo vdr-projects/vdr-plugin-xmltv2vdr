@@ -61,6 +61,7 @@ private:
     cXMLTVStringList pics;
     int parentalRating;
     uchar contents[MaxEventContents];
+    char *removepowerchar(char *s);
 public:
     cXMLTVEvent();
     ~cXMLTVEvent();

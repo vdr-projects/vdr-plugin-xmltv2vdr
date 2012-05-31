@@ -44,58 +44,107 @@ const char* cXMLTVStringList::toString()
 
 // -------------------------------------------------------------
 
+char* cXMLTVEvent::removepowerchar(char* s)
+{
+    if (!s) return NULL;
+    char *p=strchr(s,'^');
+    while (p)
+    {
+        if (p) *p=' ';
+        p=strchr(s,'^');
+
+    }
+    return s;
+}
+
 void cXMLTVEvent::SetSource(const char *Source)
 {
     source = strcpyrealloc(source, Source);
-    if (source) source = compactspace(source);
+    if (source)
+    {
+        source = removepowerchar(source);
+        source = compactspace(source);
+    }
 }
 
 void cXMLTVEvent::SetChannelID(const char *ChannelID)
 {
     channelid = strcpyrealloc(channelid, ChannelID);
-    if (channelid) channelid = compactspace(channelid);
+    if (channelid)
+    {
+        channelid=removepowerchar(channelid);
+        channelid = compactspace(channelid);
+    }
 }
 
 void cXMLTVEvent::SetTitle(const char *Title)
 {
     title = strcpyrealloc(title, Title);
-    if (title) title = compactspace(title);
+    if (title)
+    {
+        title=removepowerchar(title);
+        title = compactspace(title);
+    }
 }
 
 void cXMLTVEvent::SetOrigTitle(const char *OrigTitle)
 {
     origtitle = strcpyrealloc(origtitle, OrigTitle);
-    if (origtitle) origtitle=compactspace(origtitle);
+    if (origtitle)
+    {
+        origtitle=removepowerchar(origtitle);
+        origtitle=compactspace(origtitle);
+    }
 }
 
 void cXMLTVEvent::SetShortText(const char *ShortText)
 {
     shorttext=strcpyrealloc(shorttext,ShortText);
-    if (shorttext) shorttext=compactspace(shorttext);
+    if (shorttext)
+    {
+        shorttext=removepowerchar(shorttext);
+        shorttext=compactspace(shorttext);
+    }
 }
 
 void cXMLTVEvent::SetDescription(const char *Description)
 {
     description = strcpyrealloc(description, Description);
-    if (description) description = compactspace(description);
+    if (description)
+    {
+        description=removepowerchar(description);
+        description = compactspace(description);
+    }
 }
 
 void cXMLTVEvent::SetEITDescription(const char *EITDescription)
 {
     eitdescription = strcpyrealloc(eitdescription, EITDescription);
-    if (eitdescription) eitdescription = compactspace(eitdescription);
+    if (eitdescription)
+    {
+        eitdescription=removepowerchar(eitdescription);
+        eitdescription = compactspace(eitdescription);
+    }
 }
 
 void cXMLTVEvent::SetCountry(const char *Country)
 {
     country=strcpyrealloc(country, Country);
-    if (country) country=compactspace(country);
+    if (country)
+    {
+        country=removepowerchar(country);
+        country=compactspace(country);
+    }
 }
 
 void cXMLTVEvent::SetAudio(const char *Audio)
 {
     audio=strcpyrealloc(audio, Audio);
-    if (audio) audio = compactspace(audio);
+    if (audio)
+    {
+        audio=removepowerchar(audio);
+        audio = compactspace(audio);
+    }
 }
 
 void cXMLTVEvent::SetCredits(const char *Credits)
@@ -108,7 +157,13 @@ void cXMLTVEvent::SetCredits(const char *Credits)
     tok=strtok_r(c,delim,&sp);
     while (tok)
     {
-        credits.Append(strdup(tok));
+        char *val=strdup(tok);
+        if (val)
+        {
+            val=removepowerchar(val);
+            val=compactspace(val);
+            credits.Append(val);
+        }
         tok=strtok_r(NULL,delim,&sp);
     }
     credits.Sort();
@@ -125,7 +180,13 @@ void cXMLTVEvent::SetCategory(const char *Category)
     tok=strtok_r(c,delim,&sp);
     while (tok)
     {
-        category.Append(strdup(tok));
+        char *val=strdup(tok);
+        if (val)
+        {
+            val=removepowerchar(val);
+            val=compactspace(val);
+            category.Append(val);
+        }
         tok=strtok_r(NULL,delim,&sp);
     }
     category.Sort();
@@ -142,7 +203,13 @@ void cXMLTVEvent::SetReview(const char *Review)
     tok=strtok_r(c,delim,&sp);
     while (tok)
     {
-        review.Append(strdup(tok));
+        char *val=strdup(tok);
+        if (val)
+        {
+            val=removepowerchar(val);
+            val=compactspace(val);
+            review.Append(val);
+        }
         tok=strtok_r(NULL,delim,&sp);
     }
     free(c);
@@ -158,13 +225,19 @@ void cXMLTVEvent::SetRating(const char *Rating)
     tok=strtok_r(c,delim,&sp);
     while (tok)
     {
-        rating.Append(strdup(tok));
-        char *rval=strchr(tok,'|');
-        if (rval)
+        char *val=strdup(tok);
+        if (val)
         {
-            rval++;
-            int r=atoi(rval);
-            if ((r>0 && r<=18) && (r>parentalRating)) parentalRating=r;
+            val=removepowerchar(val);
+            val=compactspace(val);
+            rating.Append(val);
+            char *rval=strchr(tok,'|');
+            if (rval)
+            {
+                rval++;
+                int r=atoi(rval);
+                if ((r>0 && r<=18) && (r>parentalRating)) parentalRating=r;
+            }
         }
         tok=strtok_r(NULL,delim,&sp);
     }
@@ -182,7 +255,13 @@ void cXMLTVEvent::SetVideo(const char *Video)
     tok=strtok_r(c,delim,&sp);
     while (tok)
     {
-        video.Append(strdup(tok));
+        char *val=strdup(tok);
+        if (val)
+        {
+            val=removepowerchar(val);
+            val=compactspace(val);
+            video.Append(val);
+        }
         tok=strtok_r(NULL,delim,&sp);
     }
     free(c);
@@ -198,7 +277,13 @@ void cXMLTVEvent::SetPics(const char* Pics)
     tok=strtok_r(c,delim,&sp);
     while (tok)
     {
-        pics.Append(strdup(tok));
+        char *val=strdup(tok);
+        if (val)
+        {
+            val=removepowerchar(val);
+            val=compactspace(val);
+            pics.Append(val);
+        }
         tok=strtok_r(NULL,delim,&sp);
     }
     free(c);
@@ -214,7 +299,13 @@ void cXMLTVEvent::SetStarRating(const char *StarRating)
     tok=strtok_r(c,delim,&sp);
     while (tok)
     {
-        starrating.Append(strdup(tok));
+        char *val=strdup(tok);
+        if (val)
+        {
+            val=removepowerchar(val);
+            val=compactspace(val);
+            starrating.Append(val);
+        }
         tok=strtok_r(NULL,delim,&sp);
     }
     starrating.Sort();
@@ -223,18 +314,32 @@ void cXMLTVEvent::SetStarRating(const char *StarRating)
 
 void cXMLTVEvent::AddReview(const char *Review)
 {
-    review.Append(compactspace(strdup(Review)));
+    char *val=strdup(Review);
+    if (val)
+    {
+        val=removepowerchar(val);
+        val=compactspace(val);
+        review.Append(val);
+    }
 }
 
 void cXMLTVEvent::AddPics(const char* Pic)
 {
-    pics.Append(compactspace(strdup(Pic)));
+    char *val=strdup(Pic);
+    if (val)
+    {
+        val=removepowerchar(val);
+        val=compactspace(val);
+        pics.Append(val);
+    }
 }
 
 void cXMLTVEvent::AddVideo(const char *VType, const char *VContent)
 {
     char *value=NULL;
     if (asprintf(&value,"%s|%s",VType,VContent)==-1) return;
+    value=removepowerchar(value);
+    value=compactspace(value);
     video.Append(value);
 }
 
@@ -244,6 +349,8 @@ void cXMLTVEvent::AddRating(const char *System, const char *Rating)
     if (asprintf(&value,"%s|%s",System,Rating)==-1) return;
     int r=atoi(Rating);
     if ((r>0 && r<=18) && (r>parentalRating)) parentalRating=r;
+    value=removepowerchar(value);
+    value=compactspace(value);
     rating.Append(value);
     rating.Sort();
 }
@@ -259,13 +366,21 @@ void cXMLTVEvent::AddStarRating(const char *System, const char *Rating)
     {
         if (asprintf(&value,"*|%s",Rating)==-1) return;
     }
+    value=removepowerchar(value);
+    value=compactspace(value);
     starrating.Append(value);
 }
 
 void cXMLTVEvent::AddCategory(const char *Category)
 {
-    category.Append(compactspace(strdup(Category)));
-    category.Sort();
+    char *val=strdup(Category);
+    if (val)
+    {
+        val=removepowerchar(val);
+        val=compactspace(val);
+        category.Append(val);
+        category.Sort();
+    }
 }
 
 void cXMLTVEvent::AddCredits(const char *CreditType, const char *Credit, const char *Addendum)
@@ -279,6 +394,8 @@ void cXMLTVEvent::AddCredits(const char *CreditType, const char *Credit, const c
     {
         if (asprintf(&value,"%s|%s",CreditType,Credit)==-1) return;
     }
+    value=removepowerchar(value);
+    value=compactspace(value);
     credits.Append(value);
     credits.Sort();
 }
