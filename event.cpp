@@ -59,37 +59,37 @@ char* cXMLTVEvent::removepowerchar(char* s)
 
 void cXMLTVEvent::SetSource(const char *Source)
 {
-    source = strcpyrealloc(source, Source);
+    source=strcpyrealloc(source, Source);
     if (source)
     {
-        source = removepowerchar(source);
-        source = compactspace(source);
+        source=removepowerchar(source);
+        source=compactspace(source);
     }
 }
 
 void cXMLTVEvent::SetChannelID(const char *ChannelID)
 {
-    channelid = strcpyrealloc(channelid, ChannelID);
+    channelid=strcpyrealloc(channelid, ChannelID);
     if (channelid)
     {
         channelid=removepowerchar(channelid);
-        channelid = compactspace(channelid);
+        channelid=compactspace(channelid);
     }
 }
 
 void cXMLTVEvent::SetTitle(const char *Title)
 {
-    title = strcpyrealloc(title, Title);
+    title=strcpyrealloc(title, Title);
     if (title)
     {
         title=removepowerchar(title);
-        title = compactspace(title);
+        title=compactspace(title);
     }
 }
 
 void cXMLTVEvent::SetOrigTitle(const char *OrigTitle)
 {
-    origtitle = strcpyrealloc(origtitle, OrigTitle);
+    origtitle=strcpyrealloc(origtitle, OrigTitle);
     if (origtitle)
     {
         origtitle=removepowerchar(origtitle);
@@ -107,23 +107,38 @@ void cXMLTVEvent::SetShortText(const char *ShortText)
     }
 }
 
+void cXMLTVEvent::AddDescription(const char *Description)
+{
+    if (!description)
+    {
+        SetDescription(Description);
+    }
+    else
+    {
+        description=strcatrealloc(description,"\n");
+        description=strcatrealloc(description,Description);
+        description=removepowerchar(description);
+        description=compactspace(description);	
+    }
+}
+
 void cXMLTVEvent::SetDescription(const char *Description)
 {
-    description = strcpyrealloc(description, Description);
+    description=strcpyrealloc(description, Description);
     if (description)
     {
         description=removepowerchar(description);
-        description = compactspace(description);
+        description=compactspace(description);
     }
 }
 
 void cXMLTVEvent::SetEITDescription(const char *EITDescription)
 {
-    eitdescription = strcpyrealloc(eitdescription, EITDescription);
+    eitdescription=strcpyrealloc(eitdescription, EITDescription);
     if (eitdescription)
     {
         eitdescription=removepowerchar(eitdescription);
-        eitdescription = compactspace(eitdescription);
+        eitdescription=compactspace(eitdescription);
     }
 }
 
@@ -143,7 +158,7 @@ void cXMLTVEvent::SetAudio(const char *Audio)
     if (audio)
     {
         audio=removepowerchar(audio);
-        audio = compactspace(audio);
+        audio=compactspace(audio);
     }
 }
 
@@ -578,8 +593,8 @@ void cXMLTVEvent::Clear()
         channelid=NULL;
     }
     year=0;
-    starttime = 0;
-    duration = 0;
+    starttime=0;
+    duration=0;
     eventid=eiteventid=0;
     video.Clear();
     credits.Clear();

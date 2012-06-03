@@ -342,7 +342,7 @@ bool cParse::FetchEvent(xmlNodePtr enode, bool useeptext)
                 xmlChar *content=xmlNodeListGetString(node->doc,node->xmlChildrenNode,1);
                 if (content)
                 {
-                    xevent.SetDescription((const char *) content);
+                    xevent.AddDescription((const char *) content);
                     xmlFree(content);
                 }
             }

@@ -75,6 +75,7 @@ public:
     void SetEITDescription(const char *EITDescription);
     void SetCountry(const char *Country);
     void SetAudio(const char *Audio);
+    void AddDescription(const char *Description);    
     void AddVideo(const char *VType, const char *VContent);
     void AddCredits(const char *CreditType, const char *Credit, const char *Addendum=NULL);
     void AddCategory(const char *Category);
