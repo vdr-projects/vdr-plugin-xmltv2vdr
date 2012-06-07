@@ -253,13 +253,13 @@ char *cImport::AddEOT2Description(char *description, bool checkutf8)
 
     if (checkutf8)
     {
-        if (!codeset)
+        if (!g->Codeset())
         {
             description=strcatrealloc(description,nbspUTF8);
         }
         else
         {
-            if (strncasecmp(codeset,"UTF-8",5) || strncasecmp(codeset,"UTF8",4))
+            if (strncasecmp(g->Codeset(),"UTF-8",5) || strncasecmp(g->Codeset(),"UTF8",4))
             {
                 description=strcatrealloc(description,nbsp);
             }
@@ -303,11 +303,11 @@ void cImport::LinkPictures(const char *Source, cXMLTVStringList *Pics, tEventID 
             int ret;
             if (!i)
             {
-                ret=asprintf(&dstold,"%s/%i.%s",imgdir,DestID,ext);
+                ret=asprintf(&dstold,"%s/%i.%s",g->ImgDir(),DestID,ext);
             }
             else
             {
-                ret=asprintf(&dstold,"%s/%i_%i.%s",imgdir,DestID,i,ext);
+                ret=asprintf(&dstold,"%s/%i_%i.%s",g->ImgDir(),DestID,i,ext);
             }
             if (ret==-1)
             {
@@ -317,11 +317,11 @@ void cImport::LinkPictures(const char *Source, cXMLTVStringList *Pics, tEventID 
 
             if (!i)
             {
-                ret=asprintf(&dst,"%s/%s_%i.%s",imgdir,*ChanID.ToString(),DestID,ext);
+                ret=asprintf(&dst,"%s/%s_%i.%s",g->ImgDir(),*ChanID.ToString(),DestID,ext);
             }
             else
             {
-                ret=asprintf(&dst,"%s/%s_%i_%i.%s",imgdir,*ChanID.ToString(),DestID,i,ext);
+                ret=asprintf(&dst,"%s/%s_%i_%i.%s",g->ImgDir(),*ChanID.ToString(),DestID,i,ext);
             }
             if (ret==-1)
             {
@@ -386,12 +386,307 @@ void cImport::LinkPictures(const char *Source, cXMLTVStringList *Pics, tEventID 
     }
 }
 
+char *cImport::Add2Description(char *description, cXMLTVEvent *xEvent, int Flags, int what)
+{
+    if (what==USE_LONGTEXT)
+    {
+        if (((Flags & USE_LONGTEXT)==USE_LONGTEXT) || ((Flags & OPT_APPEND)==OPT_APPEND))
+        {
+            if (xEvent->Description() && (strlen(xEvent->Description())>0))
+            {
+                description=Add2Description(description,xEvent->Description());
+            }
+        }
+
+        if (!description && xEvent->EITDescription() && (strlen(xEvent->EITDescription())>0))
+        {
+            description=Add2Description(description,xEvent->EITDescription());
+        }
+        description=Add2Description(description,"\n");
+    }
+
+    if (what==USE_CREDITS)
+    {
+        cXMLTVStringList *credits=xEvent->Credits();
+        if (credits->Size())
+        {
+            cTEXTMapping *oldtext=NULL;
+            for (int i=0; i<credits->Size(); i++)
+            {
+                char *ctype=strdup((*credits)[i]);
+                if (ctype)
+                {
+                    char *cval=strchr(ctype,'|');
+                    if (cval)
+                    {
+                        *cval=0;
+                        cval++;
+                        bool add=true;
+                        if (((Flags & CREDITS_ACTORS)!=CREDITS_ACTORS) &&
+                                (!strcasecmp(ctype,"actor"))) add=false;
+                        if (((Flags & CREDITS_DIRECTORS)!=CREDITS_DIRECTORS) &&
+                                (!strcasecmp(ctype,"director"))) add=false;
+                        if (((Flags & CREDITS_OTHERS)!=CREDITS_OTHERS) &&
+                                (add) && (strcasecmp(ctype,"actor")) &&
+                                (strcasecmp(ctype,"director"))) add=false;
+                        if (add)
+                        {
+                            cTEXTMapping *text=g->TEXTMappings()->GetMap(ctype);
+                            if ((Flags & CREDITS_LIST)==CREDITS_LIST)
+                            {
+                                if (oldtext!=text)
+                                {
+                                    if (oldtext)
+                                    {
+                                        description=RemoveLastCharFromDescription(description);
+                                        description=RemoveLastCharFromDescription(description);
+                                        description=Add2Description(description,"\n");
+                                    }
+                                    description=Add2Description(description,text->Value());
+                                    description=Add2Description(description,": ");
+                                }
+                                description=Add2Description(description,cval);
+                                description=Add2Description(description,", ");
+                            }
+                            else
+                            {
+                                if (text)
+                                {
+                                    description=Add2Description(description,text->Value(),cval);
+                                }
+                            }
+                            oldtext=text;
+                        }
+                    }
+                    free(ctype);
+                }
+            }
+            if ((oldtext) && ((Flags & CREDITS_LIST)==CREDITS_LIST))
+            {
+                description=RemoveLastCharFromDescription(description);
+                description=RemoveLastCharFromDescription(description);
+                description=Add2Description(description,"\n");
+            }
+        }
+    }
+
+    if (what==USE_COUNTRYDATE)
+    {
+        if (xEvent->Country())
+        {
+            cTEXTMapping *text=g->TEXTMappings()->GetMap("country");
+            if (text) description=Add2Description(description,text->Value(),xEvent->Country());
+        }
+
+        if (xEvent->Year())
+        {
+            cTEXTMapping *text=g->TEXTMappings()->GetMap("year");
+            if (text) description=Add2Description(description,text->Value(),xEvent->Year());
+        }
+    }
+    if ((what==USE_ORIGTITLE) && (xEvent->OrigTitle()))
+    {
+        cTEXTMapping *text=g->TEXTMappings()->GetMap("originaltitle");
+        if (text) description=Add2Description(description,text->Value(),xEvent->OrigTitle());
+    }
+    if ((what==USE_CATEGORIES) && (xEvent->Category()->Size()))
+    {
+        cTEXTMapping *text=g->TEXTMappings()->GetMap("category");
+        if (text)
+        {
+            cXMLTVStringList *categories=xEvent->Category();
+            description=Add2Description(description,text->Value(),(*categories)[0]);
+            for (int i=1; i<categories->Size(); i++)
+            {
+                // prevent duplicates
+                if (strcasecmp((*categories)[i],(*categories)[i-1]))
+                    description=Add2Description(description,text->Value(),(*categories)[i]);
+            }
+        }
+    }
+
+    if ((what==USE_VIDEO) && (xEvent->Video()->Size()))
+    {
+        cTEXTMapping *text=g->TEXTMappings()->GetMap("video");
+        if (text)
+        {
+            description=Add2Description(description,text->Value());
+            description=Add2Description(description,": ");
+            cXMLTVStringList *video=xEvent->Video();
+            for (int i=0; i<video->Size(); i++)
+            {
+                char *vtype=strdup((*video)[i]);
+                if (vtype)
+                {
+                    char *vval=strchr(vtype,'|');
+                    if (vval)
+                    {
+                        *vval=0;
+                        vval++;
+
+                        if (i)
+                        {
+                            description=Add2Description(description,", ");
+                        }
+
+                        if (!strcasecmp(vtype,"colour"))
+                        {
+                            if (!strcasecmp(vval,"no"))
+                            {
+                                cTEXTMapping *text=g->TEXTMappings()->GetMap("blacknwhite");
+                                description=Add2Description(description,text->Value());
+                            }
+                        }
+                        else
+                        {
+                            description=Add2Description(description,vval);
+                        }
+                    }
+                    free(vtype);
+                }
+            }
+            description=Add2Description(description,"\n");
+        }
+    }
+
+    if (what==USE_AUDIO)
+    {
+        if (xEvent->Audio())
+        {
+            cTEXTMapping *text=g->TEXTMappings()->GetMap("audio");
+            if (text)
+            {
+                description=Add2Description(description,text->Value());
+                description=Add2Description(description,": ");
+
+                if ((!strcasecmp(xEvent->Audio(),"mono")) || (!strcasecmp(xEvent->Audio(),"stereo")))
+                {
+                    description=Add2Description(description,xEvent->Audio());
+                    description=Add2Description(description,"\n");
+                }
+                else
+                {
+                    cTEXTMapping *text=g->TEXTMappings()->GetMap(xEvent->Audio());
+                    if (text)
+                    {
+                        description=Add2Description(description,text->Value());
+                        description=Add2Description(description,"\n");
+                    }
+                }
+            }
+        }
+    }
+    if (what==USE_SEASON)
+    {
+        if (xEvent->Season())
+        {
+            cTEXTMapping *text=g->TEXTMappings()->GetMap("season");
+            if (text) description=Add2Description(description,text->Value(),xEvent->Season());
+        }
+
+        if (xEvent->Episode())
+        {
+            cTEXTMapping *text=g->TEXTMappings()->GetMap("episode");
+            if (text) description=Add2Description(description,text->Value(),xEvent->Episode());
+        }
+
+        if (xEvent->EpisodeOverall())
+        {
+            cTEXTMapping *text=g->TEXTMappings()->GetMap("episodeoverall");
+            if (text) description=Add2Description(description,text->Value(),xEvent->EpisodeOverall());
+        }
+    }
+
+    if ((what==USE_RATING) && (xEvent->Rating()->Size()))
+    {
+#if VDRVERSNUM < 10711 && !EPGHANDLER
+        Flags|=OPT_RATING_TEXT; // always add to text if we dont have the internal tag!
+#endif
+        if ((Flags & OPT_RATING_TEXT)==OPT_RATING_TEXT)
+        {
+            cXMLTVStringList *rating=xEvent->Rating();
+            for (int i=0; i<rating->Size(); i++)
+            {
+                char *rtype=strdup((*rating)[i]);
+                if (rtype)
+                {
+                    char *rval=strchr(rtype,'|');
+                    if (rval)
+                    {
+                        *rval=0;
+                        rval++;
+
+                        description=Add2Description(description,rtype);
+                        description=Add2Description(description,": ");
+                        description=Add2Description(description,rval);
+                        description=Add2Description(description,"\n");
+                    }
+                    free(rtype);
+                }
+            }
+        }
+    }
+
+    if ((what==USE_STARRATING) && (xEvent->StarRating()->Size()))
+    {
+        cTEXTMapping *text=g->TEXTMappings()->GetMap("starrating");
+        if (text)
+        {
+            description=Add2Description(description,text->Value());
+            description=Add2Description(description,": ");
+            cXMLTVStringList *starrating=xEvent->StarRating();
+            for (int i=0; i<starrating->Size(); i++)
+            {
+                char *rtype=strdup((*starrating)[i]);
+                if (rtype)
+                {
+                    char *rval=strchr(rtype,'|');
+                    if (rval)
+                    {
+                        *rval=0;
+                        rval++;
+
+                        if (i)
+                        {
+                            description=Add2Description(description,", ");
+                        }
+                        if (strcasecmp(rtype,"*"))
+                        {
+                            description=Add2Description(description,rtype);
+                            description=Add2Description(description," ");
+                        }
+                        description=Add2Description(description,rval);
+                    }
+                    free(rtype);
+                }
+            }
+            description=Add2Description(description,"\n");
+        }
+    }
+
+    if ((what==USE_REVIEW) && (xEvent->Review()->Size()))
+    {
+        cTEXTMapping *text=g->TEXTMappings()->GetMap("review");
+        if (text)
+        {
+            cXMLTVStringList *review=xEvent->Review();
+            for (int i=0; i<review->Size(); i++)
+            {
+                description=Add2Description(description,text->Value(),(*review)[i]);
+            }
+        }
+    }
+
+    return description;
+}
+
 bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
                        cEvent *Event, cXMLTVEvent *xEvent,int Flags)
 {
     if (!Source) return false;
     if (!Db) return false;
     if (!xEvent) return false;
+    if (!g) return false;
 
 #define CHANGED_NOTHING     0
 #define CHANGED_TITLE       1
@@ -598,291 +893,25 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
     }
 
     char *description=NULL;
-    if (((Flags & USE_LONGTEXT)==USE_LONGTEXT) || (append))
+
+    const char *ot=g->Order();
+    if (!ot) return false;
+
+    while (*ot)
     {
-        if (xEvent->Description() && (strlen(xEvent->Description())>0))
-        {
-            description=strdup(xEvent->Description());
-        }
-    }
-
-    if (!description && xEvent->EITDescription() && (strlen(xEvent->EITDescription())>0))
-    {
-        description=strdup(xEvent->EITDescription());
-    }
-
-    description=Add2Description(description,"\n");
-
-    if ((Flags & USE_CREDITS)==USE_CREDITS)
-    {
-        cXMLTVStringList *credits=xEvent->Credits();
-        if (credits->Size())
-        {
-            cTEXTMapping *oldtext=NULL;
-            for (int i=0; i<credits->Size(); i++)
-            {
-                char *ctype=strdup((*credits)[i]);
-                if (ctype)
-                {
-                    char *cval=strchr(ctype,'|');
-                    if (cval)
-                    {
-                        *cval=0;
-                        cval++;
-                        bool add=true;
-                        if (((Flags & CREDITS_ACTORS)!=CREDITS_ACTORS) &&
-                                (!strcasecmp(ctype,"actor"))) add=false;
-                        if (((Flags & CREDITS_DIRECTORS)!=CREDITS_DIRECTORS) &&
-                                (!strcasecmp(ctype,"director"))) add=false;
-                        if (((Flags & CREDITS_OTHERS)!=CREDITS_OTHERS) &&
-                                (add) && (strcasecmp(ctype,"actor")) &&
-                                (strcasecmp(ctype,"director"))) add=false;
-                        if (add)
-                        {
-                            cTEXTMapping *text=texts->GetMap(ctype);
-                            if ((Flags & CREDITS_LIST)==CREDITS_LIST)
-                            {
-                                if (oldtext!=text)
-                                {
-                                    if (oldtext)
-                                    {
-                                        description=RemoveLastCharFromDescription(description);
-                                        description=RemoveLastCharFromDescription(description);
-                                        description=Add2Description(description,"\n");
-                                    }
-                                    description=Add2Description(description,text->Value());
-                                    description=Add2Description(description,": ");
-                                }
-                                description=Add2Description(description,cval);
-                                description=Add2Description(description,", ");
-                            }
-                            else
-                            {
-                                if (text)
-                                {
-                                    description=Add2Description(description,text->Value(),cval);
-                                }
-                            }
-                            oldtext=text;
-                        }
-                    }
-                    free(ctype);
-                }
-            }
-            if ((oldtext) && ((Flags & CREDITS_LIST)==CREDITS_LIST))
-            {
-                description=RemoveLastCharFromDescription(description);
-                description=RemoveLastCharFromDescription(description);
-                description=Add2Description(description,"\n");
-            }
-        }
-    }
-
-    if ((Flags & USE_COUNTRYDATE)==USE_COUNTRYDATE)
-    {
-        if (xEvent->Country())
-        {
-            cTEXTMapping *text=texts->GetMap("country");
-            if (text) description=Add2Description(description,text->Value(),xEvent->Country());
-        }
-
-        if (xEvent->Year())
-        {
-            cTEXTMapping *text=texts->GetMap("year");
-            if (text) description=Add2Description(description,text->Value(),xEvent->Year());
-        }
-    }
-    if (((Flags & USE_ORIGTITLE)==USE_ORIGTITLE) && (xEvent->OrigTitle()))
-    {
-        cTEXTMapping *text=texts->GetMap("originaltitle");
-        if (text) description=Add2Description(description,text->Value(),xEvent->OrigTitle());
-    }
-    if (((Flags & USE_CATEGORIES)==USE_CATEGORIES) && (xEvent->Category()->Size()))
-    {
-        cTEXTMapping *text=texts->GetMap("category");
-        if (text)
-        {
-            cXMLTVStringList *categories=xEvent->Category();
-            description=Add2Description(description,text->Value(),(*categories)[0]);
-            for (int i=1; i<categories->Size(); i++)
-            {
-                // prevent duplicates
-                if (strcasecmp((*categories)[i],(*categories)[i-1]))
-                    description=Add2Description(description,text->Value(),(*categories)[i]);
-            }
-        }
-    }
-
-    if (((Flags & USE_VIDEO)==USE_VIDEO) && (xEvent->Video()->Size()))
-    {
-        cTEXTMapping *text=texts->GetMap("video");
-        if (text)
-        {
-            description=Add2Description(description,text->Value());
-            description=Add2Description(description,": ");
-            cXMLTVStringList *video=xEvent->Video();
-            for (int i=0; i<video->Size(); i++)
-            {
-                char *vtype=strdup((*video)[i]);
-                if (vtype)
-                {
-                    char *vval=strchr(vtype,'|');
-                    if (vval)
-                    {
-                        *vval=0;
-                        vval++;
-
-                        if (i)
-                        {
-                            description=Add2Description(description,", ");
-                        }
-
-                        if (!strcasecmp(vtype,"colour"))
-                        {
-                            if (!strcasecmp(vval,"no"))
-                            {
-                                cTEXTMapping *text=texts->GetMap("blacknwhite");
-                                description=Add2Description(description,text->Value());
-                            }
-                        }
-                        else
-                        {
-                            description=Add2Description(description,vval);
-                        }
-                    }
-                    free(vtype);
-                }
-            }
-            description=Add2Description(description,"\n");
-        }
-    }
-
-    if ((Flags & USE_AUDIO)==USE_AUDIO)
-    {
-        if (xEvent->Audio())
-        {
-            cTEXTMapping *text=texts->GetMap("audio");
-            if (text)
-            {
-                description=Add2Description(description,text->Value());
-                description=Add2Description(description,": ");
-
-                if ((!strcasecmp(xEvent->Audio(),"mono")) || (!strcasecmp(xEvent->Audio(),"stereo")))
-                {
-                    description=Add2Description(description,xEvent->Audio());
-                    description=Add2Description(description,"\n");
-                }
-                else
-                {
-                    cTEXTMapping *text=texts->GetMap(xEvent->Audio());
-                    if (text)
-                    {
-                        description=Add2Description(description,text->Value());
-                        description=Add2Description(description,"\n");
-                    }
-                }
-            }
-        }
-    }
-    if ((Flags & USE_SEASON)==USE_SEASON)
-    {
-        if (xEvent->Season())
-        {
-            cTEXTMapping *text=texts->GetMap("season");
-            if (text) description=Add2Description(description,text->Value(),xEvent->Season());
-        }
-
-        if (xEvent->Episode())
-        {
-            cTEXTMapping *text=texts->GetMap("episode");
-            if (text) description=Add2Description(description,text->Value(),xEvent->Episode());
-        }
-
-        if (xEvent->EpisodeOverall())
-        {
-            cTEXTMapping *text=texts->GetMap("episodeoverall");
-            if (text) description=Add2Description(description,text->Value(),xEvent->EpisodeOverall());
-        }
-    }
-
-    if (((Flags & USE_RATING)==USE_RATING) && (xEvent->Rating()->Size()))
-    {
-#if VDRVERSNUM < 10711 && !EPGHANDLER
-        Flags|=OPT_RATING_TEXT; // always add to text if we dont have the internal tag!
-#endif
-        if ((Flags & OPT_RATING_TEXT)==OPT_RATING_TEXT)
-        {
-            cXMLTVStringList *rating=xEvent->Rating();
-            for (int i=0; i<rating->Size(); i++)
-            {
-                char *rtype=strdup((*rating)[i]);
-                if (rtype)
-                {
-                    char *rval=strchr(rtype,'|');
-                    if (rval)
-                    {
-                        *rval=0;
-                        rval++;
-
-                        description=Add2Description(description,rtype);
-                        description=Add2Description(description,": ");
-                        description=Add2Description(description,rval);
-                        description=Add2Description(description,"\n");
-                    }
-                    free(rtype);
-                }
-            }
-        }
-    }
-
-    if (((Flags & USE_STARRATING)==USE_STARRATING) && (xEvent->StarRating()->Size()))
-    {
-        cTEXTMapping *text=texts->GetMap("starrating");
-        if (text)
-        {
-            description=Add2Description(description,text->Value());
-            description=Add2Description(description,": ");
-            cXMLTVStringList *starrating=xEvent->StarRating();
-            for (int i=0; i<starrating->Size(); i++)
-            {
-                char *rtype=strdup((*starrating)[i]);
-                if (rtype)
-                {
-                    char *rval=strchr(rtype,'|');
-                    if (rval)
-                    {
-                        *rval=0;
-                        rval++;
-
-                        if (i)
-                        {
-                            description=Add2Description(description,", ");
-                        }
-                        if (strcasecmp(rtype,"*"))
-                        {
-                            description=Add2Description(description,rtype);
-                            description=Add2Description(description," ");
-                        }
-                        description=Add2Description(description,rval);
-                    }
-                    free(rtype);
-                }
-            }
-            description=Add2Description(description,"\n");
-        }
-    }
-
-    if (((Flags & USE_REVIEW)==USE_REVIEW) && (xEvent->Review()->Size()))
-    {
-        cTEXTMapping *text=texts->GetMap("review");
-        if (text)
-        {
-            cXMLTVStringList *review=xEvent->Review();
-            for (int i=0; i<review->Size(); i++)
-            {
-                description=Add2Description(description,text->Value(),(*review)[i]);
-            }
-        }
+        if (*ot==',') ot++;
+        if (!strncmp(ot,"LOT",3)) description=Add2Description(description,xEvent,Flags,USE_LONGTEXT);
+        if (!strncmp(ot,"CRS",3)) description=Add2Description(description,xEvent,Flags,USE_CREDITS);
+        if (!strncmp(ot,"CAD",3)) description=Add2Description(description,xEvent,Flags,USE_COUNTRYDATE);
+        if (!strncmp(ot,"ORT",3)) description=Add2Description(description,xEvent,Flags,USE_ORIGTITLE);
+        if (!strncmp(ot,"CAT",3)) description=Add2Description(description,xEvent,Flags,USE_CATEGORIES);
+        if (!strncmp(ot,"VID",3)) description=Add2Description(description,xEvent,Flags,USE_VIDEO);
+        if (!strncmp(ot,"AUD",3)) description=Add2Description(description,xEvent,Flags,USE_AUDIO);
+        if (!strncmp(ot,"SEE",3)) description=Add2Description(description,xEvent,Flags,USE_SEASON);
+        if (!strncmp(ot,"RAT",3)) description=Add2Description(description,xEvent,Flags,USE_RATING);
+        if (!strncmp(ot,"STR",3)) description=Add2Description(description,xEvent,Flags,USE_STARRATING);
+        if (!strncmp(ot,"REV",3)) description=Add2Description(description,xEvent,Flags,USE_REVIEW);
+        ot+=3;
     }
 
     if (description)
@@ -1257,9 +1286,9 @@ cXMLTVEvent *cImport::SearchXMLTVEvent(sqlite3 **Db,const char *ChannelID, const
     if (!*Db)
     {
         // we need READWRITE because the epg.db maybe updated later
-        if (sqlite3_open_v2(epgfile,Db,SQLITE_OPEN_READWRITE,NULL)!=SQLITE_OK)
+        if (sqlite3_open_v2(g->EPGFile(),Db,SQLITE_OPEN_READWRITE,NULL)!=SQLITE_OK)
         {
-            esyslog("failed to open %s",epgfile);
+            esyslog("failed to open %s",g->EPGFile());
             *Db=NULL;
             return NULL;
         }
@@ -1400,9 +1429,9 @@ int cImport::Process(cEPGSource *Source, cEPGExecutor &myExecutor)
 
     dsyslogs(Source,"importing from db");
     sqlite3 *db=NULL;
-    if (sqlite3_open(epgfile,&db)!=SQLITE_OK)
+    if (sqlite3_open(g->EPGFile(),&db)!=SQLITE_OK)
     {
-        esyslogs(Source,"failed to open %s",epgfile);
+        esyslogs(Source,"failed to open %s",g->EPGFile());
         delete schedulesLock;
         return 141;
     }
@@ -1441,7 +1470,7 @@ int cImport::Process(cEPGSource *Source, cEPGExecutor &myExecutor)
             cXMLTVEvent xevent;
             if (FetchXMLTVEvent(stmt,&xevent))
             {
-                cEPGMapping *map=maps->GetMap(tChannelID::FromString(xevent.ChannelID()));
+                cEPGMapping *map=g->EPGMappings()->GetMap(tChannelID::FromString(xevent.ChannelID()));
                 if (!map)
                 {
                     if (lerr!=IMPORT_NOMAPPING)
@@ -1532,41 +1561,34 @@ int cImport::Process(cEPGSource *Source, cEPGExecutor &myExecutor)
 
 bool cImport::DBExists()
 {
-    if (!epgfile) return true; // is this safe?
+    if (!g->EPGFile()) return true; // is this safe?
     struct stat statbuf;
-    if (stat(epgfile,&statbuf)==-1) return false; // no database
+    if (stat(g->EPGFile(),&statbuf)==-1) return false; // no database
     if (!statbuf.st_size) return false; // no database
     return true;
 }
 
 cImport::cImport(cGlobals *Global)
 {
-    maps=Global->EPGMappings();
-    texts=Global->TEXTMappings();
-    epgfile=Global->EPGFile();
-    codeset=Global->Codeset();
-    imgdir=Global->ImgDir();
+    g=Global;
     pendingtransaction=false;
-    conv = new cCharSetConv("UTF-8",codeset);
+    conv = new cCharSetConv("UTF-8",g->Codeset());
 
-    epdir=Global->EPDir();
-    if (epdir)
+    if (Global->EPDir())
     {
         cep2ascii=iconv_open("ASCII//TRANSLIT",Global->EPCodeset());
         cutf2ascii=iconv_open("ASCII//TRANSLIT","UTF-8");
     }
     else
     {
-        epdir=NULL;
+        cep2ascii=(iconv_t) -1;
+        cutf2ascii=(iconv_t) -1;
     }
 }
 
 cImport::~cImport()
 {
-    if (epdir)
-    {
-        iconv_close(cep2ascii);
-        iconv_close(cutf2ascii);
-    }
+    if (cep2ascii!=(iconv_t) -1) iconv_close(cep2ascii);
+    if (cutf2ascii!=(iconv_t) -1) iconv_close(cutf2ascii);
     delete conv;
 }

@@ -38,20 +38,17 @@ private:
         IMPORT_NOCHANNELID,
         IMPORT_EMPTYSCHEDULE
     };
-    cEPGMappings *maps;
-    cTEXTMappings *texts;
+    cGlobals *g;
     cCharSetConv *conv;
-    const char *codeset;
-    const char *imgdir;
     iconv_t cep2ascii;
     iconv_t cutf2ascii;
     const char *epdir;
     bool pendingtransaction;
-    const char *epgfile;
     char *RemoveLastCharFromDescription(char *description);
     char *Add2Description(char *description, const char *value);
     char *Add2Description(char *description, const char *name, const char *value);
     char *Add2Description(char *description, const char *name, int value);
+    char *Add2Description(char *description, cXMLTVEvent *xEvent, int Flags, int what);    
     char *AddEOT2Description(char *description, bool checkutf8=false);
     struct split split(char *in, char delim);
     cEvent *GetEventBefore(cSchedule* schedule, time_t start);

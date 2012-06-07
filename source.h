@@ -173,8 +173,7 @@ private:
     bool epgsearchexists;
 public:
     cEPGSources();
-    void ReadIn(cGlobals *Global, const char *SourceOrder,
-                bool Reload=false);
+    void ReadIn(cGlobals *Global, bool Reload=false);
     bool RunItNow();
     time_t NextRunTime();
     bool Exists(const char *Name);
@@ -182,6 +181,7 @@ public:
     cEPGSource *GetSourceDB(const char *EpgFile);
     int GetSourceIdx(const char *Name);
     void Remove();
+    bool MoveEPGSource(cGlobals *Global, int From, int To);
     bool EPGSearchExists()
     {
         return epgsearchexists;

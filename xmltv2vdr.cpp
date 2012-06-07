@@ -225,7 +225,13 @@ cGlobals::cGlobals()
     epcodeset=NULL;
     imgdir=NULL;
     codeset=NULL;
+    srcorder=NULL;
+    wakeup=false;
+    epghandler=NULL;
+    epgtimer=NULL;
+    epall=0;
     epgsearchexists=(cPluginManager::GetPlugin("epgsearch")!=NULL);
+    order=strdup(GetDefaultOrder());
     imgdelafter=30;
 
     if (asprintf(&epgfile,"%s/epg.db",VideoDirectory)==-1) {};
@@ -280,9 +286,21 @@ cGlobals::~cGlobals()
     free(epdir);
     free(imgdir);
     free(codeset);
+    free(order);
+    free(srcorder);
+    if (epgtimer)
+    {
+        epgtimer->Stop();
+        delete epgtimer;
+    }
     epgsources.Remove();
     epgmappings.Remove();
     textmappings.Remove();
+}
+
+char *cGlobals::GetDefaultOrder()
+{
+    return (char *) "LOT,CRS,CAD,ORT,CAT,VID,AUD,SEE,RAT,STR,REV";
 }
 
 void cGlobals::SetImgDir(const char* ImgDir)
@@ -704,47 +722,41 @@ cPluginXmltv2vdr::cPluginXmltv2vdr(void) : housekeeping(&g),epgexecutor(g.EPGSou
     // DON'T DO ANYTHING ELSE THAT MAY HAVE SIDE EFFECTS, REQUIRE GLOBAL
     // VDR OBJECTS TO EXIST OR PRODUCE ANY OUTPUT!
     logfile=NULL;
-    srcorder=NULL;
-    epghandler=NULL;
-    epgtimer=NULL;
-    epgseasonepisode=NULL;
     last_maintime_t=0;
     last_timer_t=last_epcheck_t=last_housetime_t=time(NULL); // start this threads later!
-    wakeup=0;
-    insetup=false;
-    SetEPAll(0);
-    TEXTMappingAdd(new cTEXTMapping("country",tr("country")));
-    TEXTMappingAdd(new cTEXTMapping("year",tr("year")));
-    TEXTMappingAdd(new cTEXTMapping("originaltitle",tr("originaltitle")));
-    TEXTMappingAdd(new cTEXTMapping("category",tr("category")));
-    TEXTMappingAdd(new cTEXTMapping("actor",tr("actor")));
-    TEXTMappingAdd(new cTEXTMapping("adapter",tr("adapter")));
-    TEXTMappingAdd(new cTEXTMapping("commentator",tr("commentator")));
-    TEXTMappingAdd(new cTEXTMapping("composer",tr("composer")));
-    TEXTMappingAdd(new cTEXTMapping("director",tr("director")));
-    TEXTMappingAdd(new cTEXTMapping("editor",tr("editor")));
-    TEXTMappingAdd(new cTEXTMapping("guest",tr("guest")));
-    TEXTMappingAdd(new cTEXTMapping("presenter",tr("presenter")));
-    TEXTMappingAdd(new cTEXTMapping("producer",tr("producer")));
-    TEXTMappingAdd(new cTEXTMapping("writer",tr("writer")));
-    TEXTMappingAdd(new cTEXTMapping("video",tr("video")));
-    TEXTMappingAdd(new cTEXTMapping("blacknwhite",tr("blacknwhite")));
-    TEXTMappingAdd(new cTEXTMapping("audio",tr("audio")));
-    TEXTMappingAdd(new cTEXTMapping("dolby",tr("dolby")));
-    TEXTMappingAdd(new cTEXTMapping("dolbydigital",tr("dolbydigital")));
-    TEXTMappingAdd(new cTEXTMapping("bilingual",tr("bilingual")));
-    TEXTMappingAdd(new cTEXTMapping("review",tr("review")));
-    TEXTMappingAdd(new cTEXTMapping("starrating",tr("starrating")));
-    TEXTMappingAdd(new cTEXTMapping("season",tr("season")));
-    TEXTMappingAdd(new cTEXTMapping("episode",tr("episode")));
-    TEXTMappingAdd(new cTEXTMapping("episodeoverall",tr("episodeoverall")));
+    g.SetEPAll(0);
+    g.TEXTMappings()->Add(new cTEXTMapping("country",tr("country")));
+    g.TEXTMappings()->Add(new cTEXTMapping("year",tr("year")));
+    g.TEXTMappings()->Add(new cTEXTMapping("originaltitle",tr("originaltitle")));
+    g.TEXTMappings()->Add(new cTEXTMapping("category",tr("category")));
+    g.TEXTMappings()->Add(new cTEXTMapping("actor",tr("actor")));
+    g.TEXTMappings()->Add(new cTEXTMapping("adapter",tr("adapter")));
+    g.TEXTMappings()->Add(new cTEXTMapping("commentator",tr("commentator")));
+    g.TEXTMappings()->Add(new cTEXTMapping("composer",tr("composer")));
+    g.TEXTMappings()->Add(new cTEXTMapping("director",tr("director")));
+    g.TEXTMappings()->Add(new cTEXTMapping("editor",tr("editor")));
+    g.TEXTMappings()->Add(new cTEXTMapping("guest",tr("guest")));
+    g.TEXTMappings()->Add(new cTEXTMapping("presenter",tr("presenter")));
+    g.TEXTMappings()->Add(new cTEXTMapping("producer",tr("producer")));
+    g.TEXTMappings()->Add(new cTEXTMapping("writer",tr("writer")));
+    g.TEXTMappings()->Add(new cTEXTMapping("video",tr("video")));
+    g.TEXTMappings()->Add(new cTEXTMapping("blacknwhite",tr("blacknwhite")));
+    g.TEXTMappings()->Add(new cTEXTMapping("audio",tr("audio")));
+    g.TEXTMappings()->Add(new cTEXTMapping("dolby",tr("dolby")));
+    g.TEXTMappings()->Add(new cTEXTMapping("dolbydigital",tr("dolbydigital")));
+    g.TEXTMappings()->Add(new cTEXTMapping("bilingual",tr("bilingual")));
+    g.TEXTMappings()->Add(new cTEXTMapping("review",tr("review")));
+    g.TEXTMappings()->Add(new cTEXTMapping("starrating",tr("starrating")));
+    g.TEXTMappings()->Add(new cTEXTMapping("season",tr("season")));
+    g.TEXTMappings()->Add(new cTEXTMapping("episode",tr("episode")));
+    g.TEXTMappings()->Add(new cTEXTMapping("episodeoverall",tr("episodeoverall")));
 }
 
 cPluginXmltv2vdr::~cPluginXmltv2vdr()
 {
     // Clean up after yourself!
 #if VDRVERSNUM < 10726 && (!EPGHANDLER)
-    delete epghandler;
+    delete g.epghandler;
 #endif
 }
 
@@ -775,41 +787,6 @@ int cPluginXmltv2vdr::GetLastImportSource()
     return idx;
 }
 
-bool cPluginXmltv2vdr::EPGSourceMove(int From, int To)
-{
-    if (From==To) return false;
-
-    sqlite3 *db=NULL;
-    if (sqlite3_open_v2(g.EPGFile(),&db,SQLITE_OPEN_READWRITE,NULL)==SQLITE_OK)
-    {
-        char *sql=NULL;
-        if (asprintf(&sql,"BEGIN TRANSACTION;" \
-                     "UPDATE epg SET srcidx=98 WHERE srcidx=%i;" \
-                     "UPDATE epg SET srcidx=%i WHERE srcidx=%i;" \
-                     "UPDATE epg SET srcidx=%i WHERE srcidx=98;" \
-                     "COMMIT;", To, From, To, From)==-1)
-        {
-            sqlite3_close(db);
-            return false;
-        }
-        if (sqlite3_exec(db,sql,NULL,NULL,NULL)!=SQLITE_OK)
-        {
-            free(sql);
-            sqlite3_close(db);
-            return false;
-        }
-        free(sql);
-    }
-    else
-    {
-        return false;
-    }
-    sqlite3_close(db);
-    g.EPGSources()->Move(From,To);
-    return true;
-}
-
-
 const char *cPluginXmltv2vdr::CommandLineHelp(void)
 {
     // Return a string that describes all known command line options.
@@ -824,7 +801,6 @@ const char *cPluginXmltv2vdr::CommandLineHelp(void)
            "                           (default is /var/cache/vdr/epgimages)\n"
            "  -l FILE   --logfile=FILE write trace logs into the given FILE (default is\n"
            "                           no trace log\n";
-
 }
 
 bool cPluginXmltv2vdr::ProcessArgs(int argc, char *argv[])
@@ -879,34 +855,25 @@ bool cPluginXmltv2vdr::Start(void)
     if (g.EPDir())
     {
         isyslog("using dir '%s' (%s) for episodes",g.EPDir(),g.EPCodeset());
-        epgtimer = new cEPGTimer(&g);
-        epgseasonepisode = new cEPGSeasonEpisode(&g);
+        g.AllocateEPGSeasonThread();
+    }
+    if (g.EPAll())
+    {
+        g.AllocateEPGTimerThread();
     }
     if (g.ImgDir()) isyslog("using dir '%s' for epgimages (%i)",g.ImgDir(),g.ImgDelAfter());
 
-    ReadInEPGSources();
-    epghandler = new cEPGHandler(&g);
+    g.EPGSources()->ReadIn(&g);
+    g.epghandler = new cEPGHandler(&g);
+    g.SetEPAll(g.EPAll());
     if (sqlite3_threadsafe()==0) esyslog("sqlite3 not threadsafe!");
     cParse::InitLibXML();
-    SetEPAll(epall);
     return true;
 }
 
 void cPluginXmltv2vdr::Stop(void)
 {
     // Stop any background activities the plugin is performing.
-    if (epgtimer)
-    {
-        epgtimer->Stop();
-        delete epgtimer;
-        epgtimer=NULL;
-    }
-    if (epgseasonepisode)
-    {
-        epgseasonepisode->Stop();
-        delete epgseasonepisode;
-        epgseasonepisode=NULL;
-    }
     epgexecutor.Stop();
     housekeeping.Stop();
     cParse::CleanupLibXML();
@@ -914,11 +881,6 @@ void cPluginXmltv2vdr::Stop(void)
     {
         free(logfile);
         logfile=NULL;
-    }
-    if (srcorder)
-    {
-        free(srcorder);
-        srcorder=NULL;
     }
 }
 
@@ -954,15 +916,15 @@ void cPluginXmltv2vdr::MainThreadHook(void)
         /*
           if (now>=(last_epcheck_t+900))
           {
-              if (epgseasonepisode) epgseasonepisode->Start();
+              if (g.EPGSeasonEpisode()) g.EPGSeasonEpisode()->Start();
               last_epcheck_t=(now/900)*900;
           }
-          */
-        if (epall)
+        */
+        if (g.EPAll())
         {
             if (now>=(last_timer_t+600))
             {
-                if (epgtimer) epgtimer->Start();
+                if (g.EPGTimer()) g.EPGTimer()->Start();
                 last_timer_t=(now/600)*600;
             }
         }
@@ -982,7 +944,7 @@ cString cPluginXmltv2vdr::Active(void)
 time_t cPluginXmltv2vdr::WakeupTime(void)
 {
     // Return custom wakeup time for shutdown script
-    if (!wakeup) return (time_t) 0;
+    if (!g.WakeUp()) return (time_t) 0;
     time_t nextruntime=g.EPGSources()->NextRunTime();
     if (nextruntime) nextruntime-=(time_t) 180;
 #ifdef VDRDBG
@@ -1006,7 +968,7 @@ cOsdObject *cPluginXmltv2vdr::MainMenuAction(void)
 cMenuSetupPage *cPluginXmltv2vdr::SetupMenu(void)
 {
     // Return a setup menu in case the plugin supports one.
-    return new cMenuSetupXmltv2vdr(this);
+    return new cMenuSetupXmltv2vdr(&g);
 }
 
 bool cPluginXmltv2vdr::SetupParse(const char *Name, const char *Value)
@@ -1020,7 +982,7 @@ bool cPluginXmltv2vdr::SetupParse(const char *Name, const char *Value)
     else if (!strncasecmp(Name,"textmap",7))
     {
         if (strlen(Name)<10) return false;
-        cTEXTMapping *textmap=TEXTMapping(&Name[8]);
+        cTEXTMapping *textmap=g.TEXTMappings()->GetMap(&Name[8]);
         if (textmap)
         {
             textmap->ChangeValue(Value);
@@ -1032,19 +994,23 @@ bool cPluginXmltv2vdr::SetupParse(const char *Name, const char *Value)
     }
     else if (!strcasecmp(Name,"options.epall"))
     {
-        epall=atoi(Value); // set value later again in Start()
+        g.SetEPAll(atoi(Value));
     }
     else if (!strcasecmp(Name,"options.wakeup"))
     {
-        wakeup=(bool) atoi(Value);
+        g.SetWakeUp((bool) atoi(Value));
     }
     else if (!strcasecmp(Name,"options.imgdelafter"))
     {
-        SetImgDelAfter(atoi(Value));
+        g.SetImgDelAfter(atoi(Value));
+    }
+    else if (!strcasecmp(Name,"options.order"))
+    {
+        g.SetOrder(Value);
     }
     else if (!strcasecmp(Name,"source.order"))
     {
-        srcorder=strdup(Value);
+        g.SetSrcOrder(Value);
     }
     else return false;
     return true;

@@ -54,14 +54,13 @@ void cMyMenuEditBitItem::Set(void)
 
 // --------------------------------------------------------------------------------------------------------
 
-cMenuSetupXmltv2vdr::cMenuSetupXmltv2vdr(cPluginXmltv2vdr *Plugin)
+cMenuSetupXmltv2vdr::cMenuSetupXmltv2vdr(cGlobals *Global)
 {
-    baseplugin=Plugin;
-    baseplugin->SetSetupState(true);
+    g=Global;
     sourcesBegin=sourcesEnd=mappingBegin=mappingEnd=mappingEntry=0;
-    epall=(unsigned int) baseplugin->EPAll();
-    wakeup=(int) baseplugin->WakeUp();
-    imgdelafter=baseplugin->ImgDelAfter();
+    epall=g->EPAll();
+    wakeup=g->WakeUp();
+    imgdelafter=g->ImgDelAfter();
     if (imgdelafter<=6) imgdelafter=6;
     cs=NULL;
     cm=NULL;
@@ -70,21 +69,20 @@ cMenuSetupXmltv2vdr::cMenuSetupXmltv2vdr(cPluginXmltv2vdr *Plugin)
 
 cMenuSetupXmltv2vdr::~cMenuSetupXmltv2vdr()
 {
-    baseplugin->SetSetupState(false);
     if (cs) cs->ClearMenu();
     if (cm) cm->ClearMenu();
 }
 
 void cMenuSetupXmltv2vdr::Output(void)
 {
-    if (!baseplugin) return;
+    if (!g) return;
     int current=Current();
     Clear();
     cOsdItem *first=NewTitle(tr("options"));
     Add(first,true);
 
     epEntry=0;
-    if (baseplugin->EPDir())
+    if (g->EPDir())
     {
         Add(new cMyMenuEditBitItem(tr("add season/episode on all timers"),
                                    &epall,EPLIST_USE_SEASON),true);
@@ -100,19 +98,21 @@ void cMenuSetupXmltv2vdr::Output(void)
         }
     }
     Add(new cMenuEditBoolItem(tr("automatic wakeup"),&wakeup),true);
-    if (baseplugin->ImgDir())
+    if (g->ImgDir())
     {
         Add(new cMenuEditIntItem(tr("delete pics after (days)"),&imgdelafter,6,365,tr("never")),true);
     }
 
     Add(new cOsdItem(tr("text mapping")),true);
     mappingEntry=Current();
+    Add(new cOsdItem(tr("order of epg data")),true);
+    orderEntry=Current();
     Add(NewTitle(tr("epg sources")),true);
 
-    if (!baseplugin->EPGSourceCount())
+    if (!g->EPGSources()->Count())
     {
-        baseplugin->ReadInEPGSources();
-        if (!baseplugin->EPGSourceCount())
+        g->EPGSources()->ReadIn(g);
+        if (!g->EPGSources()->Count())
         {
             Add(new cOsdItem(tr("no epgsources installed"),osUnknown,false));
             Display();
@@ -120,9 +120,9 @@ void cMenuSetupXmltv2vdr::Output(void)
         }
     }
     sourcesBegin=Current()+1;
-    for (int i=0; i<baseplugin->EPGSourceCount(); i++)
+    for (int i=0; i<g->EPGSources()->Count()-1; i++)
     {
-        cEPGSource *epgsrc=baseplugin->EPGSource(i);
+        cEPGSource *epgsrc=g->EPGSources()->Get(i);
         if (epgsrc)
         {
             if (epgsrc->Disabled())
@@ -144,7 +144,7 @@ void cMenuSetupXmltv2vdr::Output(void)
     for (int i=0; i<channels.Size(); i++)
     {
         bool mapped=false;
-        cEPGMapping *map=baseplugin->EPGMapping(channels[i]);
+        cEPGMapping *map=g->EPGMappings()->GetMap(channels[i]);
         if (map)
         {
             for (int x=0; x<map->NumChannelIDs(); x++)
@@ -181,10 +181,11 @@ void cMenuSetupXmltv2vdr::Output(void)
 void cMenuSetupXmltv2vdr::generatesumchannellist()
 {
     channels.Clear();
-    for (int i=0; i<baseplugin->EPGSourceCount(); i++)
+    if (!g->EPGSources()->Count()) return;
+    for (int i=0; i<g->EPGSources()->Count()-1; i++)
     {
-        cEPGSource *epgsrc=baseplugin->EPGSource(i);
-        if (epgsrc)
+        cEPGSource *epgsrc=g->EPGSources()->Get(i);
+        if (epgsrc && !epgsrc->Disabled())
         {
             cEPGChannels *channellist=epgsrc->ChannelList();
             if (channellist)
@@ -202,7 +203,6 @@ void cMenuSetupXmltv2vdr::generatesumchannellist()
                         {
                             channels.Append(strdup(channellist->Get(x)->Name()));
                         }
-
                     }
                 }
             }
@@ -213,53 +213,59 @@ void cMenuSetupXmltv2vdr::generatesumchannellist()
 
 void cMenuSetupXmltv2vdr::Store(void)
 {
-
-    char *order=NULL;
-    for (int i=0; i<baseplugin->EPGSourceCount(); i++)
+    char *srcorder=NULL;
+    if (g->EPGSources()->Count())
     {
-        cEPGSource *epgsrc=baseplugin->EPGSource(i);
-        if (epgsrc && epgsrc->Name())
+        for (int i=0; i<g->EPGSources()->Count()-1; i++)
         {
-            if (epgsrc->Disabled())
+            cEPGSource *epgsrc=g->EPGSources()->Get(i);
+            if (epgsrc && epgsrc->Name())
             {
-                order=strcatrealloc(order,"-");
+                if (epgsrc->Disabled())
+                {
+                    srcorder=strcatrealloc(srcorder,"-");
+                }
+                srcorder=strcatrealloc(srcorder,epgsrc->Name());
+                if (i<g->EPGSources()->Count()-2) srcorder=strcatrealloc(srcorder,",");
             }
-            order=strcatrealloc(order,epgsrc->Name());
-            if (i<baseplugin->EPGSourceCount()-1) order=strcatrealloc(order,",");
         }
     }
 
-    if (order)
+    if (srcorder)
     {
-        SetupStore("source.order",order);
-        free(order);
+        SetupStore("source.order",srcorder);
+        free(srcorder);
     }
 
     if (imgdelafter<=6) imgdelafter=0;
     SetupStore("options.epall",epall);
     SetupStore("options.wakeup",wakeup);
     SetupStore("options.imgdelafter",imgdelafter);
-    baseplugin->SetEPAll(epall);
-    baseplugin->SetWakeUp((bool) wakeup);
-    baseplugin->SetImgDelAfter(imgdelafter);
+    g->SetEPAll(epall);
+    g->SetWakeUp((bool) wakeup);
+    g->SetImgDelAfter(imgdelafter);
 }
 
 eOSState cMenuSetupXmltv2vdr::edit()
 {
     if ((Current()>=sourcesBegin) && (Current()<=sourcesEnd))
     {
-        cs=new cMenuSetupXmltv2vdrChannelSource(baseplugin,this,Current()-sourcesBegin);
+        cs=new cMenuSetupXmltv2vdrChannelSource(g,this,Current()-sourcesBegin);
         return AddSubMenu(cs);
     }
 
     if ((Current()>=mappingBegin) && (Current()<=mappingEnd))
     {
-        cm=new cMenuSetupXmltv2vdrChannelMap(baseplugin,this,Current()-mappingBegin);
+        cm=new cMenuSetupXmltv2vdrChannelMap(g,this,Current()-mappingBegin);
         return AddSubMenu(cm);
     }
     if (Current()==mappingEntry)
     {
-        return AddSubMenu(new cMenuSetupXmltv2vdrTextMap(baseplugin));
+        return AddSubMenu(new cMenuSetupXmltv2vdrTextMap(g));
+    }
+    if (Current()==orderEntry)
+    {
+        return AddSubMenu(new cMenuSetupXmltv2vdrOrder(g));
     }
     return osUnknown;
 }
@@ -288,7 +294,7 @@ eOSState cMenuSetupXmltv2vdr::ProcessKey(eKeys Key)
                     SetHelp(NULL,NULL,tr("Button$Log"),tr("Button$Edit"));
                 }
             }
-            else if (Current()==mappingEntry)
+            else if ((Current()==mappingEntry) || (Current()==orderEntry))
             {
                 SetHelp(NULL,NULL,NULL,tr("Button$Edit"));
             }
@@ -310,7 +316,7 @@ eOSState cMenuSetupXmltv2vdr::ProcessKey(eKeys Key)
             if ((Current()>=sourcesBegin) && (Current()<=sourcesEnd))
             {
                 int srcid=Current()-sourcesBegin;
-                cEPGSource *src=baseplugin->EPGSource(srcid);
+                cEPGSource *src=g->EPGSources()->Get(srcid);
                 if (src)
                 {
                     if (src->Disabled())
@@ -333,7 +339,7 @@ eOSState cMenuSetupXmltv2vdr::ProcessKey(eKeys Key)
             {
                 int From=Current()-sourcesBegin;
                 int To=From-1;
-                if (baseplugin->EPGSourceMove(From,To))
+                if (g->EPGSources()->MoveEPGSource(g,From,To))
                 {
                     CursorUp();
                     Output();
@@ -348,7 +354,7 @@ eOSState cMenuSetupXmltv2vdr::ProcessKey(eKeys Key)
             {
                 int From=Current()-sourcesBegin;
                 int To=From+1;
-                if (baseplugin->EPGSourceMove(From,To))
+                if (g->EPGSources()->MoveEPGSource(g,From,To))
                 {
                     CursorDown();
                     Output();
@@ -369,10 +375,10 @@ eOSState cMenuSetupXmltv2vdr::ProcessKey(eKeys Key)
         {
             if ((Current()>=sourcesBegin) && (Current()<=sourcesEnd))
             {
-                cEPGSource *src=baseplugin->EPGSource(Current()-sourcesBegin);
+                cEPGSource *src=g->EPGSources()->Get(Current()-sourcesBegin);
                 if (src)
                 {
-                    return AddSubMenu(new cMenuSetupXmltv2vdrLog(baseplugin,src));
+                    return AddSubMenu(new cMenuSetupXmltv2vdrLog(src));
                 }
             }
         }
@@ -386,15 +392,18 @@ eOSState cMenuSetupXmltv2vdr::ProcessKey(eKeys Key)
 
 // --------------------------------------------------------------------------------------------------------
 
-cMenuSetupXmltv2vdrTextMap::cMenuSetupXmltv2vdrTextMap(cPluginXmltv2vdr *Plugin)
+cMenuSetupXmltv2vdrTextMap::cMenuSetupXmltv2vdrTextMap(cGlobals *Global)
 {
-    baseplugin=Plugin;
-    SetPlugin(baseplugin);
-    SetSection(cString::sprintf("%s '%s' : %s",trVDR("Plugin"), baseplugin->Name(), tr("texts")));
+    cPlugin *plugin=cPluginManager::GetPlugin("xmltv2vdr");
+    if (!plugin) return;
+    SetPlugin(plugin);
+    SetSection(cString::sprintf("%s '%s' : %s",trVDR("Plugin"), plugin->Name(), tr("texts")));
+
+    g=Global;
 
     cTEXTMapping *textmap;
 
-#define settval(dummy) textmap=baseplugin->TEXTMapping(#dummy); \
+#define settval(dummy) textmap=g->TEXTMappings()->GetMap(#dummy); \
    if (textmap) { \
      strn0cpy(dummy,textmap->Value(),sizeof(dummy)-1); \
    } else { \
@@ -472,14 +481,14 @@ cMenuSetupXmltv2vdrTextMap::cMenuSetupXmltv2vdrTextMap(cPluginXmltv2vdr *Plugin)
 
 void cMenuSetupXmltv2vdrTextMap::Store()
 {
-    if (!baseplugin) return;
+    if (!g) return;
     cTEXTMapping *textmap;
 
-#define savetval(dummy) textmap=baseplugin->TEXTMapping(#dummy); \
+#define savetval(dummy) textmap=g->TEXTMappings()->GetMap(#dummy); \
    if (textmap) { \
     textmap->ChangeValue(dummy); \
    } else { \
-    baseplugin->TEXTMappingAdd(new cTEXTMapping(#dummy,dummy)); \
+    g->TEXTMappings()->Add(new cTEXTMapping(#dummy,dummy)); \
    }
 
     savetval(country);
@@ -533,6 +542,151 @@ void cMenuSetupXmltv2vdrTextMap::Store()
     SetupStore("textmap.season",season);
     SetupStore("textmap.episode",episode);
     SetupStore("textmap.episodeoverall",episodeoverall);
+}
+
+// --------------------------------------------------------------------------------------------------------
+
+cMenuSetupXmltv2vdrOrder::cMenuSetupXmltv2vdrOrder(cGlobals* Global)
+{
+    cPlugin *plugin=cPluginManager::GetPlugin("xmltv2vdr");
+    if (!plugin) return;
+    SetPlugin(plugin);
+    SetSection(cString::sprintf("%s '%s' : %s",trVDR("Plugin"), plugin->Name(), tr("order")));
+    SetHelp(trVDR("Button$Reset"),NULL,tr("Button$Down"));
+
+    g=Global;
+    order=strdup(g->Order());
+    output();
+}
+
+void cMenuSetupXmltv2vdrOrder::output(void)
+{
+    int current=Current();
+    Clear();
+    char *ot=order;
+    while (*ot)
+    {
+        if (*ot==',') ot++;
+        if (!strncmp(ot,"LOT",3)) Add(new cOsdItem(tr("long text")));
+        if (!strncmp(ot,"CRS",3)) Add(new cOsdItem(tr("credits")));
+        if (!strncmp(ot,"CAD",3)) Add(new cOsdItem(tr("country and date")));
+        if (!strncmp(ot,"ORT",3)) Add(new cOsdItem(tr("original title")));
+        if (!strncmp(ot,"CAT",3)) Add(new cOsdItem(tr("category")));
+        if (!strncmp(ot,"VID",3)) Add(new cOsdItem(tr("video")));
+        if (!strncmp(ot,"AUD",3)) Add(new cOsdItem(tr("audio")));
+        if (!strncmp(ot,"SEE",3)) Add(new cOsdItem(tr("season and episode")));
+        if (!strncmp(ot,"RAT",3)) Add(new cOsdItem(tr("rating")));
+        if (!strncmp(ot,"STR",3)) Add(new cOsdItem(tr("starrating")));
+        if (!strncmp(ot,"REV",3)) Add(new cOsdItem(tr("review")));
+        ot+=3;
+    }
+    if (current==-1)
+    {
+        SetCurrent(Get(0));
+    }
+    else
+    {
+        SetCurrent(Get(current));
+    }
+
+    if (Current()==0)
+    {
+        SetHelp(trVDR("Button$Reset"),NULL,tr("Button$Down"));
+    }
+    if ((Current()>0) && (Current()<Count()-1))
+    {
+        SetHelp(trVDR("Button$Reset"),tr("Button$Up"),tr("Button$Down"));
+    }
+    if (Current()==Count()-1)
+    {
+        SetHelp(trVDR("Button$Reset"),tr("Button$Up"),NULL);
+    }
+
+    Display();
+}
+
+eOSState cMenuSetupXmltv2vdrOrder::ProcessKey(eKeys Key)
+{
+    eOSState state = cOsdMenu::ProcessKey(Key);
+    if (HasSubMenu()) return osContinue;
+
+    if (state==osContinue)
+    {
+        switch (Key)
+        {
+        case kDown:
+        case kUp:
+        case kDown|k_Repeat:
+        case kUp|k_Repeat:
+        case kLeft:
+        case kRight:
+        case kGreen:
+            if (Current()==0)
+            {
+                SetHelp(trVDR("Button$Reset"),NULL,tr("Button$Down"));
+            }
+            if ((Current()>0) && (Current()<Count()-1))
+            {
+                SetHelp(trVDR("Button$Reset"),tr("Button$Up"),tr("Button$Down"));
+            }
+            if (Current()==Count()-1)
+            {
+                SetHelp(trVDR("Button$Reset"),tr("Button$Up"),NULL);
+            }
+            break;
+        default:
+            break;
+        }
+    }
+
+    if (state==osUnknown)
+    {
+        switch (Key)
+        {
+        case kGreen:
+            if (Current()>0)
+            {
+                // up
+                char tmp[4];
+                memcpy(&tmp,&order[(Current()-1)*4],3);
+                memmove(&order[(Current()-1)*4],&order[Current()*4],3);
+                memcpy(&order[Current()*4],&tmp,3);
+                CursorUp();
+                output();
+            }
+            break;
+        case kYellow:
+            if (Current()<Count()-1)
+            {
+                // down
+                char tmp[4];
+                memcpy(&tmp,&order[Current()*4],3);
+                memmove(&order[Current()*4],&order[(Current()+1)*4],3);
+                memcpy(&order[(Current()+1)*4],&tmp,3);
+                CursorDown();
+                output();
+            }
+            break;
+        case kRed:
+            free(order);
+            order=strdup(g->GetDefaultOrder());
+            output();
+            break;
+        case kOk:
+            Store();
+            state=osBack;
+            break;
+        default:
+            break;
+        }
+    }
+    return state;
+}
+
+void cMenuSetupXmltv2vdrOrder::Store(void)
+{
+    SetupStore("options.order",order);
+    g->SetOrder(order);
 }
 
 // --------------------------------------------------------------------------------------------------------
@@ -629,12 +783,15 @@ void cMenuSetupXmltv2vdrLog::output(void)
     Display();
 }
 
-cMenuSetupXmltv2vdrLog::cMenuSetupXmltv2vdrLog(cPluginXmltv2vdr *Plugin, cEPGSource *Source)
+cMenuSetupXmltv2vdrLog::cMenuSetupXmltv2vdrLog(cEPGSource *Source)
         :cOsdMenu("",25)
 {
+    cPlugin *plugin=cPluginManager::GetPlugin("xmltv2vdr");
+    if (!plugin) return;
+
     cString title=cString::sprintf("%s - %s '%s' : %s Log",
                                    trVDR("Setup"),trVDR("Plugin"),
-                                   Plugin->Name(), Source->Name());
+                                   plugin->Name(), Source->Name());
     SetTitle(title);
     src=Source;
     SetHelp(tr("Button$Info"));
@@ -726,10 +883,13 @@ eOSState cMenuSetupXmltv2vdrLog::ProcessKey(eKeys Key)
 
 // --------------------------------------------------------------------------------------------------------
 
-cMenuSetupXmltv2vdrChannelSource::cMenuSetupXmltv2vdrChannelSource(cPluginXmltv2vdr *Plugin, cMenuSetupXmltv2vdr *Menu, int Index)
+cMenuSetupXmltv2vdrChannelSource::cMenuSetupXmltv2vdrChannelSource(cGlobals *Global, cMenuSetupXmltv2vdr *Menu, int Index)
 {
+    cPlugin *plugin=cPluginManager::GetPlugin("xmltv2vdr");
+    if (!plugin) return;
+
     menu=Menu;
-    baseplugin=Plugin;
+    g=Global;
     sel=NULL;
 
     day=0;
@@ -739,10 +899,11 @@ cMenuSetupXmltv2vdrChannelSource::cMenuSetupXmltv2vdrChannelSource(cPluginXmltv2
     days=1;
     pin[0]=0;
 
-    epgsrc=baseplugin->EPGSource(Index);
+    epgsrc=g->EPGSources()->Get(Index);
     if (!epgsrc) return;
 
-    SetSection(cString::sprintf("%s '%s' : %s",trVDR("Plugin"), baseplugin->Name(), epgsrc->Name()));
+    SetPlugin(plugin);
+    SetSection(cString::sprintf("%s '%s' : %s",trVDR("Plugin"), plugin->Name(), epgsrc->Name()));
 
     usepics=epgsrc->UsePics();
     weekday=epgsrc->ExecWeekDay();
@@ -836,7 +997,7 @@ eOSState cMenuSetupXmltv2vdrChannelSource::ProcessKey(eKeys Key)
 
 void cMenuSetupXmltv2vdrChannelSource::Store(void)
 {
-    if ((!baseplugin) || (!sel) || (!epgsrc)) return;
+    if ((!sel) || (!epgsrc)) return;
 
     epgsrc->ChangeExec(start,weekday);
     epgsrc->ChangeChannelSelection(sel);
@@ -850,9 +1011,12 @@ void cMenuSetupXmltv2vdrChannelSource::Store(void)
 
 // --------------------------------------------------------------------------------------------------------
 
-cMenuSetupXmltv2vdrChannelMap::cMenuSetupXmltv2vdrChannelMap(cPluginXmltv2vdr *Plugin, cMenuSetupXmltv2vdr *Menu, int Index)
+cMenuSetupXmltv2vdrChannelMap::cMenuSetupXmltv2vdrChannelMap(cGlobals *Global, cMenuSetupXmltv2vdr *Menu, int Index)
 {
-    baseplugin=Plugin;
+    cPlugin *plugin=cPluginManager::GetPlugin("xmltv2vdr");
+    if (!plugin) return;
+
+    g=Global;
     menu=Menu;
     hasmaps=false;
     flags=0;
@@ -860,9 +1024,9 @@ cMenuSetupXmltv2vdrChannelMap::cMenuSetupXmltv2vdrChannelMap(cPluginXmltv2vdr *P
     const char *channel=(*menu->ChannelList())[Index];
     if (!channel) return;
 
-    SetPlugin(baseplugin);
+    SetPlugin(plugin);
 
-    cEPGMapping *oldmap=baseplugin->EPGMapping(channel);
+    cEPGMapping *oldmap=g->EPGMappings()->GetMap(channel);
     if (oldmap)
     {
         lmap=new cEPGMapping(*oldmap);
@@ -873,7 +1037,7 @@ cMenuSetupXmltv2vdrChannelMap::cMenuSetupXmltv2vdrChannelMap(cPluginXmltv2vdr *P
     }
     if (!lmap) return;
 
-    title=cString::sprintf("%s - %s '%s' : %s",trVDR("Setup"),trVDR("Plugin"), baseplugin->Name(), channel);
+    title=cString::sprintf("%s - %s '%s' : %s",trVDR("Setup"),trVDR("Plugin"),plugin->Name(), channel);
     SetTitle(title);
 
     flags=lmap->Flags();
@@ -946,7 +1110,7 @@ void cMenuSetupXmltv2vdrChannelMap::output(void)
     Add(new cMyMenuEditBitItem(tr("video"),&flags,USE_VIDEO),true);
     Add(new cMyMenuEditBitItem(tr("audio"),&flags,USE_AUDIO),true);
 
-    if (baseplugin->EPDir())
+    if (g->EPDir())
     {
         Add(new cMyMenuEditBitItem(tr("season and episode"),&flags,USE_SEASON),true);
         c4=Current();
@@ -1029,7 +1193,7 @@ eOSState cMenuSetupXmltv2vdrChannelMap::ProcessKey(eKeys Key)
         case kOk:
             if ((Current()>=cm) && (!hasmaps))
             {
-                return AddSubMenu(new cMenuSetupXmltv2vdrChannelsVDR(baseplugin,this,lmap->ChannelName(),title));
+                return AddSubMenu(new cMenuSetupXmltv2vdrChannelsVDR(g,this,lmap->ChannelName(),title));
             }
             else
             {
@@ -1053,18 +1217,18 @@ eOSState cMenuSetupXmltv2vdrChannelMap::ProcessKey(eKeys Key)
             break;
         case kGreen:
             if (Current()>=cm)
-                return AddSubMenu(new cMenuSetupXmltv2vdrChannelsVDR(baseplugin,this,lmap->ChannelName(),title));
+                return AddSubMenu(new cMenuSetupXmltv2vdrChannelsVDR(g,this,lmap->ChannelName(),title));
             break;
         case kBlue: // copy
-            if ((Current()<cm) && (baseplugin))
+            if ((Current()<cm) && (g))
             {
                 if (Skins.Message(mtInfo,tr("Copy to all mapped channels?"))==kOk)
                 {
-                    for (int i=0; i<baseplugin->EPGMappingCount();i++)
+                    for (int i=0; i<g->EPGMappings()->Count();i++)
                     {
-                        if (strcmp(baseplugin->EPGMapping(i)->ChannelName(),lmap->ChannelName()))
+                        if (strcmp(g->EPGMappings()->Get(i)->ChannelName(),lmap->ChannelName()))
                         {
-                            Store(baseplugin->EPGMapping(i),false);
+                            Store(g->EPGMappings()->Get(i),false);
                         }
                     }
                     state=osContinue;
@@ -1072,14 +1236,14 @@ eOSState cMenuSetupXmltv2vdrChannelMap::ProcessKey(eKeys Key)
             }
             break;
         case kYellow: // reset
-            if (Current()<cm)
+            if ((Current()<cm) && (g))
             {
                 if (Skins.Message(mtInfo,tr("Reset all channel settings?"))==kOk)
                 {
                     flags=0;
-                    for (int i=0; i<baseplugin->EPGMappingCount();i++)
+                    for (int i=0; i<g->EPGMappings()->Count();i++)
                     {
-                        Store(baseplugin->EPGMapping(i),false);
+                        Store(g->EPGMappings()->Get(i),false);
                     }
                     output();
                     state=osContinue;
@@ -1115,11 +1279,11 @@ bool cMenuSetupXmltv2vdrChannelMap::EPGMappingExists(tChannelID ChannelID)
 void cMenuSetupXmltv2vdrChannelMap::epgmappingreplace(cEPGMapping *newmapping)
 {
     if (!newmapping) return;
-    cEPGMapping *map=baseplugin->EPGMapping(newmapping->ChannelName());
+    cEPGMapping *map=g->EPGMappings()->GetMap(newmapping->ChannelName());
     if (!map)
     {
         map=new cEPGMapping(*newmapping);
-        baseplugin->EPGMappingAdd(map);
+        g->EPGMappings()->Add(map);
     }
     else
     {
@@ -1163,11 +1327,11 @@ void cMenuSetupXmltv2vdrChannelMap::Store(cEPGMapping *newmapping, bool replacem
 
 // --------------------------------------------------------------------------------------------------------
 
-cMenuSetupXmltv2vdrChannelsVDR::cMenuSetupXmltv2vdrChannelsVDR(cPluginXmltv2vdr *Plugin,
+cMenuSetupXmltv2vdrChannelsVDR::cMenuSetupXmltv2vdrChannelsVDR(cGlobals *Global,
         cMenuSetupXmltv2vdrChannelMap *Map, const char *Channel, cString Title)
         :cOsdMenu("",CHNUMWIDTH)
 {
-    baseplugin=Plugin;
+    g=Global;
     map=Map;
     SetHelp(NULL,NULL,tr("Button$Choose"));
     SetTitle(Title);
@@ -1191,14 +1355,14 @@ cMenuSetupXmltv2vdrChannelsVDR::cMenuSetupXmltv2vdrChannelsVDR(cPluginXmltv2vdr 
 
 bool cMenuSetupXmltv2vdrChannelsVDR::epgmappingexists(tChannelID channelid, const char *channel2ignore)
 {
-    if (!baseplugin) return true;
-    if (!baseplugin->EPGMappingCount()) return false;
-    for (int i=0; i<baseplugin->EPGMappingCount(); i++)
+    if (!g) return true;
+    if (!g->EPGMappings()->Count()) return false;
+    for (int i=0; i<g->EPGMappings()->Count(); i++)
     {
-        if (channel2ignore && !strcmp(baseplugin->EPGMapping(i)->ChannelName(),channel2ignore)) continue;
-        for (int x=0; x<baseplugin->EPGMapping(i)->NumChannelIDs(); x++)
+        if (channel2ignore && !strcmp(g->EPGMappings()->Get(i)->ChannelName(),channel2ignore)) continue;
+        for (int x=0; x<g->EPGMappings()->Get(i)->NumChannelIDs(); x++)
         {
-            if (baseplugin->EPGMapping(i)->ChannelIDs()[x]==channelid) return true;
+            if (g->EPGMappings()->Get(i)->ChannelIDs()[x]==channelid) return true;
         }
     }
     return false;

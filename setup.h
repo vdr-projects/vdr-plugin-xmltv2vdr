@@ -31,12 +31,13 @@ protected:
     virtual void Store(void);
 private:
     cStringList channels;
-    cPluginXmltv2vdr *baseplugin;
+    cGlobals *g;
     cMenuSetupXmltv2vdrChannelSource *cs;
     cMenuSetupXmltv2vdrChannelMap *cm;
     int mappingBegin,mappingEnd;
     int sourcesBegin,sourcesEnd;
     int mappingEntry;
+    int orderEntry;
     int epEntry;
     eOSState edit(void);
     void generatesumchannellist();
@@ -54,7 +55,7 @@ public:
     {
         cm=NULL;
     }
-    cMenuSetupXmltv2vdr(cPluginXmltv2vdr *Plugin);
+    cMenuSetupXmltv2vdr(cGlobals *Global);
     ~cMenuSetupXmltv2vdr();
     virtual eOSState ProcessKey(eKeys Key);
     cStringList *ChannelList()
@@ -68,7 +69,7 @@ class cMenuSetupXmltv2vdrTextMap : public cMenuSetupPage
 protected:
     virtual void Store(void);
 private:
-    cPluginXmltv2vdr *baseplugin;
+    cGlobals *g;
     char country[255];
     char year[255];
     char originaltitle[255];
@@ -86,7 +87,7 @@ private:
     char category[255];
     char season[255];
     char episode[255];
-    char episodeoverall[255];    
+    char episodeoverall[255];
     char starrating[255];
     char audio[255];
     char video[255];
@@ -95,7 +96,24 @@ private:
     char dolbydigital[255];
     char bilingual[255];
 public:
-    cMenuSetupXmltv2vdrTextMap(cPluginXmltv2vdr *Plugin);
+    cMenuSetupXmltv2vdrTextMap(cGlobals *Global);
+};
+
+class cMenuSetupXmltv2vdrOrder : public cMenuSetupPage
+{
+protected:
+    virtual void Store(void);
+    char *order;
+private:
+    cGlobals *g;
+    void output(void);
+public:
+    cMenuSetupXmltv2vdrOrder(cGlobals *Global);
+    ~cMenuSetupXmltv2vdrOrder()
+    {
+        free(order);
+    }
+    virtual eOSState ProcessKey(eKeys Key);
 };
 
 class cMenuSetupXmltv2vdrChannelSource : public cMenuSetupPage
@@ -104,7 +122,7 @@ protected:
     virtual void Store(void);
 private:
     cMenuSetupXmltv2vdr *menu;
-    cPluginXmltv2vdr *baseplugin;
+    cGlobals *g;
     cEPGSource *epgsrc;
     int *sel;
     time_t day;
@@ -114,7 +132,7 @@ private:
     char pin[255];
     void output(void);
 public:
-    cMenuSetupXmltv2vdrChannelSource(cPluginXmltv2vdr *Plugin, cMenuSetupXmltv2vdr *Menu, int Index);
+    cMenuSetupXmltv2vdrChannelSource(cGlobals *Global, cMenuSetupXmltv2vdr *Menu, int Index);
     ~cMenuSetupXmltv2vdrChannelSource();
     virtual eOSState ProcessKey(eKeys Key);
     void ClearMenu()
@@ -128,7 +146,7 @@ class cMenuSetupXmltv2vdrChannelMap : public cMenuSetupPage
 protected:
     virtual void Store(void);
 private:
-    cPluginXmltv2vdr *baseplugin;
+    cGlobals *g;
     cMenuSetupXmltv2vdr *menu;
     cEPGMapping *lmap;
     bool hasmaps;
@@ -137,10 +155,10 @@ private:
     cString title;
     cOsdItem *option(const char *s, bool yesno);
     void epgmappingreplace(cEPGMapping *newmapping);
-    void Store(cEPGMapping *newmapping, bool replacemapping=true);    
+    void Store(cEPGMapping *newmapping, bool replacemapping=true);
     int c1,c2,c3,c4,cm;
 public:
-    cMenuSetupXmltv2vdrChannelMap(cPluginXmltv2vdr *Plugin, cMenuSetupXmltv2vdr *Menu, int Index);
+    cMenuSetupXmltv2vdrChannelMap(cGlobals *Global, cMenuSetupXmltv2vdr *Menu, int Index);
     ~cMenuSetupXmltv2vdrChannelMap();
     void AddChannel2Map(int ChannelNumber);
     bool EPGMappingExists(tChannelID ChannelID);
@@ -154,11 +172,11 @@ public:
 class cMenuSetupXmltv2vdrChannelsVDR : public cOsdMenu
 {
 private:
-    cPluginXmltv2vdr *baseplugin;
+    cGlobals *g;
     cMenuSetupXmltv2vdrChannelMap *map;
     bool epgmappingexists(tChannelID channelid, const char *channel2ignore);
 public:
-    cMenuSetupXmltv2vdrChannelsVDR(cPluginXmltv2vdr *Plugin, cMenuSetupXmltv2vdrChannelMap *Map,
+    cMenuSetupXmltv2vdrChannelsVDR(cGlobals *Global, cMenuSetupXmltv2vdrChannelMap *Map,
                                    const char *Channel, cString Title);
     virtual eOSState ProcessKey(eKeys Key);
     virtual const char *MenuKind()
@@ -184,7 +202,7 @@ private:
     time_t lastrefresh;
     const cFont *font;
 public:
-    cMenuSetupXmltv2vdrLog(cPluginXmltv2vdr *Plugin, cEPGSource *Source);
+    cMenuSetupXmltv2vdrLog(cEPGSource *Source);
     virtual const char *MenuKind()
     {
         return "MenuLog";

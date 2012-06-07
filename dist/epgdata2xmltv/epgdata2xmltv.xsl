@@ -32,6 +32,10 @@
 G <xsl:value-of select="d25"/>
 </xsl:variable>
 
+<xsl:variable name="EPISODE">
+<xsl:if test="d26 &gt; 0"><xsl:value-of select="d26 - 1"/></xsl:if>
+</xsl:variable>
+
 <xsl:variable name="PICS">
 <xsl:if test="string-length(d38)">
 <xsl:element name="icon">
@@ -122,6 +126,15 @@ G <xsl:value-of select="d25"/>
 </xsl:if>
 </xsl:variable>
 
+<xsl:variable name="TIPP">
+<xsl:if test="d18=1">
+<star-rating system="TagesTipp"><value>1/1</value></star-rating><xsl:text>&#x0A;</xsl:text>
+</xsl:if>
+<xsl:if test="d18=2">
+<star-rating system="TopTipp"><value>1/1</value></star-rating><xsl:text>&#x0A;</xsl:text>
+</xsl:if>
+</xsl:variable>
+
 <xsl:variable name="vps_iso8601">
 <xsl:if test="string-length(d8)">
 <xsl:call-template name="date2UTC">
@@ -202,6 +215,9 @@ G <xsl:value-of select="d25"/>
 <xsl:if test="string-length($LAND)">
 <country><xsl:value-of select="$LAND"/></country><xsl:text>&#x0A;</xsl:text>
 </xsl:if>
+<xsl:if test="string-length($EPISODE)">
+<episode-num system='xmltv_ns'>.<xsl:value-of select="$EPISODE"/>.</episode-num><xsl:text>&#x0A;</xsl:text>
+</xsl:if>
 <xsl:if test="string-length($VIDEO)">
 <video><xsl:text>&#x0A;</xsl:text><xsl:copy-of select="$VIDEO"/></video><xsl:text>&#x0A;</xsl:text>
 </xsl:if>
@@ -211,6 +227,9 @@ G <xsl:value-of select="d25"/>
 
 <xsl:if test="string-length($STARRATING)">
 <xsl:copy-of select="$STARRATING"/>
+</xsl:if>
+<xsl:if test="string-length($TIPP)">
+<xsl:copy-of select="$TIPP"/>
 </xsl:if>
 
 </xsl:element>

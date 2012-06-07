@@ -881,8 +881,42 @@ time_t cEPGSources::NextRunTime()
     return next;
 }
 
-void cEPGSources::ReadIn(cGlobals *Global, const char *SourceOrder,
-                         bool Reload)
+bool cEPGSources::MoveEPGSource(cGlobals *Global, int From, int To)
+{
+    if (From==To) return false;
+
+    sqlite3 *db=NULL;
+    if (sqlite3_open_v2(Global->EPGFile(),&db,SQLITE_OPEN_READWRITE,NULL)==SQLITE_OK)
+    {
+        char *sql=NULL;
+        if (asprintf(&sql,"BEGIN TRANSACTION;" \
+                     "UPDATE epg SET srcidx=98 WHERE srcidx=%i;" \
+                     "UPDATE epg SET srcidx=%i WHERE srcidx=%i;" \
+                     "UPDATE epg SET srcidx=%i WHERE srcidx=98;" \
+                     "COMMIT;", To, From, To, From)==-1)
+        {
+            sqlite3_close(db);
+            return false;
+        }
+        if (sqlite3_exec(db,sql,NULL,NULL,NULL)!=SQLITE_OK)
+        {
+            free(sql);
+            sqlite3_close(db);
+            return false;
+        }
+        free(sql);
+    }
+    else
+    {
+        return false;
+    }
+    sqlite3_close(db);
+    Global->EPGSources()->Move(From,To);
+    return true;
+}
+
+
+void cEPGSources::ReadIn(cGlobals *Global, bool Reload)
 {
     epgsearchexists=Global->EPGSearchExists();
     if (Reload) Remove();
@@ -942,8 +976,8 @@ void cEPGSources::ReadIn(cGlobals *Global, const char *SourceOrder,
         Add(new cEPGSource(EITSOURCE,Global));
     }
 
-    if (!SourceOrder) return;
-    char *buf=strdup(SourceOrder);
+    if (!Global->SrcOrder()) return;
+    char *buf=strdup(Global->SrcOrder());
     if (!buf) return;
     char *saveptr;
     char *pch=strtok_r(buf,",",&saveptr);

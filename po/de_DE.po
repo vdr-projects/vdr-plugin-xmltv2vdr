@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: vdr\n"
 "Report-Msgid-Bugs-To: <see README>\n"
-"POT-Creation-Date: 2012-05-08 00:36+0200\n"
+"POT-Creation-Date: 2012-06-04 17:24+0200\n"
 "PO-Revision-Date: 2010-12-23 23:59+0100\n"
 "Last-Translator: Jochen Dolze <vdr@dolze.de>\n"
 "Language-Team: <vdr@linuxtv.org>\n"
@@ -33,6 +33,9 @@ msgstr "nie"
 
 msgid "text mapping"
 msgstr "Textzuordnungen"
+
+msgid "order of epg data"
+msgstr "Reihenfolge der EPG Daten"
 
 msgid "epg sources"
 msgstr "EPG Quellen"
@@ -90,6 +93,21 @@ msgstr "Wertung"
 
 msgid "season and episode"
 msgstr "Staffel und Episode"
+
+msgid "order"
+msgstr "Reihenfolge"
+
+msgid "long text"
+msgstr "Langtext"
+
+msgid "video"
+msgstr "Video"
+
+msgid "audio"
+msgstr "Audio"
+
+msgid "rating"
+msgstr "Freigabe"
 
 msgid "overview"
 msgstr "Übersicht"
@@ -157,9 +175,6 @@ msgstr "erstellen"
 msgid "short text"
 msgstr "Kurztext"
 
-msgid "long text"
-msgstr "Langtext"
-
 msgid " actors"
 msgstr " Darsteller"
 
@@ -178,17 +193,8 @@ msgstr "mehrzeilig"
 msgid "singleline"
 msgstr "einzeilig"
 
-msgid "rating"
-msgstr "Freigabe"
-
 msgid " rating in description"
 msgstr " Freigabe im Text"
-
-msgid "video"
-msgstr "Video"
-
-msgid "audio"
-msgstr "Audio"
 
 msgid " add shorttext from list"
 msgstr " Kurztext von Liste übernehmen"

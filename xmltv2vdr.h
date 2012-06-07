@@ -34,84 +34,24 @@ public:
     bool Send(const char *format, ...);
 };
 
-class cGlobals
+class cEPGTimer : public cThread
 {
 private:
-    char *confdir;
-    char *epgfile;
-    char *epdir;
-    char *epcodeset;
-    char *imgdir;
-    char *codeset;
-    bool epgsearchexists;    
-    int imgdelafter;
-    cEPGMappings epgmappings;
-    cTEXTMappings textmappings;
-    cEPGSources epgsources;
+    cEPGSources *sources;
+    cEPGMappings *maps;
+    cImport import;
+    int epall;
 public:
-    cGlobals();
-    ~cGlobals();
-    bool DBExists();
-    cEPGMappings *EPGMappings()
+    cEPGTimer(cGlobals *Global);
+    void Stop()
     {
-        return &epgmappings;
+        Cancel(3);
     }
-    cTEXTMappings *TEXTMappings()
+    void SetEPAll(int Value)
     {
-        return &textmappings;
+        epall=Value;
     }
-    cEPGSources *EPGSources()
-    {
-        return &epgsources;
-    }
-    void SetConfDir(const char *ConfDir)
-    {
-        free(confdir);
-        confdir=strdup(ConfDir);
-    }
-    const char *ConfDir()
-    {
-        return confdir;
-    }
-    void SetEPGFile(const char *EPGFile)
-    {
-        free(epgfile);
-        epgfile=strdup(EPGFile);
-    }
-    const char *EPGFile()
-    {
-        return epgfile;
-    }
-    void SetEPDir(const char *EPDir);
-    const char *EPDir()
-    {
-        return epdir;
-    }
-    const char *EPCodeset()
-    {
-        return epcodeset;
-    }
-    const char *Codeset()
-    {
-        return codeset;
-    }
-    void SetImgDir(const char *ImgDir);
-    const char *ImgDir()
-    {
-        return imgdir;
-    }
-    void SetImgDelAfter(int Value)
-    {
-        imgdelafter=Value;
-    }
-    int ImgDelAfter()
-    {
-        return imgdelafter;
-    }
-    bool EPGSearchExists()
-    {
-      return epgsearchexists;
-    }
+    virtual void Action();
 };
 
 #if VDRVERSNUM < 10726 && !EPGHANDLER
@@ -179,26 +119,6 @@ public:
     virtual bool SortSchedule(cSchedule *Schedule);
 };
 
-class cEPGTimer : public cThread
-{
-private:
-    cEPGSources *sources;
-    cEPGMappings *maps;
-    cImport import;
-    int epall;
-public:
-    cEPGTimer(cGlobals *Global);
-    void Stop()
-    {
-        Cancel(3);
-    }
-    void SetEPAll(int Value)
-    {
-        epall=Value;
-    }
-    virtual void Action();
-};
-
 class cHouseKeeping : public cThread
 {
 private:
@@ -226,28 +146,125 @@ public:
     virtual void Action();
 };
 
-class cPluginXmltv2vdr : public cPlugin
+class cGlobals
 {
 private:
-    cGlobals g;
-    cEPGHandler *epghandler;
-    cEPGTimer *epgtimer;
-    cEPGSeasonEpisode *epgseasonepisode;
-    cHouseKeeping housekeeping;
-    cEPGExecutor epgexecutor;
-    time_t last_housetime_t;
-    time_t last_maintime_t;
-    time_t last_timer_t;
-    time_t last_epcheck_t;
+    char *confdir;
+    char *epgfile;
+    char *epdir;
+    char *epcodeset;
+    char *imgdir;
+    char *codeset;
+    char *order;
     char *srcorder;
     int epall;
+    int imgdelafter;
     bool wakeup;
-    bool insetup;
-    int GetLastImportSource();
+    bool epgsearchexists;
+    cEPGMappings epgmappings;
+    cTEXTMappings textmappings;
+    cEPGSources epgsources;
+    cEPGTimer *epgtimer;
+    cEPGSeasonEpisode *epgseasonepisode;
 public:
-    void SetSetupState(bool Value)
+    cGlobals();
+    ~cGlobals();
+    cEPGHandler *epghandler;
+    bool DBExists();
+    char *GetDefaultOrder();
+    void AllocateEPGTimerThread()
     {
-        insetup=Value;
+        epgtimer=new cEPGTimer(this);
+    }
+    void AllocateEPGSeasonThread()
+    {
+        epgseasonepisode=new cEPGSeasonEpisode(this);
+    }
+    cEPGSeasonEpisode *EPGSeasonEpisode()
+    {
+        return epgseasonepisode;
+    }
+    cEPGTimer *EPGTimer()
+    {
+        return epgtimer;
+    }
+    cEPGMappings *EPGMappings()
+    {
+        return &epgmappings;
+    }
+    cTEXTMappings *TEXTMappings()
+    {
+        return &textmappings;
+    }
+    cEPGSources *EPGSources()
+    {
+        return &epgsources;
+    }
+    void SetConfDir(const char *ConfDir)
+    {
+        free(confdir);
+        confdir=strdup(ConfDir);
+    }
+    const char *ConfDir()
+    {
+        return confdir;
+    }
+    void SetEPGFile(const char *EPGFile)
+    {
+        free(epgfile);
+        epgfile=strdup(EPGFile);
+    }
+    const char *EPGFile()
+    {
+        return epgfile;
+    }
+    void SetEPDir(const char *EPDir);
+    const char *EPDir()
+    {
+        return epdir;
+    }
+    const char *EPCodeset()
+    {
+        return epcodeset;
+    }
+    const char *Codeset()
+    {
+        return codeset;
+    }
+    void SetImgDir(const char *ImgDir);
+    const char *ImgDir()
+    {
+        return imgdir;
+    }
+    void SetImgDelAfter(int Value)
+    {
+        imgdelafter=Value;
+    }
+    int ImgDelAfter()
+    {
+        return imgdelafter;
+    }
+    void SetSrcOrder(const char *NewOrder)
+    {
+        free(srcorder);
+        srcorder=strdup(NewOrder);
+    }
+    const char *SrcOrder()
+    {
+        return srcorder;
+    }
+    void SetOrder(const char *NewOrder)
+    {
+        free(order);
+        order=strdup(NewOrder);
+    }
+    const char *Order()
+    {
+        return order;
+    }
+    bool EPGSearchExists()
+    {
+        return epgsearchexists;
     }
     void SetEPAll(int Value)
     {
@@ -267,60 +284,20 @@ public:
     {
         return wakeup;
     }
-    void SetImgDelAfter(int Value)
-    {
-        g.SetImgDelAfter(Value);
-    }
-    int ImgDelAfter()
-    {
-        return g.ImgDelAfter();
-    }
-    const char *ImgDir()
-    {
-        return g.ImgDir();
-    }
-    const char *EPDir()
-    {
-        return g.EPDir();
-    }
-    void ReadInEPGSources(bool Reload=false)
-    {
-        g.EPGSources()->ReadIn(&g,srcorder,Reload);
-    }
-    bool EPGSourceMove(int From, int To);
-    int EPGSourceCount()
-    {
-        if (!g.EPGSources()->Count()) return 0;
-        return g.EPGSources()->Count()-1;
-    }
-    cEPGSource *EPGSource(int Index)
-    {
-        return g.EPGSources()->Get(Index);
-    }
-    int EPGMappingCount()
-    {
-        return g.EPGMappings()->Count();
-    }
-    cEPGMapping *EPGMapping(int Index)
-    {
-        return g.EPGMappings()->Get(Index);
-    }
-    cEPGMapping *EPGMapping(const char *ChannelName)
-    {
-        return g.EPGMappings()->GetMap(ChannelName);
-    }
-    void EPGMappingAdd(cEPGMapping *Map)
-    {
-        g.EPGMappings()->Add(Map);
-    }
-    cTEXTMapping *TEXTMapping(const char *Name)
-    {
-        return g.TEXTMappings()->GetMap(Name);
-    }
-    void TEXTMappingAdd(cTEXTMapping *TextMap)
-    {
-        g.TEXTMappings()->Add(TextMap);
-    }
+};
+
+class cPluginXmltv2vdr : public cPlugin
+{
+private:
+    cGlobals g;
+    cHouseKeeping housekeeping;
+    cEPGExecutor epgexecutor;
+    time_t last_housetime_t;
+    time_t last_maintime_t;
+    time_t last_timer_t;
+    time_t last_epcheck_t;
+    int GetLastImportSource();
+public:
     cPluginXmltv2vdr(void);
     virtual ~cPluginXmltv2vdr();
     virtual const char *Version(void)
