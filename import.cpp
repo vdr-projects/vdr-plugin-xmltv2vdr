@@ -405,7 +405,7 @@ char *cImport::Add2Description(char *description, cXMLTVEvent *xEvent, int Flags
         description=Add2Description(description,"\n");
     }
 
-    if (what==USE_CREDITS)
+    if ((what==USE_CREDITS) && ((Flags & USE_CREDITS)==USE_CREDITS))
     {
         cXMLTVStringList *credits=xEvent->Credits();
         if (credits->Size())
@@ -470,7 +470,7 @@ char *cImport::Add2Description(char *description, cXMLTVEvent *xEvent, int Flags
         }
     }
 
-    if (what==USE_COUNTRYDATE)
+    if ((what==USE_COUNTRYDATE) && ((Flags & USE_COUNTRYDATE)==USE_COUNTRYDATE))
     {
         if (xEvent->Country())
         {
@@ -484,12 +484,14 @@ char *cImport::Add2Description(char *description, cXMLTVEvent *xEvent, int Flags
             if (text) description=Add2Description(description,text->Value(),xEvent->Year());
         }
     }
-    if ((what==USE_ORIGTITLE) && (xEvent->OrigTitle()))
+    if ((what==USE_ORIGTITLE) && ((Flags & USE_ORIGTITLE)==USE_ORIGTITLE) &&
+            (xEvent->OrigTitle()))
     {
         cTEXTMapping *text=g->TEXTMappings()->GetMap("originaltitle");
         if (text) description=Add2Description(description,text->Value(),xEvent->OrigTitle());
     }
-    if ((what==USE_CATEGORIES) && (xEvent->Category()->Size()))
+    if ((what==USE_CATEGORIES) && ((Flags & USE_CATEGORIES)==USE_CATEGORIES) &&
+            (xEvent->Category()->Size()))
     {
         cTEXTMapping *text=g->TEXTMappings()->GetMap("category");
         if (text)
@@ -505,7 +507,7 @@ char *cImport::Add2Description(char *description, cXMLTVEvent *xEvent, int Flags
         }
     }
 
-    if ((what==USE_VIDEO) && (xEvent->Video()->Size()))
+    if ((what==USE_VIDEO) && ((Flags & USE_VIDEO)==USE_VIDEO) && (xEvent->Video()->Size()))
     {
         cTEXTMapping *text=g->TEXTMappings()->GetMap("video");
         if (text)
@@ -549,7 +551,7 @@ char *cImport::Add2Description(char *description, cXMLTVEvent *xEvent, int Flags
         }
     }
 
-    if (what==USE_AUDIO)
+    if ((what==USE_AUDIO) && ((Flags & USE_AUDIO)==USE_AUDIO))
     {
         if (xEvent->Audio())
         {
@@ -576,28 +578,32 @@ char *cImport::Add2Description(char *description, cXMLTVEvent *xEvent, int Flags
             }
         }
     }
-    if (what==USE_SEASON)
+    if ((what==USE_SEASON) && ((Flags & USE_SEASON)==USE_SEASON))
     {
         if (xEvent->Season())
         {
             cTEXTMapping *text=g->TEXTMappings()->GetMap("season");
-            if (text) description=Add2Description(description,text->Value(),xEvent->Season());
+            if (text) description=Add2Description(description,text->Value(),
+                                                      xEvent->Season());
         }
 
         if (xEvent->Episode())
         {
             cTEXTMapping *text=g->TEXTMappings()->GetMap("episode");
-            if (text) description=Add2Description(description,text->Value(),xEvent->Episode());
+            if (text) description=Add2Description(description,text->Value(),
+                                                      xEvent->Episode());
         }
 
         if (xEvent->EpisodeOverall())
         {
             cTEXTMapping *text=g->TEXTMappings()->GetMap("episodeoverall");
-            if (text) description=Add2Description(description,text->Value(),xEvent->EpisodeOverall());
+            if (text) description=Add2Description(description,text->Value(),
+                                                      xEvent->EpisodeOverall());
         }
     }
 
-    if ((what==USE_RATING) && (xEvent->Rating()->Size()))
+    if ((what==USE_RATING) && ((Flags & USE_RATING)==USE_RATING) &&
+            (xEvent->Rating()->Size()))
     {
 #if VDRVERSNUM < 10711 && !EPGHANDLER
         Flags|=OPT_RATING_TEXT; // always add to text if we dont have the internal tag!
@@ -627,7 +633,8 @@ char *cImport::Add2Description(char *description, cXMLTVEvent *xEvent, int Flags
         }
     }
 
-    if ((what==USE_STARRATING) && (xEvent->StarRating()->Size()))
+    if ((what==USE_STARRATING) && ((Flags & USE_STARRATING)==USE_STARRATING) &&
+            (xEvent->StarRating()->Size()))
     {
         cTEXTMapping *text=g->TEXTMappings()->GetMap("starrating");
         if (text)
@@ -664,7 +671,8 @@ char *cImport::Add2Description(char *description, cXMLTVEvent *xEvent, int Flags
         }
     }
 
-    if ((what==USE_REVIEW) && (xEvent->Review()->Size()))
+    if ((what==USE_REVIEW) && ((Flags & USE_REVIEW)==USE_REVIEW) &&
+            (xEvent->Review()->Size()))
     {
         cTEXTMapping *text=g->TEXTMappings()->GetMap("review");
         if (text)
