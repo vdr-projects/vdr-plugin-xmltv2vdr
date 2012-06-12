@@ -183,10 +183,23 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
         if (dirent->d_name[0]=='.') continue;
         char *pt=strrchr(dirent->d_name,'.');
         if (pt) *pt=0;
-        if (!strncasecmp(dirent->d_name,Title,strlen(dirent->d_name)))
+        int dlen=strlen(dirent->d_name);
+        if (!strncasecmp(dirent->d_name,Title,dlen))
         {
-            found=true;
-            break;
+            int tlen=strlen(Title);
+            if (tlen>dlen)
+            {
+                if (Title[dlen+1]==32)
+                {
+                    found=true;
+                    break;
+                }
+            }
+            else
+            {
+                found=true;
+                break;
+            }
         }
     }
     closedir(dir);

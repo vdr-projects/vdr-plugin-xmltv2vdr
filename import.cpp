@@ -390,15 +390,17 @@ char *cImport::Add2Description(char *description, cXMLTVEvent *xEvent, int Flags
 {
     if (what==USE_LONGTEXT)
     {
+        bool lta=false;
         if (((Flags & USE_LONGTEXT)==USE_LONGTEXT) || ((Flags & OPT_APPEND)==OPT_APPEND))
         {
             if (xEvent->Description() && (strlen(xEvent->Description())>0))
             {
                 description=Add2Description(description,xEvent->Description());
+                lta=true;
             }
         }
 
-        if (!description && xEvent->EITDescription() && (strlen(xEvent->EITDescription())>0))
+        if (!lta && xEvent->EITDescription() && (strlen(xEvent->EITDescription())>0))
         {
             description=Add2Description(description,xEvent->EITDescription());
         }

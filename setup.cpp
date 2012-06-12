@@ -1110,14 +1110,11 @@ void cMenuSetupXmltv2vdrChannelMap::output(void)
     Add(new cMyMenuEditBitItem(tr("video"),&flags,USE_VIDEO),true);
     Add(new cMyMenuEditBitItem(tr("audio"),&flags,USE_AUDIO),true);
 
-    if (g->EPDir())
+    Add(new cMyMenuEditBitItem(tr("season and episode"),&flags,USE_SEASON),true);
+    c4=Current();
+    if (((flags & USE_SEASON)==USE_SEASON) && (g->EPDir()))
     {
-        Add(new cMyMenuEditBitItem(tr("season and episode"),&flags,USE_SEASON),true);
-        c4=Current();
-        if ((flags & USE_SEASON)==USE_SEASON)
-        {
-            Add(new cMyMenuEditBitItem(tr(" add shorttext from list"),&flags,OPT_SEASON_SHORTTEXT),true);
-        }
+        Add(new cMyMenuEditBitItem(tr(" add shorttext from list"),&flags,OPT_SEASON_SHORTTEXT),true);
     }
 
     hasmaps=false;
