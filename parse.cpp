@@ -934,10 +934,10 @@ void cParse::CleanupLibXML()
 cParse::cParse(cEPGSource *Source, cGlobals *Global)
 {
     source=Source;
-//    maps=Global->EPGMappings();
-    if (Global->EPDir())
+    g=Global;
+    if (g->EPDir())
     {
-        cep2ascii=iconv_open("ASCII//TRANSLIT",Global->EPCodeset());
+        cep2ascii=iconv_open("ASCII//TRANSLIT",g->EPCodeset());
         cutf2ascii=iconv_open("ASCII//TRANSLIT","UTF-8");
     }
     else
