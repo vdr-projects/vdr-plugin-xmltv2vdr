@@ -612,7 +612,7 @@ bool cParse::FetchEvent(xmlNodePtr enode, bool useeptext)
     int season,episode,episodeoverall;
     char *epshorttext=NULL;
     char *eptitle=NULL;
-    if (FetchSeasonEpisode(cep2ascii,cutf2ascii,epdir,xevent.Title(),xevent.ShortText(),
+    if (FetchSeasonEpisode(cep2ascii,cutf2ascii,g->EPDir(),xevent.Title(),xevent.ShortText(),
                            xevent.Description(),season,episode,episodeoverall,&epshorttext,
                            &eptitle))
     {
@@ -681,9 +681,9 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
     }
 
     sqlite3 *db=NULL;
-    if (sqlite3_open(epgfile,&db)!=SQLITE_OK)
+    if (sqlite3_open(g->EPGFile(),&db)!=SQLITE_OK)
     {
-        esyslogs(source,"failed to open or create %s",epgfile);
+        esyslogs(source,"failed to open or create %s",g->EPGFile());
         xmlFreeDoc(xmltv);
         delete schedulesLock;
         return 141;
@@ -744,7 +744,7 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
             skipped++;
             continue;
         }
-        cEPGMapping *map=maps->GetMap((const char *) channelid);
+        cEPGMapping *map=g->EPGMappings()->GetMap((const char *) channelid);
         if (!map)
         {
             if ((lerr!=PARSE_NOMAPPING) || (lastchannelid && xmlStrcmp(channelid,lastchannelid)))
@@ -934,25 +934,21 @@ void cParse::CleanupLibXML()
 cParse::cParse(cEPGSource *Source, cGlobals *Global)
 {
     source=Source;
-    maps=Global->EPGMappings();
-    epgfile=Global->EPGFile();
-    epdir=Global->EPDir();
-    if (epdir)
+//    maps=Global->EPGMappings();
+    if (Global->EPDir())
     {
         cep2ascii=iconv_open("ASCII//TRANSLIT",Global->EPCodeset());
         cutf2ascii=iconv_open("ASCII//TRANSLIT","UTF-8");
     }
     else
     {
-        epdir=NULL;
+        cep2ascii=(iconv_t) -1;
+        cutf2ascii=(iconv_t) -1;
     }
 }
 
 cParse::~cParse()
 {
-    if (epdir)
-    {
-        iconv_close(cep2ascii);
-        iconv_close(cutf2ascii);
-    }
+    if (cep2ascii!=(iconv_t) -1) iconv_close(cep2ascii);
+    if (cutf2ascii!=(iconv_t) -1) iconv_close(cutf2ascii);
 }

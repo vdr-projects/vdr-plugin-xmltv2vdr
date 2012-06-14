@@ -1110,11 +1110,11 @@ cXMLTVEvent *cImport::AddXMLTVEvent(cEPGSource *Source,sqlite3 *Db, const char *
     if (!Source) return NULL;
     if (!ChannelID) return NULL;
     if (!Event) return NULL;
-    if (!epdir) return NULL;
+    if (!g->EPDir()) return NULL;
 
     int season,episode,episodeoverall;
     char *epshorttext=NULL,*eptitle=NULL;
-    if (!cParse::FetchSeasonEpisode(cep2ascii,cutf2ascii,epdir,Event->Title(),
+    if (!cParse::FetchSeasonEpisode(cep2ascii,cutf2ascii,g->EPDir(),Event->Title(),
                                     Event->ShortText(),Event->Description(),
                                     season,episode,episodeoverall,&epshorttext,
                                     &eptitle))

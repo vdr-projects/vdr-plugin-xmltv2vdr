@@ -34,12 +34,10 @@ class cParse
     };
 
 private:
+    cGlobals *g;  
     iconv_t cep2ascii;
     iconv_t cutf2ascii;
-    const char *epdir;
-    const char *epgfile;
     cEPGSource *source;
-    cEPGMappings *maps;
     cXMLTVEvent xevent;
     time_t ConvertXMLTVTime2UnixTime(char *xmltvtime);
     bool FetchEvent(xmlNodePtr node, bool useeptext);

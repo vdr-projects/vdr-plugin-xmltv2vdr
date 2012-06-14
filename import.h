@@ -42,7 +42,6 @@ private:
     cCharSetConv *conv;
     iconv_t cep2ascii;
     iconv_t cutf2ascii;
-    const char *epdir;
     bool pendingtransaction;
     char *RemoveLastCharFromDescription(char *description);
     char *Add2Description(char *description, const char *value);
