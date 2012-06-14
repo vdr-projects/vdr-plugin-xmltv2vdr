@@ -424,7 +424,7 @@ bool cEPGHandler::SetDescription(cEvent* Event, const char* Description)
         if (!Description) return true; // prevent setting nothing to description
         int len=strlen(Description);
         if (!len) return true; // prevent setting nothing to description
-        if (strncasecmp(Event->Description(),Description,len))
+        if (!strcasestr(Event->Description(),Description))
         {
             // eit description changed -> set it
             tsyslog("{%5i} %schanging descr of '%s'",Event->EventID(),seth ? "*" : "",

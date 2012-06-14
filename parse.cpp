@@ -308,7 +308,7 @@ bool cParse::FetchEvent(xmlNodePtr enode, bool useeptext)
                 char *eq=strchr((char *) pid,'=');
                 if (eq)
                 {
-                    xevent.SetEventID(atol(eq+6));
+                    xevent.SetEventID((tEventID) atol(eq+1));
                 }
             }
         }
@@ -407,7 +407,8 @@ bool cParse::FetchEvent(xmlNodePtr enode, bool useeptext)
                 {
                     if (isdigit(content[0]))
                     {
-                        xevent.SetEventID(atol((const char *) content));
+                        if (!xevent.EventID())
+                            xevent.SetEventID((tEventID) atol((const char *) content));
                     }
                     else
                     {
