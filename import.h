@@ -51,7 +51,7 @@ private:
     char *AddEOT2Description(char *description, bool checkutf8=false);
     struct split split(char *in, char delim);
     cEvent *GetEventBefore(cSchedule* schedule, time_t start);
-    cEvent *SearchVDREvent(cEPGSource *source, cSchedule* schedule, cXMLTVEvent *event, bool append);
+    cEvent *SearchVDREvent(cEPGSource *source, cSchedule* schedule, cXMLTVEvent *event, bool append, int hint);
     bool FetchXMLTVEvent(sqlite3_stmt *stmt, cXMLTVEvent *xevent);
     char *RemoveNonASCII(const char *src);
     cXMLTVEvent *PrepareAndReturn(sqlite3 *db, char *sql);

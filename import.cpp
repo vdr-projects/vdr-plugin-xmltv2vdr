@@ -79,7 +79,7 @@ char *cImport::RemoveNonASCII(const char *src)
     return dst;
 }
 
-cEvent *cImport::SearchVDREvent(cEPGSource *source, cSchedule* schedule, cXMLTVEvent *xevent, bool append)
+cEvent *cImport::SearchVDREvent(cEPGSource *source, cSchedule* schedule, cXMLTVEvent *xevent, bool append, int hint)
 {
     if (!source) return NULL;
     if (!schedule) return NULL;
@@ -104,20 +104,19 @@ cEvent *cImport::SearchVDREvent(cEPGSource *source, cSchedule* schedule, cXMLTVE
     const char *cxTitle=conv->Convert(xevent->Title());
 
     // 2nd with StartTime
-    f=(cEvent *) schedule->GetEvent((tEventID) 0,xevent->StartTime());
+    f=(cEvent *) schedule->GetEvent((tEventID) 0,xevent->StartTime()+hint);
     if (f)
     {
-        if (!strcmp(f->Title(),cxTitle))
+        if (!strcasecmp(f->Title(),cxTitle))
         {
             return f;
         }
     }
-    // 3rd with StartTime +/- WaitTime
+    // 3rd with StartTime +/- TimeDiff
     int maxdiff=INT_MAX;
-    int eventTimeDiff=0;
-    if (xevent->Duration()) eventTimeDiff=xevent->Duration()/4;
+    int eventTimeDiff=720;
+    if (xevent->Duration() && eventTimeDiff>=xevent->Duration()) eventTimeDiff/=3;
     if (eventTimeDiff<100) eventTimeDiff=100;
-    if (eventTimeDiff>780) eventTimeDiff=780;
 
     for (cEvent *p = schedule->Events()->First(); p; p = schedule->Events()->Next(p))
     {
@@ -125,7 +124,7 @@ cEvent *cImport::SearchVDREvent(cEPGSource *source, cSchedule* schedule, cXMLTVE
         if (diff<=eventTimeDiff)
         {
             // found event with exact the same title
-            if (!strcmp(p->Title(),cxTitle))
+            if (!strcasecmp(p->Title(),cxTitle))
             {
                 if (diff<=maxdiff)
                 {
@@ -1311,8 +1310,8 @@ cXMLTVEvent *cImport::SearchXMLTVEvent(sqlite3 **Db,const char *ChannelID, const
     int eventTimeDiff=0;
     if (Event->Duration()) eventTimeDiff=Event->Duration()/4;
     if (eventTimeDiff<100) eventTimeDiff=100;
-    if (eventTimeDiff>780) eventTimeDiff=780;    
-    
+    if (eventTimeDiff>720) eventTimeDiff=720;
+
     if (asprintf(&sql,"select channelid,eventid,starttime,duration,title,origtitle,shorttext,description," \
                  "country,year,credits,category,review,rating,starrating,video,audio,season,episode," \
                  "episodeoverall,pics,src,eiteventid,eitdescription,abs(starttime-%li) as diff from epg where " \
@@ -1454,7 +1453,7 @@ int cImport::Process(cEPGSource *Source, cEPGExecutor &myExecutor)
                  "country,year,credits,category,review,rating,starrating,video,audio,season,episode,episodeoverall," \
                  "pics,src,eiteventid,eitdescription from epg where (starttime > %li or " \
                  " (starttime + duration) > %li) and (starttime + duration) < %li "\
-                 " and src='%s';",begin,begin,end,Source->Name())==-1)
+                 " and src='%s' order by channelid,starttime;",begin,begin,end,Source->Name())==-1)
     {
         sqlite3_close(db);
         esyslogs(Source,"out of memory");
@@ -1476,6 +1475,10 @@ int cImport::Process(cEPGSource *Source, cEPGExecutor &myExecutor)
 
     int lerr=0;
     int cnt=0;
+    char *lastChannelID=NULL;
+    int flags=0,hint=0;
+    bool addevents=false;
+    cSchedule* schedule=NULL;
     for (;;)
     {
         if (sqlite3_step(stmt)==SQLITE_ROW)
@@ -1483,55 +1486,88 @@ int cImport::Process(cEPGSource *Source, cEPGExecutor &myExecutor)
             cXMLTVEvent xevent;
             if (FetchXMLTVEvent(stmt,&xevent))
             {
-                cEPGMapping *map=g->EPGMappings()->GetMap(tChannelID::FromString(xevent.ChannelID()));
-                if (!map)
+                if (!lastChannelID || strcmp(lastChannelID,xevent.ChannelID()))
                 {
-                    if (lerr!=IMPORT_NOMAPPING)
-                        esyslogs(Source,"no mapping for channelid %s",xevent.ChannelID());
-                    lerr=IMPORT_NOMAPPING;
-                    continue;
-                }
+                    cEPGMapping *map=g->EPGMappings()->GetMap(tChannelID::FromString(xevent.ChannelID()));
+                    if (!map)
+                    {
+                        if (lerr!=IMPORT_NOMAPPING)
+                            esyslogs(Source,"no mapping for channelid %s",xevent.ChannelID());
+                        lerr=IMPORT_NOMAPPING;
+                        if (lastChannelID)
+                        {
+                            free(lastChannelID);
+                            lastChannelID=NULL;
+                        }
+                        continue;
+                    }
+                    flags=map->Flags();
 
-                bool addevents=false;
-                if ((map->Flags() & OPT_APPEND)==OPT_APPEND) addevents=true;
+                    bool addevents=false;
+                    if ((flags & OPT_APPEND)==OPT_APPEND) addevents=true;
 
-                for (int i=0; i<map->NumChannelIDs(); i++)
-                {
-                    cChannel *channel=Channels.GetByChannelID(map->ChannelIDs()[i]);
+                    cChannel *channel=Channels.GetByChannelID(tChannelID::FromString(xevent.ChannelID()));
                     if (!channel)
                     {
                         if (lerr!=IMPORT_NOCHANNEL)
                             esyslogs(Source,"channel %s not found in channels.conf",
-                                     *map->ChannelIDs()[i].ToString());
+                                     xevent.ChannelID());
                         lerr=IMPORT_NOCHANNEL;
+                        if (lastChannelID)
+                        {
+                            free(lastChannelID);
+                            lastChannelID=NULL;
+                        }
                         continue;
                     }
 
-                    cSchedule* schedule = (cSchedule *) schedules->GetSchedule(channel,addevents);
+                    schedule = (cSchedule *) schedules->GetSchedule(channel,addevents);
                     if (!schedule)
                     {
                         if (lerr!=IMPORT_NOSCHEDULE)
                             esyslogs(Source,"cannot get schedule for channel %s%s",
                                      channel->Name(),addevents ? "" : " - try add option");
                         lerr=IMPORT_NOSCHEDULE;
+                        if (lastChannelID)
+                        {
+                            free(lastChannelID);
+                            lastChannelID=NULL;
+                        }
                         continue;
                     }
+                    if (lastChannelID) free(lastChannelID);
+                    lastChannelID=strdup(xevent.ChannelID());
+                    hint=0;
+                }
 
-                    cEvent *event=SearchVDREvent(Source, schedule, &xevent, addevents);
+                cEvent *event=SearchVDREvent(Source, schedule, &xevent, addevents, hint);
 
-                    if (addevents && event && (event->EventID() != xevent.EventID()))
+                if (!addevents)
+                {
+                    if (event)
+                    {
+                        hint=(int)(event->StartTime()+event->Duration())-(int)(xevent.StartTime()+xevent.Duration());
+                    }
+                    else
+                    {
+                        hint=0;
+                    }
+                }
+                else
+                {
+                    if (event && (event->EventID() != xevent.EventID()))
                     {
                         tsyslogs(Source,"{%5i} changing existing eventid to {%5i}",event->EventID(),xevent.EventID());
                         event->SetEventID(xevent.EventID());
                         event->SetVersion(0);
                         event->SetTableID(0);
                     }
+                }
 
 #if VDRVERSNUM < 10726 && (!EPGHANDLER)
-                    if ((!addevents) && (xevent.StartTime()>endoneday)) continue;
+                if ((!addevents) && (xevent.StartTime()>endoneday)) continue;
 #endif
-                    if (PutEvent(Source, db, schedule, event, &xevent, map->Flags())) cnt++;
-                }
+                if (PutEvent(Source, db, schedule, event, &xevent, flags)) cnt++;
             }
         }
         else
