@@ -697,12 +697,11 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
                "credits text, category text, review text, rating text, " \
                "starrating text, video text, audio text, season int, episode int, " \
                "episodeoverall int, pics text, srcidx int," \
-               "PRIMARY KEY(src, channelid, eventid)" \
+               "PRIMARY KEY(eventid, src, channelid)" \
                ");" \
-               "CREATE INDEX IF NOT EXISTS idx1 on epg (eventid, channelid); " \
-               "CREATE INDEX IF NOT EXISTS idx2 on epg (eventid, src); " \
-               "CREATE INDEX IF NOT EXISTS idx3 on epg (starttime, title, channelid); " \
-               "CREATE INDEX IF NOT EXISTS idx4 on epg (starttime, src); " \
+               "CREATE INDEX IF NOT EXISTS idx1 on epg (starttime, eiteventid, channelid); " \
+               "CREATE INDEX IF NOT EXISTS idx2 on epg (starttime, title, channelid); " \
+               "CREATE INDEX IF NOT EXISTS idx3 on epg (starttime, duration, src); " \
                "BEGIN";
 
     char *errmsg;

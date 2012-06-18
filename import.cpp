@@ -729,6 +729,7 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
             {
                 if (prev->EndTime()==next->StartTime())
                 {
+                    // ok - no gap
                     localtime_r(&start,&tm);
                     strftime(from,sizeof(from)-1,"%b %d %H:%M",&tm);
                     localtime_r(&end,&tm);
@@ -756,7 +757,7 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
                 if (end>next->StartTime())
                 {
                     int diff=(int) difftime(prev->EndTime(),start);
-                    if (diff>300)
+                    if (diff>420)
                     {
 
                         localtime_r(&start,&tm);
@@ -1307,10 +1308,17 @@ cXMLTVEvent *cImport::SearchXMLTVEvent(sqlite3 **Db,const char *ChannelID, const
     cXMLTVEvent *xevent=NULL;
     char *sql=NULL;
 
+    int eventTimeDiff=0;
+    if (Event->Duration()) eventTimeDiff=Event->Duration()/4;
+    if (eventTimeDiff<100) eventTimeDiff=100;
+    if (eventTimeDiff>780) eventTimeDiff=780;    
+    
     if (asprintf(&sql,"select channelid,eventid,starttime,duration,title,origtitle,shorttext,description," \
-                 "country,year,credits,category,review,rating,starrating,video,audio,season,episode,episodeoverall," \
-                 "pics,src,eiteventid,eitdescription from epg where eiteventid=%li and channelid='%s' " \
-                 "order by srcidx asc limit 1;",(long int) Event->EventID(),ChannelID)==-1)
+                 "country,year,credits,category,review,rating,starrating,video,audio,season,episode," \
+                 "episodeoverall,pics,src,eiteventid,eitdescription,abs(starttime-%li) as diff from epg where " \
+                 " (starttime>=%li and starttime<=%li) and eiteventid=%u and channelid='%s' " \
+                 " order by diff,srcidx asc limit 1;",Event->StartTime(),Event->StartTime()-eventTimeDiff,
+                 Event->StartTime()+eventTimeDiff,Event->EventID(),ChannelID)==-1)
     {
         esyslog("out of memory");
         return NULL;
@@ -1318,11 +1326,6 @@ cXMLTVEvent *cImport::SearchXMLTVEvent(sqlite3 **Db,const char *ChannelID, const
 
     xevent=PrepareAndReturn(*Db,sql);
     if (xevent) return xevent;
-
-    int eventTimeDiff=0;
-    if (Event->Duration()) eventTimeDiff=Event->Duration()/4;
-    if (eventTimeDiff<100) eventTimeDiff=100;
-    if (eventTimeDiff>780) eventTimeDiff=780;
 
     char *sqltitle=strdup(Event->Title());
     if (!sqltitle)
