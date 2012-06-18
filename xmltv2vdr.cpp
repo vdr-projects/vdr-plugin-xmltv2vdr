@@ -229,6 +229,7 @@ cGlobals::cGlobals()
     wakeup=false;
     epghandler=NULL;
     epgtimer=NULL;
+    epgseasonepisode=NULL;
     epall=0;
     epgsearchexists=(cPluginManager::GetPlugin("epgsearch")!=NULL);
     order=strdup(GetDefaultOrder());
@@ -292,6 +293,11 @@ cGlobals::~cGlobals()
     {
         epgtimer->Stop();
         delete epgtimer;
+    }
+    if (epgseasonepisode)
+    {
+        epgseasonepisode->Stop();
+        delete epgseasonepisode;
     }
     epgsources.Remove();
     epgmappings.Remove();

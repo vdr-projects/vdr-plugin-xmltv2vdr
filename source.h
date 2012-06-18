@@ -209,6 +209,7 @@ public:
     void SetForceDownload()
     {
         forcedownload=true;
+        forceimportsrc=-1;
     }
     void SetForceImport(int SourceIdx)
     {

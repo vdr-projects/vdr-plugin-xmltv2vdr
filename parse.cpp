@@ -189,7 +189,7 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
             int tlen=strlen(Title);
             if (tlen>dlen)
             {
-                if (Title[dlen+1]==32)
+                if (Title[dlen]==32)
                 {
                     found=true;
                     break;
@@ -577,13 +577,59 @@ bool cParse::FetchEvent(xmlNodePtr enode, bool useeptext)
                 }
 
             }
+            else if ((!xmlStrcasecmp(node->name, (const xmlChar *) "episode-num")))
+            {
+                xmlChar *system=xmlGetProp(node,(const xmlChar *) "system");
+                if (system && !xmlStrcasecmp(system,(const xmlChar *) "xmltv_ns"))
+                {
+                    xmlChar *content=xmlNodeListGetString(node->doc,node->xmlChildrenNode,1);
+                    if (content)
+                    {
+                        // format is:  season[/max_season].episode[/max_episode_in_season].part[/max_part]
+                        //             all numbers are zero based, overallepisode is not representable,
+                        //             one or two (or even three?) numbers may be omitted, e.g. '0.5.'
+                        //             means episode 6 in season 1
+                        char *xmltv_ns=strdup((const char *) content);
+                        if (xmltv_ns)
+                        {
+                            xmltv_ns=compactspace(xmltv_ns); // get rid of spaces
+                            if (strlen(xmltv_ns)>1)
+                            {
+                                if (xmltv_ns[0]=='.')
+                                {
+                                    // no season
+                                    if (xmltv_ns[1]!='.')
+                                    {
+                                        // extract episode
+                                        int episode=atoi(xmltv_ns+1)+1;
+                                        if (episode>0) xevent.SetEpisode(episode);
+                                    }
+                                }
+                                else
+                                {
+                                    // extract season
+                                    int season=atoi(xmltv_ns)+1;
+                                    if (season>0) xevent.SetSeason(season);
+                                    char *p=strchr(xmltv_ns,'.');
+                                    if (*p)
+                                    {
+                                        p++;
+                                        // extract episode
+                                        int episode=atoi(p)+1;
+                                        if (episode>0) xevent.SetEpisode(episode);
+                                    }
+                                }
+                            }
+                            free(xmltv_ns);
+                        }
+                        xmlFree(content);
+                    }
+                }
+                if (system) xmlFree(system);
+            }
             else if ((!xmlStrcasecmp(node->name, (const xmlChar *) "length")))
             {
                 // length without advertisements -> just ignore
-            }
-            else if ((!xmlStrcasecmp(node->name, (const xmlChar *) "episode-num")))
-            {
-                // episode-num in not usable format -> just ignore
             }
             else if ((!xmlStrcasecmp(node->name, (const xmlChar *) "subtitles")))
             {

@@ -270,6 +270,13 @@ public:
     {
         epall=Value;
         if (epghandler) epghandler->SetEPAll(Value);
+        if (!epgtimer)
+        {
+            if (Value!=0)
+            {
+                AllocateEPGTimerThread();
+            }
+        }
         if (epgtimer) epgtimer->SetEPAll(Value);
     }
     int EPAll()
