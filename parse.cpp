@@ -124,6 +124,13 @@ void cParse::RemoveNonAlphaNumeric(char *String)
             len--;
             continue;
         }
+        if ((*p=='i') && (*(p+1) && *(p+1)=='e'))
+        {
+            memmove(p,p+1,len-pos);
+            len--;
+            *p='y';
+            continue;
+        }
         p++;
         pos++;
     }

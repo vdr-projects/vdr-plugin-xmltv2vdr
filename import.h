@@ -58,7 +58,8 @@ private:
 public:
     cImport(cGlobals *Global);
     ~cImport();
-    void LinkPictures(const char *Source, cXMLTVStringList *Pics, tEventID DestID, tChannelID ChanID);
+    void LinkPictures(const char *Source, cXMLTVStringList *Pics, tEventID DestID, 
+		      tChannelID ChanID, bool MakeOld=true);
     int Process(cEPGSource *Source, cEPGExecutor &myExecutor);
     bool Begin(cEPGSource *Source, sqlite3 *Db);
     bool Commit(cEPGSource *Source, sqlite3 *Db);

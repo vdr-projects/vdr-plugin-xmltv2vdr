@@ -283,7 +283,7 @@ bool cImport::WasChanged(cEvent* Event)
     return true;
 }
 
-void cImport::LinkPictures(const char *Source, cXMLTVStringList *Pics, tEventID DestID, tChannelID ChanID)
+void cImport::LinkPictures(const char *Source, cXMLTVStringList *Pics, tEventID DestID, tChannelID ChanID, bool MakeOld)
 {
     // source-pics are located in /var/lib/epgsources/%SOURCE%-img/
     // dest-pics are located in imgdir (default /var/cache/vdr/epgimages)
@@ -291,15 +291,19 @@ void cImport::LinkPictures(const char *Source, cXMLTVStringList *Pics, tEventID 
     for (int i=0; i<Pics->Size(); i++)
     {
         char *pic=(*Pics)[i];
+
+        char *ext=strrchr(pic,'.');
+        if (!ext) continue;
+
+        ext++;
+        char *dst,*dstold=NULL;
+        int ret;
+
         char *src;
         if (asprintf(&src,"/var/lib/epgsources/%s-img/%s",Source,pic)==-1) return;
 
-        char *ext=strrchr(pic,'.');
-        if (ext)
+        if (MakeOld)
         {
-            ext++;
-            char *dst,*dstold;
-            int ret;
             if (!i)
             {
                 ret=asprintf(&dstold,"%s/%i.%s",g->ImgDir(),DestID,ext);
@@ -313,75 +317,85 @@ void cImport::LinkPictures(const char *Source, cXMLTVStringList *Pics, tEventID 
                 free(src);
                 return;
             }
+        }
 
-            if (!i)
+        if (!i)
+        {
+            ret=asprintf(&dst,"%s/%s_%i.%s",g->ImgDir(),*ChanID.ToString(),DestID,ext);
+        }
+        else
+        {
+            ret=asprintf(&dst,"%s/%s_%i_%i.%s",g->ImgDir(),*ChanID.ToString(),DestID,i,ext);
+        }
+        if (ret==-1)
+        {
+            free(src);
+            if (dstold) free(dstold);
+            return;
+        }
+
+        struct stat statbuf;
+        if (MakeOld)
+        {
+            if (stat(dstold,&statbuf)!=-1)
             {
-                ret=asprintf(&dst,"%s/%s_%i.%s",g->ImgDir(),*ChanID.ToString(),DestID,ext);
+                unlink(dstold);
+            }
+            if (symlink(src,dstold)==-1)
+            {
+                if (!i)
+                {
+                    tsyslog("failed to link %s to %i.%s",pic,DestID,ext);
+                }
+                else
+                {
+                    tsyslog("failed to link %s to %i_%i.%s",pic,DestID,i,ext);
+                }
             }
             else
             {
-                ret=asprintf(&dst,"%s/%s_%i_%i.%s",g->ImgDir(),*ChanID.ToString(),DestID,i,ext);
-            }
-            if (ret==-1)
-            {
-                free(src);
-                free(dstold);
-                return;
-            }
-
-            struct stat statbuf;
-            if (stat(dstold,&statbuf)==-1)
-            {
-                if (symlink(src,dstold)==-1)
+                if (!i)
                 {
-                    if (!i)
-                    {
-                        tsyslog("failed to link %s to %i.%s",pic,DestID,ext);
-                    }
-                    else
-                    {
-                        tsyslog("failed to link %s to %i_%i.%s",pic,DestID,i,ext);
-                    }
+                    tsyslog("linked %s to %i.%s",pic,DestID,ext);
                 }
                 else
                 {
-                    if (!i)
-                    {
-                        tsyslog("linked %s to %i.%s",pic,DestID,ext);
-                    }
-                    else
-                    {
-                        tsyslog("linked %s to %i_%i.%s",pic,DestID,i,ext);
-                    }
-                }
-            }
-
-            if (stat(dst,&statbuf)==-1)
-            {
-                if (symlink(src,dst)==-1)
-                {
-                    if (!i)
-                    {
-                        tsyslog("failed to link %s to %s_%i.%s",pic,*ChanID.ToString(),DestID,ext);
-                    }
-                    else
-                    {
-                        tsyslog("failed to link %s to %s_%i_%i.%s",pic,*ChanID.ToString(),DestID,i,ext);
-                    }
-                }
-                else
-                {
-                    if (!i)
-                    {
-                        tsyslog("linked %s to %s_%i.%s",pic,*ChanID.ToString(),DestID,ext);
-                    }
-                    else
-                    {
-                        tsyslog("linked %s to %s_%i_%i.%s",pic,*ChanID.ToString(),DestID,i,ext);
-                    }
+                    tsyslog("linked %s to %i_%i.%s",pic,DestID,i,ext);
                 }
             }
         }
+
+        if (stat(dst,&statbuf)!=-1)
+        {
+            unlink(dst);
+        }
+        if (symlink(src,dst)==-1)
+        {
+            if (!i)
+            {
+                tsyslog("failed to link %s to %s_%i.%s",pic,*ChanID.ToString(),DestID,ext);
+            }
+            else
+            {
+                tsyslog("failed to link %s to %s_%i_%i.%s",pic,*ChanID.ToString(),DestID,i,ext);
+            }
+        }
+        else
+        {
+            if (!i)
+            {
+                tsyslog("linked %s to %s_%i.%s",pic,*ChanID.ToString(),DestID,ext);
+            }
+            else
+            {
+                tsyslog("linked %s to %s_%i_%i.%s",pic,*ChanID.ToString(),DestID,i,ext);
+            }
+        }
+
+        free(src);
+        free(dst);
+        if (dstold) free(dstold);
+
     }
 }
 

@@ -1039,6 +1039,8 @@ const char **cPluginXmltv2vdr::SVDRPHelpPages(void)
         "    Delete xmltv2vdr epg database (triggers update)\n",
         "HOUS\n"
         "    Start housekeeping manually\n",
+        "TIMR\n"
+        "    Start timerthread manually\n",
         NULL
     };
     return HelpPages;
@@ -1107,12 +1109,35 @@ cString cPluginXmltv2vdr::SVDRPCommand(const char *Command, const char *Option, 
             output="epgfile parameter not set\n";
         }
     }
+    if (!strcasecmp(Command,"TIMR"))
+    {
+        if (!epgexecutor.Active() && g.EPGTimer() && !g.EPGTimer()->Active())
+        {
+            g.EPGTimer()->Start();
+            last_timer_t=(time(NULL)/600)*600;
+            ReplyCode=250;
+            output="timerthread started\n";
+        }
+        else
+        {
+            if (g.EPGTimer())
+            {
+                ReplyCode=550;
+                output="system busy\n";
+            }
+            else
+            {
+                ReplyCode=550;
+                output="no timerthread\n";
+            }
+        }
+    }
     if (!strcasecmp(Command,"HOUS"))
     {
         if (!epgexecutor.Active() && !housekeeping.Active())
         {
             housekeeping.Start();
-            last_housetime_t=(time(NULL) / 3600)*3600;
+            last_housetime_t=(time(NULL)/3600)*3600;
             ReplyCode=250;
             output="housekeeping started\n";
         }
