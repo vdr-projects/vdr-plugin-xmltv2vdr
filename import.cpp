@@ -1434,6 +1434,8 @@ int cImport::Process(cEPGSource *Source, cEPGExecutor &myExecutor)
     time_t endoneday=begin+86400;
 #endif
 
+    Timers.IncBeingEdited(); // prevent Timers.DeleteExpired() to execute
+
     cSchedulesLock *schedulesLock=NULL;
     const cSchedules *schedules=NULL;
 
@@ -1446,6 +1448,7 @@ int cImport::Process(cEPGSource *Source, cEPGExecutor &myExecutor)
         if (!myExecutor.StillRunning())
         {
             delete schedulesLock;
+            Timers.DecBeingEdited();
             isyslogs(Source,"request to stop from vdr");
             return 0;
         }
@@ -1459,6 +1462,7 @@ int cImport::Process(cEPGSource *Source, cEPGExecutor &myExecutor)
     {
         esyslogs(Source,"failed to open %s",g->EPGFile());
         delete schedulesLock;
+        Timers.DecBeingEdited();
         return 141;
     }
 
@@ -1472,6 +1476,7 @@ int cImport::Process(cEPGSource *Source, cEPGExecutor &myExecutor)
         sqlite3_close(db);
         esyslogs(Source,"out of memory");
         delete schedulesLock;
+        Timers.DecBeingEdited();
         return 134;
     }
 
@@ -1483,6 +1488,7 @@ int cImport::Process(cEPGSource *Source, cEPGExecutor &myExecutor)
         sqlite3_close(db);
         free(sql);
         delete schedulesLock;
+        Timers.DecBeingEdited();
         return 141;
     }
     free(sql);
@@ -1581,7 +1587,11 @@ int cImport::Process(cEPGSource *Source, cEPGExecutor &myExecutor)
 #if VDRVERSNUM < 10726 && (!EPGHANDLER)
                 if ((!addevents) && (xevent.StartTime()>endoneday)) continue;
 #endif
-                if (PutEvent(Source, db, schedule, event, &xevent, flags)) cnt++;
+                if (PutEvent(Source, db, schedule, event, &xevent, flags))
+                {
+                    schedules->SetModified(schedule);
+                    cnt++;
+                }
             }
         }
         else
@@ -1619,6 +1629,8 @@ int cImport::Process(cEPGSource *Source, cEPGExecutor &myExecutor)
     sqlite3_finalize(stmt);
     sqlite3_close(db);
     delete schedulesLock;
+    Timers.SetEvents();
+    Timers.DecBeingEdited();
     return 0;
 }
 

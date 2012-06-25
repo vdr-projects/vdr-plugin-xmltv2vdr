@@ -51,10 +51,10 @@ void cEPGExecutor::Action()
         esyslog("failed to set ioprio to 3,7");
     }
 
-    cSVDRPMsg msg;
-    if (sources->EPGSearchExists())
+    cEPGSearch_Client epgsearch;
+    if (epgsearch.Installed())
     {
-        if (!msg.Send("SETS OFF"))
+        if (!epgsearch.DisableSearchTimer())
         {
             esyslog("failed to stop epgsearch searchthread");
         }
@@ -112,13 +112,14 @@ void cEPGExecutor::Action()
     forceimportsrc=-1;
     forcedownload=false;
 
-    if (sources->EPGSearchExists())
+    if (epgsearch.Installed())
     {
-        if (!msg.Send("SETS ON"))
+        if (!epgsearch.EnableSearchTimer())
         {
             esyslog("failed to start epgsearch searchthread");
         }
     }
+
 }
 
 // -------------------------------------------------------------
@@ -806,11 +807,6 @@ void cEPGSource::Add2Log(struct tm *Tm, const char Prefix, const char *Line)
 
 // -------------------------------------------------------------
 
-cEPGSources::cEPGSources()
-{
-    epgsearchexists=false;
-}
-
 bool cEPGSources::Exists(const char* Name)
 {
     if (!Name) return false;
@@ -915,10 +911,8 @@ bool cEPGSources::MoveEPGSource(cGlobals *Global, int From, int To)
     return true;
 }
 
-
 void cEPGSources::ReadIn(cGlobals *Global, bool Reload)
 {
-    epgsearchexists=Global->EPGSearchExists();
     if (Reload) Remove();
     DIR *dir=opendir(EPGSOURCES);
     if (!dir) return;

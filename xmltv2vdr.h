@@ -26,12 +26,33 @@ static const char *DESCRIPTION    = trNOOP("Imports xmltv epg into vdr");
 
 int ioprio_set(int which, int who, int ioprio);
 
+// Data structure for service "Epgsearch-enablesearchtimers-v1.0"
+struct Epgsearch_enablesearchtimers_v1_0
+{
+// in
+    bool enable;           // enable search timer thread?
+};
+
 class cSVDRPMsg
 {
 private:
     bool readreply(int fd);
 public:
     bool Send(const char *format, ...);
+};
+
+class cEPGSearch_Client
+{
+private:
+    cPlugin *plugin;
+public:
+    cEPGSearch_Client();
+    bool Installed()
+    {
+        return (plugin!=NULL);
+    }
+    bool EnableSearchTimer();
+    bool DisableSearchTimer();
 };
 
 class cEPGTimer : public cThread
@@ -160,7 +181,6 @@ private:
     int epall;
     int imgdelafter;
     bool wakeup;
-    bool epgsearchexists;
     cEPGMappings epgmappings;
     cTEXTMappings textmappings;
     cEPGSources epgsources;
@@ -261,10 +281,6 @@ public:
     const char *Order()
     {
         return order;
-    }
-    bool EPGSearchExists()
-    {
-        return epgsearchexists;
     }
     void SetEPAll(int Value)
     {

@@ -694,25 +694,6 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
     if (!buffer) return 134;
     if (!bufsize) return 134;
 
-    cSchedulesLock *schedulesLock=NULL;
-    const cSchedules *schedules=NULL;
-
-    int l=0;
-    while (l<300)
-    {
-        if (schedulesLock) delete schedulesLock;
-        schedulesLock = new cSchedulesLock(true,200); // wait up to 60 secs for lock!
-        schedules = cSchedules::Schedules(*schedulesLock);
-        if (!myExecutor.StillRunning())
-        {
-            delete schedulesLock;
-            isyslogs(source,"request to stop from vdr");
-            return 0;
-        }
-        if (schedules) break;
-        l++;
-    }
-
     dsyslogs(source,"parsing output");
 
     xmlDocPtr xmltv;
@@ -720,7 +701,6 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
     if (!xmltv)
     {
         esyslogs(source,"failed to parse xmltv");
-        delete schedulesLock;
         return 141;
     }
 
@@ -729,7 +709,6 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
     {
         esyslogs(source,"no rootnode in xmltv");
         xmlFreeDoc(xmltv);
-        delete schedulesLock;
         return 141;
     }
 
@@ -738,7 +717,6 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
     {
         esyslogs(source,"failed to open or create %s",g->EPGFile());
         xmlFreeDoc(xmltv);
-        delete schedulesLock;
         return 141;
     }
 
@@ -764,7 +742,6 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
         sqlite3_free(errmsg);
         sqlite3_close(db);
         xmlFreeDoc(xmltv);
-        delete schedulesLock;
         return 141;
     }
 
@@ -969,7 +946,6 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
     sqlite3_close(db);
 
     xmlFreeDoc(xmltv);
-    delete schedulesLock;
     return 0;
 }
 

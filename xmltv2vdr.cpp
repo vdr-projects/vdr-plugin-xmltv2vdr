@@ -217,6 +217,41 @@ bool cSVDRPMsg::Send(const char *format, ...)
 
 // -------------------------------------------------------------
 
+cEPGSearch_Client::cEPGSearch_Client()
+{
+    plugin=cPluginManager::GetPlugin("epgsearch");
+}
+
+bool cEPGSearch_Client::EnableSearchTimer()
+{
+    if (!plugin) return false;
+    Epgsearch_enablesearchtimers_v1_0 serviceData;
+    serviceData.enable = true;
+    if (!plugin->Service("Epgsearch-enablesearchtimers-v1.0", (void*) &serviceData))
+    {
+        // SVDRP fallback
+        cSVDRPMsg msg;
+        if (!msg.Send("SETS ON")) return false;
+    }
+    return true;
+}
+
+bool cEPGSearch_Client::DisableSearchTimer()
+{
+    if (!plugin) return false;
+    Epgsearch_enablesearchtimers_v1_0 serviceData;
+    serviceData.enable = false;
+    if (!plugin->Service("Epgsearch-enablesearchtimers-v1.0", (void*) &serviceData))
+    {
+        // SVDRP fallback
+        cSVDRPMsg msg;
+        if (!msg.Send("SETS OFF")) return false;
+    }
+    return true;
+}
+
+// -------------------------------------------------------------
+
 cGlobals::cGlobals()
 {
     confdir=NULL;
@@ -231,7 +266,6 @@ cGlobals::cGlobals()
     epgtimer=NULL;
     epgseasonepisode=NULL;
     epall=0;
-    epgsearchexists=(cPluginManager::GetPlugin("epgsearch")!=NULL);
     order=strdup(GetDefaultOrder());
     imgdelafter=30;
 
