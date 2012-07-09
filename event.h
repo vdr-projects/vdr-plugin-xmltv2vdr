@@ -33,6 +33,7 @@ class cXMLTVEvent
 {
 private:
     char *title;
+    char *title2;
     char *shorttext;
     char *description;
     char *eitdescription;
@@ -180,10 +181,7 @@ public:
     {
         return source;
     }
-    const char *Title(void) const
-    {
-        return title;
-    }
+    const char *Title(bool Second=false);
     const char *ShortText(void) const
     {
         return shorttext;

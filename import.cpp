@@ -101,16 +101,27 @@ cEvent *cImport::SearchVDREvent(cEPGSource *source, cSchedule* schedule, cXMLTVE
         return f;
     }
 
-    const char *cxTitle=conv->Convert(xevent->Title());
+    char *cxTitle1=strdup(conv->Convert(xevent->Title()));
+    char *cxTitle2=NULL;
+    if (xevent->Title(true)) cxTitle2=strdup(conv->Convert(xevent->Title(true)));
 
     // 2nd with StartTime
     f=(cEvent *) schedule->GetEvent((tEventID) 0,xevent->StartTime()+hint);
     if (f)
     {
-        if (!strcasecmp(f->Title(),cxTitle))
+        if (!strcasecmp(f->Title(),cxTitle1))
         {
+            free((void *) cxTitle1);
+            if (cxTitle2) free((void *) cxTitle2);
             return f;
         }
+        if (cxTitle2 && (!strcasecmp(f->Title(),cxTitle2)))
+        {
+            free((void *) cxTitle1);
+            free((void *) cxTitle2);
+            return f;
+        }
+
     }
     // 3rd with StartTime +/- TimeDiff
     int maxdiff=INT_MAX;
@@ -124,7 +135,7 @@ cEvent *cImport::SearchVDREvent(cEPGSource *source, cSchedule* schedule, cXMLTVE
         if (diff<=eventTimeDiff)
         {
             // found event with exact the same title
-            if (!strcasecmp(p->Title(),cxTitle))
+            if (!strcasecmp(p->Title(),cxTitle1) || (cxTitle2 && !strcasecmp(p->Title(),cxTitle2)))
             {
                 if (diff<=maxdiff)
                 {
@@ -144,7 +155,7 @@ cEvent *cImport::SearchVDREvent(cEPGSource *source, cSchedule* schedule, cXMLTVE
                 // 0x20,0x30-0x39,0x41-0x5A,0x61-0x7A
                 int wfound=0;
                 char *s1=RemoveNonASCII(p->Title());
-                char *s2=RemoveNonASCII(cxTitle);
+                char *s2=RemoveNonASCII(cxTitle1);
                 if (s1 && s2)
                 {
                     if (!strcmp(s1,s2))
@@ -170,15 +181,54 @@ cEvent *cImport::SearchVDREvent(cEPGSource *source, cSchedule* schedule, cXMLTVE
                         }
                     }
                 }
+
+                char *s3=NULL;
+                if (cxTitle2) s3=RemoveNonASCII(cxTitle2);
+                if (s1 && s3 && !wfound)
+                {
+                    if (!strcmp(s1,s3))
+                    {
+                        wfound++;
+                    }
+                    else
+                    {
+                        struct split w1 = split(s1,' ');
+                        struct split w3 = split(s3,' ');
+                        if ((w1.count) && (w3.count))
+                        {
+                            for (int i1=0; i1<w1.count; i1++)
+                            {
+                                for (int i3=0; i3<w3.count; i3++)
+                                {
+                                    if (!strcmp(w1.pointers[i1],w3.pointers[i3]))
+                                    {
+                                        if (strlen(w1.pointers[i1])>3) wfound++;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 if (s1) free(s1);
                 if (s2) free(s2);
+                if (s3) free(s3);
 
                 if (wfound)
                 {
                     if (diff<=maxdiff)
                     {
                         if (!WasChanged(p))
-                            tsyslogs(source,"found '%s' for '%s'",p->Title(),cxTitle);
+                        {
+                            if (cxTitle2)
+                            {
+                                tsyslogs(source,"found '%s' for '%s' or '%s'",p->Title(),cxTitle1,cxTitle2);
+                            }
+                            else
+                            {
+                                tsyslogs(source,"found '%s' for '%s'",p->Title(),cxTitle1);
+                            }
+                        }
                         f=p;
                         maxdiff=diff;
                     }
@@ -186,6 +236,10 @@ cEvent *cImport::SearchVDREvent(cEPGSource *source, cSchedule* schedule, cXMLTVE
             }
         }
     }
+
+    free((void *) cxTitle1);
+    if (cxTitle2) free((void *) cxTitle2);
+
     return f;
 }
 

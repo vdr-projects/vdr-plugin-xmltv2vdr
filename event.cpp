@@ -79,7 +79,19 @@ void cXMLTVEvent::SetChannelID(const char *ChannelID)
 
 void cXMLTVEvent::SetTitle(const char *Title)
 {
-    title=strcpyrealloc(title, Title);
+    if (title)
+    {
+        if (strncasecmp(Title,title,3))
+        {
+            title=strcatrealloc(title,"|");
+            title=strcatrealloc(title,Title);
+        }
+    }
+    else
+    {
+        title=strcpyrealloc(title, Title);
+    }
+
     if (title)
     {
         title=removechar(title,'\'');
@@ -87,6 +99,24 @@ void cXMLTVEvent::SetTitle(const char *Title)
         title=removechar(title,'\r');
         title=compactspace(title);
     }
+}
+
+const char *cXMLTVEvent::Title(bool Second)
+{
+    char *p=strchr(title,'|');
+    if (!p && Second) return NULL;
+    if (!p) return title;
+
+    if (!Second)
+    {
+        return p++;
+    }
+    if (title2) free(title2);
+    title2=strdup(title);
+    if (!title2) return NULL;
+    p=strchr(title2,'|');
+    if (p) *p=0;
+    return title2;
 }
 
 void cXMLTVEvent::SetOrigTitle(const char *OrigTitle)
@@ -561,6 +591,11 @@ void cXMLTVEvent::Clear()
         free(title);
         title=NULL;
     }
+    if (title2)
+    {
+        free(title2);
+        title2=NULL;
+    }
     if (shorttext)
     {
         free(shorttext);
@@ -622,6 +657,7 @@ cXMLTVEvent::cXMLTVEvent()
     source=NULL;
     channelid=NULL;
     title=NULL;
+    title2=NULL;
     shorttext=NULL;
     description=eitdescription=NULL;
     country=NULL;

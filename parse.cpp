@@ -222,6 +222,32 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
         return false;
     }
 
+    char dname[2048]="";
+    if (readlink(epfile,dname,sizeof(dname)-1)!=-1)
+    {
+        char *ls=strrchr(dname,'/');
+        if (ls)
+        {
+            ls++;
+            memmove(dname,ls,strlen(ls));
+        }
+        char *pt=strrchr(dname,'.');
+        if (pt)
+        {
+            *pt=0;
+        }
+        else
+        {
+            dname[0]=0;
+        }
+    }
+    else
+    {
+        dname[0]=0;
+    }
+
+    if (dname[0]==0) strn0cpy(dname,dirent->d_name,sizeof(dname)-1);
+
     size_t dlen=4*slen;
     char *dshorttext=(char *) calloc(dlen,1);
     if (!dshorttext)
@@ -275,7 +301,7 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
                 {
                     found=true;
                     if (EPShortText) *EPShortText=strdup(epshorttext);
-                    if (EPTitle) *EPTitle=strdup(dirent->d_name);
+                    if (EPTitle) *EPTitle=strdup(dname);
                     break;
                 }
             }
