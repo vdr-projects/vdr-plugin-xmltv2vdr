@@ -743,11 +743,6 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
     bool retcode=false;
     bool added=false;
 
-    if (xEvent->EventID()==65234425)
-    {
-        dsyslog("!!!");
-    }
-
     if ((Flags & OPT_APPEND)==OPT_APPEND) append=true;
 
     if (append && !Event)

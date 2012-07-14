@@ -916,6 +916,7 @@ bool cPluginXmltv2vdr::Start(void)
     g.EPGSources()->ReadIn(&g);
     g.epghandler = new cEPGHandler(&g);
     g.SetEPAll(g.EPAll());
+    isyslog("using sqlite v%s",sqlite3_libversion());
     if (sqlite3_threadsafe()==0) esyslog("sqlite3 not threadsafe!");
     cParse::InitLibXML();
     return true;
