@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: vdr\n"
 "Report-Msgid-Bugs-To: <see README>\n"
-"POT-Creation-Date: 2012-06-04 17:24+0200\n"
+"POT-Creation-Date: 2012-07-14 17:02+0200\n"
 "PO-Revision-Date: 2010-12-23 23:59+0100\n"
 "Last-Translator: Jochen Dolze <vdr@dolze.de>\n"
 "Language-Team: <vdr@linuxtv.org>\n"
@@ -146,7 +146,7 @@ msgid "pin"
 msgstr "Pin"
 
 msgid "download pics"
-msgstr ""
+msgstr "Bilder herunterladen"
 
 msgid "channels provided"
 msgstr "Verfügbare Kanäle"
@@ -195,9 +195,6 @@ msgstr "einzeilig"
 
 msgid " rating in description"
 msgstr " Freigabe im Text"
-
-msgid " add shorttext from list"
-msgstr " Kurztext von Liste übernehmen"
 
 msgid "epg source channel mappings"
 msgstr "EPG Quellkanalzuordnungen"
@@ -285,3 +282,4 @@ msgstr "xmltv2vdr plugin ist noch aktiv"
 
 msgid "Imports xmltv epg into vdr"
 msgstr "Importiert xmltv epg in den VDR"
+

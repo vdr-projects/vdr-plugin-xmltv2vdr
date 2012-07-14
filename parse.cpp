@@ -135,13 +135,13 @@ void cParse::RemoveNonAlphaNumeric(char *String)
         pos++;
     }
 
-    // remove leading numbers
+    // remove leading numbers (inkl. roman numerals)
     len=strlen(String);
     p=String;
     while (*p)
     {
         // 0x30 - 0x39
-        if ((*p>=0x30) && (*p<=0x39))
+        if (((*p>=0x30) && (*p<=0x39)) || *p=='I' || *p=='V')
         {
             memmove(p,p+1,len);
             len--;
@@ -163,18 +163,6 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
 {
     // Title and ShortText are always UTF8 !
     if (!EPDir) return false;
-    if ((!ShortText) && (!Description)) return false;
-    size_t slen;
-    if (ShortText)
-    {
-        slen=strlen(ShortText);
-    }
-    else
-    {
-        slen=strlen(Description);
-        if (slen>40) slen=40;
-    }
-    if (!slen) return false;
     if (!Title) return false;
     if (cEP2ASCII==(iconv_t) -1) return false;
     if (cUTF2ASCII==(iconv_t) -1) return false;
@@ -248,6 +236,29 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
 
     if (dname[0]==0) strn0cpy(dname,dirent->d_name,sizeof(dname)-1);
 
+    if (EPTitle && strcasecmp(Title,dname)) *EPTitle=strdup(dname);    
+    
+    if ((!ShortText) && (!Description)) {
+        fclose(f);
+        free(epfile);
+        return false;
+    }
+    size_t slen;
+    if (ShortText)
+    {
+        slen=strlen(ShortText);
+    }
+    else
+    {
+        slen=strlen(Description);
+        if (slen>40) slen=40;
+    }
+    if (!slen) {
+        fclose(f);
+        free(epfile);
+        return false;
+    }
+    
     size_t dlen=4*slen;
     char *dshorttext=(char *) calloc(dlen,1);
     if (!dshorttext)
@@ -301,7 +312,6 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
                 {
                     found=true;
                     if (EPShortText) *EPShortText=strdup(epshorttext);
-                    if (EPTitle) *EPTitle=strdup(dname);
                     break;
                 }
             }
@@ -691,6 +701,7 @@ bool cParse::FetchEvent(xmlNodePtr enode, bool useeptext)
     int season,episode,episodeoverall;
     char *epshorttext=NULL;
     char *eptitle=NULL;
+    
     if (FetchSeasonEpisode(cep2ascii,cutf2ascii,g->EPDir(),xevent.Title(),xevent.ShortText(),
                            xevent.Description(),season,episode,episodeoverall,&epshorttext,
                            &eptitle))
@@ -698,19 +709,16 @@ bool cParse::FetchEvent(xmlNodePtr enode, bool useeptext)
         xevent.SetSeason(season);
         xevent.SetEpisode(episode);
         xevent.SetEpisodeOverall(episodeoverall);
-        if (useeptext)
+        if (epshorttext)
         {
-            if (epshorttext)
-            {
-                xevent.SetShortText(epshorttext);
-                free(epshorttext);
-            }
-            if (eptitle)
-            {
-                xevent.SetTitle(eptitle);
-                free(eptitle);
-            }
+            if (useeptext) xevent.SetShortText(epshorttext);
+            free(epshorttext);
         }
+    }
+    if (eptitle)
+    {
+        if (useeptext) xevent.SetAltTitle(eptitle);
+        free(eptitle);
     }
     return xevent.HasTitle();
 }
@@ -748,9 +756,9 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
 
     char sql[]="CREATE TABLE IF NOT EXISTS epg (" \
                "src nvarchar(100), channelid nvarchar(255), eventid int, eiteventid int, "\
-               "starttime datetime, duration int, title nvarchar(255),origtitle nvarchar(255), "\
-               "shorttext nvarchar(255), description text, eitdescription text, " \
-               "country nvarchar(255), year int, " \
+               "starttime datetime, duration int, title nvarchar(255), alttitle nvarchar(255), "\
+               "origtitle nvarchar(255), shorttext nvarchar(255), description text, "\
+               "eitdescription text, country nvarchar(255), year int, " \
                "credits text, category text, review text, rating text, " \
                "starrating text, video text, audio text, season int, episode int, " \
                "episodeoverall int, pics text, srcidx int," \
@@ -777,6 +785,7 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
     int lerr=0,lweak=0;
     xmlChar *lastchannelid=NULL;
     int skipped=0;
+    bool do_unlink=false;
     while (node)
     {
         if (node->type!=XML_ELEMENT_NODE)
@@ -873,7 +882,7 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
         if (start) xmlFree(start);
         if (stop) xmlFree(stop);
 
-        if (!FetchEvent(node,(map->Flags() & OPT_SEASON_SHORTTEXT)==OPT_SEASON_SHORTTEXT)) // sets xevent
+        if (!FetchEvent(node,(map->Flags() & OPT_SEASON_STEXTITLE)==OPT_SEASON_STEXTITLE)) // sets xevent
         {
             if (lerr!=PARSE_FETCHERR)
                 esyslogs(source,"failed to fetch event");
@@ -905,26 +914,36 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
                 int ret=sqlite3_exec(db,isql,NULL,NULL,&errmsg);
                 if (ret!=SQLITE_OK)
                 {
+                    bool update_issued=false;
                     if (ret==SQLITE_CONSTRAINT)
                     {
                         sqlite3_free(errmsg);
                         ret=sqlite3_exec(db,usql,NULL,NULL,&errmsg);
+                        update_issued=true;
                     }
                     if (ret!=SQLITE_OK)
                     {
                         if (lerr!=PARSE_SQLERR)
                         {
-                            if (!xevent.WeakID())
+                            if (strstr(errmsg,"has no column named"))
                             {
-                                esyslogs(source,"sqlite3: %s (%u@%i)",errmsg,xevent.EventID(),node->line);
-                                tsyslogs(source,"sqlite3: %s",isql);
-                                tsyslogs(source,"sqlite3: %s",usql);
+                                esyslogs(source,"sqlite3: database schema changed, unlinking epg.db!");
+                                do_unlink=true;
                             }
                             else
                             {
-                                esyslogs(source,"sqlite3: %s ('%s'@%i)",errmsg,xevent.Title(),node->line);
-                                tsyslogs(source,"sqlite3: %s",isql);
-                                tsyslogs(source,"sqlite3: %s",usql);
+                                if (!xevent.WeakID())
+                                {
+                                    esyslogs(source,"sqlite3: %s (%u@%i)",errmsg,xevent.EventID(),node->line);
+                                    tsyslogs(source,"sqlite3: %s",isql);
+                                    if (update_issued) tsyslogs(source,"sqlite3: %s",usql);
+                                }
+                                else
+                                {
+                                    esyslogs(source,"sqlite3: %s ('%s'@%i)",errmsg,xevent.Title(),node->line);
+                                    tsyslogs(source,"sqlite3: %s",isql);
+                                    if (update_issued) tsyslogs(source,"sqlite3: %s",usql);
+                                }
                             }
                         }
                         lerr=PARSE_SQLERR;
@@ -941,6 +960,7 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
             isyslogs(source,"request to stop from vdr");
             break;
         }
+        if (do_unlink) break;
     }
 
     if (sqlite3_exec(db,"COMMIT",NULL,NULL,&errmsg)!=SQLITE_OK)
@@ -951,7 +971,7 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
 
     int cnt=sqlite3_total_changes(db);
 
-    if (skipped)
+    if ((skipped) && (!do_unlink))
         isyslogs(source,"skipped %i xmltv events",skipped);
 
     if (!lerr)
@@ -972,6 +992,9 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
     sqlite3_close(db);
 
     xmlFreeDoc(xmltv);
+
+    if (do_unlink) unlink(g->EPGFile());
+
     return 0;
 }
 

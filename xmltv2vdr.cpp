@@ -519,8 +519,8 @@ bool cEPGHandler::HandleEvent(cEvent* Event)
         }
         source=sources->GetSource(EITSOURCE);
         if (!source) tsyslog("no source for %s",EITSOURCE);
-        bool useeptext=((epall & EPLIST_USE_TEXT)==EPLIST_USE_TEXT);
-        if (useeptext) Flags|=(USE_SHORTTEXT|USE_TITLE);
+        bool useeptext=((epall & EPLIST_USE_STEXTITLE)==EPLIST_USE_STEXTITLE);
+        if (useeptext) Flags|=(USE_SHORTTEXT|OPT_SEASON_STEXTITLE);
         xevent=import.AddXMLTVEvent(source,db,ChannelID,Event,Event->Description(),useeptext);
         if (!xevent)
         {
@@ -584,20 +584,23 @@ void cEPGTimer::Action()
 
     sqlite3 *db=NULL;
     cEPGSource *source=sources->GetSource(EITSOURCE);
-    bool useeptext=((epall & EPLIST_USE_TEXT)==EPLIST_USE_TEXT);
+    bool useeptext=((epall & EPLIST_USE_STEXTITLE)==EPLIST_USE_STEXTITLE);
     int Flags=USE_SEASON;
-    if (useeptext) Flags|=(USE_SHORTTEXT|USE_TITLE);
+    if (useeptext) Flags|=(USE_SHORTTEXT|OPT_SEASON_STEXTITLE);
     for (cTimer *Timer = Timers.First(); Timer; Timer = Timers.Next(Timer))
     {
         if (Timer->Recording()) continue; // to late ;)
         cEvent *event=(cEvent *) Timer->Event();
         if (!event) continue;
-        if (!event->ShortText() && !event->Description()) continue; // no text -> no episode
-        if (event->ShortText() && event->Description())
+        if (!useeptext)
         {
-            if ((strlen(event->ShortText())+strlen(event->Description()))==0) continue; // no text -> no episode
+            if (!event->ShortText() && !event->Description()) continue; // no text -> no episode
+            if (event->ShortText() && event->Description())
+            {
+                if ((strlen(event->ShortText())+strlen(event->Description()))==0) continue; // no text -> no episode
+            }
         }
-        if (maps->ProcessChannel(event->ChannelID())) continue; // already processed by xmltv2vdr
+        if (maps->ProcessChannel(event->ChannelID()) && event->ShortText()) continue; // already processed by xmltv2vdr
 
         const char *ChannelID=strdup(*event->ChannelID().ToString());
         cXMLTVEvent *xevent=import.SearchXMLTVEvent(&db,ChannelID,event);
@@ -608,6 +611,13 @@ void cEPGTimer::Action()
             {
                 free((void*)ChannelID);
                 continue;
+            }
+        }
+        else
+        {
+            if (!event->ShortText() && event->Description())
+            {
+                import.AddShortTextFromEITDescription(xevent,event->Description());
             }
         }
         free((void*)ChannelID);

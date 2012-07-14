@@ -90,7 +90,7 @@ void cMenuSetupXmltv2vdr::Output(void)
         if ((epall & EPLIST_USE_SEASON)==EPLIST_USE_SEASON)
         {
             Add(new cMyMenuEditBitItem(tr(" add shorttext/title from list"),
-                                       &epall,EPLIST_USE_TEXT),true);
+                                       &epall,EPLIST_USE_STEXTITLE),true);
         }
         else
         {
@@ -1114,7 +1114,7 @@ void cMenuSetupXmltv2vdrChannelMap::output(void)
     c4=Current();
     if (((flags & USE_SEASON)==USE_SEASON) && (g->EPDir()))
     {
-        Add(new cMyMenuEditBitItem(tr(" add shorttext from list"),&flags,OPT_SEASON_SHORTTEXT),true);
+        Add(new cMyMenuEditBitItem(tr(" add shorttext/title from list"),&flags,OPT_SEASON_STEXTITLE),true);
     }
 
     hasmaps=false;

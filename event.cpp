@@ -79,19 +79,7 @@ void cXMLTVEvent::SetChannelID(const char *ChannelID)
 
 void cXMLTVEvent::SetTitle(const char *Title)
 {
-    if (title)
-    {
-        if (strncasecmp(Title,title,3))
-        {
-            title=strcatrealloc(title,"|");
-            title=strcatrealloc(title,Title);
-        }
-    }
-    else
-    {
-        title=strcpyrealloc(title, Title);
-    }
-
+    title=strcpyrealloc(title, Title);
     if (title)
     {
         title=removechar(title,'\'');
@@ -101,22 +89,16 @@ void cXMLTVEvent::SetTitle(const char *Title)
     }
 }
 
-const char *cXMLTVEvent::Title(bool Second)
+void cXMLTVEvent::SetAltTitle(const char *AltTitle)
 {
-    char *p=strchr(title,'|');
-    if (!p && Second) return NULL;
-    if (!p) return title;
-
-    if (!Second)
+    alttitle=strcpyrealloc(alttitle, AltTitle);
+    if (alttitle)
     {
-        return p++;
+        alttitle=removechar(alttitle,'\'');
+        alttitle=removechar(alttitle,'\n');
+        alttitle=removechar(alttitle,'\r');
+        alttitle=compactspace(alttitle);
     }
-    if (title2) free(title2);
-    title2=strdup(title);
-    if (!title2) return NULL;
-    p=strchr(title2,'|');
-    if (p) *p=0;
-    return title2;
 }
 
 void cXMLTVEvent::SetOrigTitle(const char *OrigTitle)
@@ -500,13 +482,14 @@ void cXMLTVEvent::GetSQL(const char *Source, int SrcIdx, const char *ChannelID, 
 
     if (asprintf(&sql_insert,
                  "INSERT OR FAIL INTO epg (src,channelid,eventid,starttime,duration,"\
-                 "title,origtitle,shorttext,description,country,year,credits,category,"\
+                 "title,alttitle,origtitle,shorttext,description,country,year,credits,category,"\
                  "review,rating,starrating,video,audio,season,episode,episodeoverall,pics,srcidx) "\
                  "VALUES (^%s^,^%s^,%u,%li,%i,"\
-                 "^%s^,^%s^,^%s^,^%s^,^%s^,%i,^%s^,^%s^,"\
+                 "^%s^,^%s^,^%s^,^%s^,^%s^,^%s^,%i,^%s^,^%s^,"\
                  "^%s^,^%s^,^%s^,^%s^,^%s^,%i,%i,%i,^%s^,%i);"
                  ,
                  Source,ChannelID,eventid,starttime,duration,title,
+                 alttitle ? alttitle : "NULL",
                  origtitle ? origtitle : "NULL",
                  shorttext ? shorttext : "NULL",
                  description ? description : "NULL",
@@ -522,13 +505,14 @@ void cXMLTVEvent::GetSQL(const char *Source, int SrcIdx, const char *ChannelID, 
     }
 
     if (asprintf(&sql_update,
-                 "UPDATE epg SET duration=%i,starttime=%li,title=^%s^,origtitle=^%s^,"\
+                 "UPDATE epg SET duration=%i,starttime=%li,title=^%s^,alttitle=^%s^,origtitle=^%s^,"\
                  "shorttext=^%s^,description=^%s^,country=^%s^,year=%i,credits=^%s^,category=^%s^,"\
                  "review=^%s^,rating=^%s^,starrating=^%s^,video=^%s^,audio=^%s^,season=%i,episode=%i, "\
                  "episodeoverall=%i,pics=^%s^,srcidx=%i " \
                  " where src=^%s^ and channelid=^%s^ and eventid=%u"
                  ,
                  duration,starttime,title,
+                 alttitle ? alttitle : "NULL",
                  origtitle ? origtitle : "NULL",
                  shorttext ? shorttext : "NULL",
                  description ? description : "NULL",
@@ -591,10 +575,10 @@ void cXMLTVEvent::Clear()
         free(title);
         title=NULL;
     }
-    if (title2)
+    if (alttitle)
     {
-        free(title2);
-        title2=NULL;
+        free(alttitle);
+        alttitle=NULL;
     }
     if (shorttext)
     {
@@ -657,7 +641,7 @@ cXMLTVEvent::cXMLTVEvent()
     source=NULL;
     channelid=NULL;
     title=NULL;
-    title2=NULL;
+    alttitle=NULL;
     shorttext=NULL;
     description=eitdescription=NULL;
     country=NULL;

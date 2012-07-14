@@ -33,7 +33,7 @@ class cXMLTVEvent
 {
 private:
     char *title;
-    char *title2;
+    char *alttitle;
     char *shorttext;
     char *description;
     char *eitdescription;
@@ -70,6 +70,7 @@ public:
     void SetSource(const char *Source);
     void SetChannelID(const char *ChannelID);
     void SetTitle(const char *Title);
+    void SetAltTitle(const char *AltTitle);
     void SetOrigTitle(const char *OrigTitle);
     void SetShortText(const char *ShortText);
     void SetDescription(const char *Description);
@@ -181,7 +182,14 @@ public:
     {
         return source;
     }
-    const char *Title(bool Second=false);
+    const char *Title(void) const
+    {
+        return title;
+    }
+    const char *AltTitle(void) const
+    {
+        return alttitle;
+    }
     const char *ShortText(void) const
     {
         return shorttext;

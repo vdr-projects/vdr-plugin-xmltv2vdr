@@ -47,19 +47,22 @@ private:
     char *Add2Description(char *description, const char *value);
     char *Add2Description(char *description, const char *name, const char *value);
     char *Add2Description(char *description, const char *name, int value);
-    char *Add2Description(char *description, cXMLTVEvent *xEvent, int Flags, int what);    
+    char *Add2Description(char *description, cXMLTVEvent *xEvent, int Flags, int what);
     char *AddEOT2Description(char *description, bool checkutf8=false);
     struct split split(char *in, char delim);
     cEvent *GetEventBefore(cSchedule* schedule, time_t start);
     cEvent *SearchVDREvent(cEPGSource *source, cSchedule* schedule, cXMLTVEvent *event, bool append, int hint);
+    cEvent *SearchVDREventByTitle(cEPGSource *source, cSchedule* schedule, const char *Title, time_t StartTime,
+                                  int Duration, int hint);
     bool FetchXMLTVEvent(sqlite3_stmt *stmt, cXMLTVEvent *xevent);
     char *RemoveNonASCII(const char *src);
-    cXMLTVEvent *PrepareAndReturn(sqlite3 *db, char *sql);
+    cXMLTVEvent *PrepareAndReturn(sqlite3 **db, char *sql);
+    int SoundEx(char *SoundEx,char *WordString,int LengthOption,int CensusOption);
 public:
     cImport(cGlobals *Global);
     ~cImport();
-    void LinkPictures(const char *Source, cXMLTVStringList *Pics, tEventID DestID, 
-		      tChannelID ChanID, bool MakeOld=true);
+    void LinkPictures(const char *Source, cXMLTVStringList *Pics, tEventID DestID,
+                      tChannelID ChanID, bool MakeOld=true);
     int Process(cEPGSource *Source, cEPGExecutor &myExecutor);
     bool Begin(cEPGSource *Source, sqlite3 *Db);
     bool Commit(cEPGSource *Source, sqlite3 *Db);
@@ -71,6 +74,7 @@ public:
     cXMLTVEvent *SearchXMLTVEvent(sqlite3 **Db, const char *ChannelID, const cEvent *Event);
     cXMLTVEvent *AddXMLTVEvent(cEPGSource *Source, sqlite3 *Db, const char *ChannelID,
                                const cEvent *Event, const char *EITDescription, bool UseEPText);
+    void AddShortTextFromEITDescription(cXMLTVEvent *xEvent, const char *EITDescription);
     bool WasChanged(cEvent *Event);
 };
 

@@ -58,7 +58,7 @@ LIBS    += $(shell $(PKG-CONFIG) --libs $(PKG-LIBS))
 
 ### The object files (add further files here):
 
-OBJS = $(PLUGIN).o extpipe.o parse.o source.o import.o event.o setup.o maps.o
+OBJS = $(PLUGIN).o soundex.o extpipe.o parse.o source.o import.o event.o setup.o maps.o
 
 ### The main target:
 

@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: vdr\n"
 "Report-Msgid-Bugs-To: <see README>\n"
-"POT-Creation-Date: 2012-06-04 17:24+0200\n"
+"POT-Creation-Date: 2012-07-14 16:59+0200\n"
 "PO-Revision-Date: 2011-03-05 15:45+0100\n"
 "Last-Translator: Diego Pierotto <vdr-italian@tiscali.it>\n"
 "Language-Team:  <vdr@linuxtv.org>\n"
@@ -197,9 +197,6 @@ msgid "singleline"
 msgstr ""
 
 msgid " rating in description"
-msgstr ""
-
-msgid " add shorttext from list"
 msgstr ""
 
 msgid "epg source channel mappings"

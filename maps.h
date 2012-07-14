@@ -31,7 +31,7 @@
 #define USE_AUDIO              0x200
 #define USE_SEASON             0x400
 #define USE_STARRATING         0x800
-#define USE_TITLE              0x1000
+//#define USE_TITLE              0x1000
 
 #define CREDITS_ACTORS         0x100000
 #define CREDITS_DIRECTORS      0x200000
@@ -40,11 +40,11 @@
 
 #define OPT_RATING_TEXT        0x1000000
 #define OPT_CATEGORIES_TEXT    0x2000000
-#define OPT_SEASON_SHORTTEXT   0x4000000
+#define OPT_SEASON_STEXTITLE   0x4000000
 #define OPT_APPEND             0x40000000
 
 #define EPLIST_USE_SEASON      0x1
-#define EPLIST_USE_TEXT        0x2
+#define EPLIST_USE_STEXTITLE   0x2
 
 class cTEXTMapping : public cListObject
 {
