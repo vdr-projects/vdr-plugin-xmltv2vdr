@@ -319,6 +319,7 @@ private:
     time_t last_maintime_t;
     time_t last_timer_t;
     time_t last_epcheck_t;
+    void GetSqliteCompileOptions();
     int GetLastImportSource();
 public:
     cPluginXmltv2vdr(void);

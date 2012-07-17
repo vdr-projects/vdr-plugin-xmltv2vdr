@@ -810,6 +810,39 @@ cPluginXmltv2vdr::~cPluginXmltv2vdr()
 #endif
 }
 
+void cPluginXmltv2vdr::GetSqliteCompileOptions()
+{
+    sqlite3 *db=NULL;
+    if (sqlite3_open(":memory:",&db)!=SQLITE_OK) return;
+
+    char sql[]="pragma compile_options;";
+    sqlite3_stmt *stmt;
+
+    int ret=sqlite3_prepare_v2(db,sql,strlen(sql),&stmt,NULL);
+    if (ret!=SQLITE_OK)
+    {
+        esyslog("%i %s (gsco)",ret,sqlite3_errmsg(db));
+        sqlite3_close(db);
+        return ;
+    }
+
+    for (;;)
+    {
+        if (sqlite3_step(stmt)==SQLITE_ROW)
+        {
+            const char *option=(const char *) sqlite3_column_text(stmt,0);
+            tsyslog("option %s",option);
+        }
+        else
+        {
+            break;
+        }
+    }
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+    return;
+}
+
 int cPluginXmltv2vdr::GetLastImportSource()
 {
     sqlite3 *db=NULL;
@@ -917,6 +950,7 @@ bool cPluginXmltv2vdr::Start(void)
     g.epghandler = new cEPGHandler(&g);
     g.SetEPAll(g.EPAll());
     isyslog("using sqlite v%s",sqlite3_libversion());
+    GetSqliteCompileOptions();
     if (sqlite3_threadsafe()==0) esyslog("sqlite3 not threadsafe!");
     cParse::InitLibXML();
     return true;
