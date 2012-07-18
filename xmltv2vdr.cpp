@@ -428,12 +428,6 @@ bool cEPGHandler::check4proc(cEvent *event, bool &spth, cEPGMapping **map)
     return true;
 }
 
-bool cEPGHandler::SetTitle(cEvent* Event, const char* UNUSED(Title))
-{
-    if (!Event->Title()) return false; // no title? new event! let VDR handle this..
-    return true;
-}
-
 bool cEPGHandler::SetShortText(cEvent* Event, const char* ShortText)
 {
     // prevent setting empty shorttext

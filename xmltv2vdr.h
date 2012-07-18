@@ -85,10 +85,6 @@ public:
     {
         return false;
     }
-    virtual bool SetTitle(cEvent *UNUSED(Event), const char *UNUSED(Title))
-    {
-        return false;
-    }
     virtual bool SetShortText(cEvent *UNUSED(Event),const char *UNUSED(ShortText))
     {
         return false;
