@@ -983,7 +983,7 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
 #endif
 
 #if VDRVERSNUM < 10726 && (!EPGHANDLER)
-    event->SetTableID(0); // prevent EIT EPG to update this event
+    Event->SetTableID(0); // prevent EIT EPG to update this event
 #endif
 
     if (!added && changed)

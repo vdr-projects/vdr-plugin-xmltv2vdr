@@ -129,7 +129,6 @@ public:
         return (db!=NULL);
     }
     virtual bool IgnoreChannel(const cChannel *Channel);
-    virtual bool SetTitle(cEvent *Event,const char *Title);
     virtual bool SetShortText(cEvent *Event,const char *ShortText);
     virtual bool SetDescription(cEvent *Event,const char *Description);
     virtual bool HandleEvent(cEvent *Event);
