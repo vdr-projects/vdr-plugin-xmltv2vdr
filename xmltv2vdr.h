@@ -176,6 +176,7 @@ private:
     int epall;
     int imgdelafter;
     bool wakeup;
+    bool soundex;
     cEPGMappings epgmappings;
     cTEXTMappings textmappings;
     cEPGSources epgsources;
@@ -301,6 +302,14 @@ public:
     bool WakeUp()
     {
         return wakeup;
+    }
+    void SetSoundEx()
+    {
+        soundex=true;
+    }
+    bool SoundEx()
+    {
+        return soundex;
     }
 };
 

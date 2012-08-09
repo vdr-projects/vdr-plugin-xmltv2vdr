@@ -268,6 +268,7 @@ cGlobals::cGlobals()
     epall=0;
     order=strdup(GetDefaultOrder());
     imgdelafter=30;
+    soundex=false;
 
     if (asprintf(&epgfile,"%s/epg.db",VideoDirectory)==-1) {};
     if (asprintf(&imgdir,"%s","/var/cache/vdr/epgimages")==-1) {};
@@ -826,6 +827,7 @@ void cPluginXmltv2vdr::GetSqliteCompileOptions()
         {
             const char *option=(const char *) sqlite3_column_text(stmt,0);
             tsyslog("option %s",option);
+            if (!strncasecmp(option,"SOUNDEX",7)) g.SetSoundEx();
         }
         else
         {
