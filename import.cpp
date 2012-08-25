@@ -258,7 +258,6 @@ char *cImport::Add2Description(char *description, const char *Name, int Value)
 char *cImport::AddEOT2Description(char *description, bool checkutf8)
 {
     const char nbspUTF8[]={0xc2,0xa0,0};
-    const char nbsp[]={0xa0,0};
 
     if (checkutf8)
     {
@@ -274,6 +273,7 @@ char *cImport::AddEOT2Description(char *description, bool checkutf8)
             }
             else
             {
+                const char nbsp[]={0xa0,0};
                 description=strcatrealloc(description,nbsp);
             }
         }
@@ -884,6 +884,19 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
 
     if (!Event) return false;
 
+    if ((Flags & USE_TITLE)==USE_TITLE)
+    {
+        if (xEvent->Title() && (strlen(xEvent->Title())>0))
+        {
+            const char *dp=conv->Convert(xEvent->Title());
+            if (!Event->Title() || strcmp(Event->Title(),dp))
+            {
+                Event->SetTitle(dp);
+                changed|=CHANGED_TITLE; // title really changed
+            }
+        }
+    }
+
     if ((Flags & OPT_SEASON_STEXTITLE)==OPT_SEASON_STEXTITLE)
     {
         if (xEvent->AltTitle() && (strlen(xEvent->AltTitle())>0))
@@ -1431,10 +1444,45 @@ cXMLTVEvent *cImport::SearchXMLTVEvent(sqlite3 **Db,const char *ChannelID, const
             return NULL;
         }
 
-        xevent=PrepareAndReturn(Db,sql);
-        if (xevent) return xevent;
     }
-    return NULL;
+    else
+    {
+        char *sqltitle=strdup(Event->Title());
+        if (!sqltitle)
+        {
+            esyslog("out of memory");
+            return NULL;
+        }
+
+        string st=sqltitle;
+
+        int reps;
+        reps=pcrecpp::RE("'").GlobalReplace("''",&st);
+        if (reps)
+        {
+            char *tmp_sqltitle=(char *) realloc(sqltitle,st.size()+1);
+            if (tmp_sqltitle)
+            {
+                sqltitle=tmp_sqltitle;
+                strcpy(sqltitle,st.c_str());
+            }
+        }
+
+        if (asprintf(&sql,"select channelid,eventid,starttime,duration,title,origtitle,shorttext,description," \
+                     "country,year,credits,category,review,rating,starrating,video,audio,season,episode," \
+                     "episodeoverall,pics,src,eiteventid,eitdescription,abs(starttime-%li) as diff from epg where " \
+                     " (starttime>=%li and starttime<=%li) and title='%s' and channelid='%s' " \
+                     " order by diff,srcidx asc limit 1;",Event->StartTime(),Event->StartTime()-eventTimeDiff,
+                     Event->StartTime()+eventTimeDiff,sqltitle,ChannelID)==-1)
+        {
+            free(sqltitle);
+            esyslog("out of memory");
+            return NULL;
+        }
+        free(sqltitle);
+    }
+
+    return PrepareAndReturn(Db,sql);
 }
 
 bool cImport::Begin(cEPGSource *Source, sqlite3 *Db)

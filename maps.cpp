@@ -244,7 +244,7 @@ void cEPGMapping::AddChannel(int ChannelNumber)
         }
         if (!found)
         {
-            tChannelID *tmp_channelids=(tChannelID *) realloc(channelids,(numchannelids+1)*sizeof(struct tChannelID));
+            tChannelID *tmp_channelids=static_cast<tChannelID *>(realloc(channelids,(numchannelids+1)*sizeof(struct tChannelID)));
             if (tmp_channelids)
             {
                 channelids=tmp_channelids;
@@ -267,7 +267,7 @@ void cEPGMapping::ReplaceChannels(int NumChannelIDs, tChannelID *ChannelIDs)
 
     for (int i=0; i<NumChannelIDs; i++)
     {
-        tChannelID *tmp_channelids=(tChannelID *) realloc(channelids,(numchannelids+1)*sizeof(tChannelID));
+        tChannelID *tmp_channelids=static_cast<tChannelID *>(realloc(channelids,(numchannelids+1)*sizeof(tChannelID)));
         if (tmp_channelids)
         {
             channelids=tmp_channelids;

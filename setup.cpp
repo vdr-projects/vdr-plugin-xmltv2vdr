@@ -1076,11 +1076,13 @@ void cMenuSetupXmltv2vdrChannelMap::output(void)
     c1=Current();
     if ((flags & OPT_APPEND)!=OPT_APPEND)
     {
+        Add(new cMyMenuEditBitItem(tr("title"),&flags,USE_TITLE),true);
         Add(new cMyMenuEditBitItem(tr("short text"),&flags,USE_SHORTTEXT),true);
         Add(new cMyMenuEditBitItem(tr("long text"),&flags,USE_LONGTEXT),true);
     }
     else
     {
+        Add(option(tr("title"),true),true);
         Add(option(tr("short text"),true),true);
         Add(option(tr("long text"),true),true);
     }

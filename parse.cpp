@@ -236,9 +236,10 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
 
     if (dname[0]==0) strn0cpy(dname,dirent->d_name,sizeof(dname)-1);
 
-    if (EPTitle && strcasecmp(Title,dname)) *EPTitle=strdup(dname);    
-    
-    if ((!ShortText) && (!Description)) {
+    if (EPTitle && strcasecmp(Title,dname)) *EPTitle=strdup(dname);
+
+    if ((!ShortText) && (!Description))
+    {
         fclose(f);
         free(epfile);
         return false;
@@ -253,12 +254,13 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
         slen=strlen(Description);
         if (slen>40) slen=40;
     }
-    if (!slen) {
+    if (!slen)
+    {
         fclose(f);
         free(epfile);
         return false;
     }
-    
+
     size_t dlen=4*slen;
     char *dshorttext=(char *) calloc(dlen,1);
     if (!dshorttext)
@@ -292,9 +294,9 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
     {
         if (line[0]=='#') continue;
         char epshorttext[256]="";
-        char depshorttext[1024]="";
         if (sscanf(line,"%3d\t%3d\t%5d\t%255c",&Season,&Episode,&EpisodeOverall,epshorttext)==4)
         {
+            char depshorttext[1024]="";
             char *lf=strchr(epshorttext,'\n');
             if (lf) *lf=0;
             slen=strlen(epshorttext);
@@ -701,7 +703,7 @@ bool cParse::FetchEvent(xmlNodePtr enode, bool useeptext)
     int season,episode,episodeoverall;
     char *epshorttext=NULL;
     char *eptitle=NULL;
-    
+
     if (FetchSeasonEpisode(cep2ascii,cutf2ascii,g->EPDir(),xevent.Title(),xevent.ShortText(),
                            xevent.Description(),season,episode,episodeoverall,&epshorttext,
                            &eptitle))

@@ -31,6 +31,7 @@
 #define USE_AUDIO              0x200
 #define USE_SEASON             0x400
 #define USE_STARRATING         0x800
+#define USE_TITLE              0x1000
 
 #define CREDITS_ACTORS         0x100000
 #define CREDITS_DIRECTORS      0x200000
