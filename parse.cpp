@@ -161,7 +161,11 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
                                 int &Season, int &Episode, int &EpisodeOverall, char **EPShortText,
                                 char **EPTitle)
 {
-    // Title and ShortText are always UTF8 !
+Season=0;
+Episode=0;
+EpisodeOverall=0;
+  
+  // Title and ShortText are always UTF8 !
     if (!EPDir) return false;
     if (!Title) return false;
     if (cEP2ASCII==(iconv_t) -1) return false;
