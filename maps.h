@@ -32,6 +32,7 @@
 #define USE_SEASON             0x400
 #define USE_STARRATING         0x800
 #define USE_TITLE              0x1000
+#define USE_CONTENT            0x2000
 
 #define CREDITS_ACTORS         0x100000
 #define CREDITS_DIRECTORS      0x200000
@@ -39,7 +40,6 @@
 #define CREDITS_LIST           0x800000
 
 #define OPT_RATING_TEXT        0x1000000
-#define OPT_CATEGORIES_TEXT    0x2000000
 #define OPT_SEASON_STEXTITLE   0x4000000
 #define OPT_APPEND             0x40000000
 

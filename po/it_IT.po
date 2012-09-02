@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: vdr\n"
 "Report-Msgid-Bugs-To: <see README>\n"
-"POT-Creation-Date: 2012-08-13 18:38+0200\n"
+"POT-Creation-Date: 2012-09-01 13:18+0200\n"
 "PO-Revision-Date: 2011-03-05 15:45+0100\n"
 "Last-Translator: Diego Pierotto <vdr-italian@tiscali.it>\n"
 "Language-Team:  <vdr@linuxtv.org>\n"
@@ -180,6 +180,9 @@ msgstr ""
 
 msgid "short text"
 msgstr "Testo breve"
+
+msgid "dvb content id"
+msgstr ""
 
 msgid " actors"
 msgstr " Attore"

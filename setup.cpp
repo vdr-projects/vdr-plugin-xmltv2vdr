@@ -1089,6 +1089,9 @@ void cMenuSetupXmltv2vdrChannelMap::output(void)
     Add(new cMyMenuEditBitItem(tr("country and date"),&flags,USE_COUNTRYDATE),true);
     Add(new cMyMenuEditBitItem(tr("original title"),&flags,USE_ORIGTITLE),true);
     Add(new cMyMenuEditBitItem(tr("category"),&flags,USE_CATEGORIES),true);
+#if VDRVERSNUM >= 10712 || EPGHANDLER    
+    Add(new cMyMenuEditBitItem(tr("dvb content id"),&flags,USE_CONTENT),true);
+#endif
     Add(new cMyMenuEditBitItem(tr("credits"),&flags,USE_CREDITS),true);
     c2=Current();
     if ((flags & USE_CREDITS)==USE_CREDITS)

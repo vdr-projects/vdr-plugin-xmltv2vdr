@@ -529,12 +529,16 @@ char *cImport::Add2Description(char *description, cXMLTVEvent *xEvent, int Flags
         if (text)
         {
             cXMLTVStringList *categories=xEvent->Category();
-            description=Add2Description(description,text->Value(),(*categories)[0]);
+            // prevent duplicates
+            if ((*categories)[0][0]!='G' && (*categories)[0][1]!=' ')
+                description=Add2Description(description,text->Value(),(*categories)[0]);
             for (int i=1; i<categories->Size(); i++)
             {
-                // prevent duplicates
                 if (strcasecmp((*categories)[i],(*categories)[i-1]))
-                    description=Add2Description(description,text->Value(),(*categories)[i]);
+                {
+                    if ((*categories)[i][0]!='G' && (*categories)[i][1]!=' ')
+                        description=Add2Description(description,text->Value(),(*categories)[i]);
+                }
             }
         }
     }
@@ -995,6 +999,63 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
     }
 #endif
 
+#if VDRVERSNUM >= 10712 || EPGHANDLER
+    if ((Flags & USE_CONTENT)==USE_CONTENT)
+    {
+        uchar contents[MaxEventContents];
+        for (int i=0; i<MaxEventContents; i++)
+        {
+            contents[i]=Event->Contents(i);
+        }
+        cXMLTVStringList *categories=xEvent->Category();
+        for (int i=0; i<categories->Size(); i++)
+        {
+            char *tok,*sp;
+            char delim[]=",";
+            if ((*categories)[i][0]=='G' && (*categories)[i][1]==' ')
+            {
+                char *val=strdup(&(*categories)[i][2]);
+                if (val)
+                {
+                    tok=strtok_r(val,delim,&sp);
+                    while (tok)
+                    {
+                        unsigned int hval;
+                        if (sscanf(tok,"%2x",&hval)==1)
+                        {
+                            uchar uval=(uchar) hval;
+                            bool found=false;
+                            for (int i=0; i<MaxEventContents; i++)
+                            {
+                                if (contents[i]==uval)
+                                {
+                                    found=true;
+                                    break;
+                                }
+                            }
+                            if (!found)
+                            {
+                                for (int i=0; i<MaxEventContents; i++)
+                                {
+                                    if (!contents[i])
+                                    {
+                                        contents[i]=uval;
+                                        break;
+                                    }
+                                }
+                            }
+
+                        }
+                        tok=strtok_r(NULL,delim,&sp);
+                    }
+                }
+                free(val);
+                Event->SetContents(contents);
+            }
+        }
+    }
+#endif
+
 #if VDRVERSNUM < 10726 && (!EPGHANDLER)
     Event->SetTableID(0); // prevent EIT EPG to update this event
 #endif
@@ -1002,7 +1063,7 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
     if (!added && changed)
     {
 
-        if (((changed & CHANGED_SHORTTEXT)==CHANGED_SHORTTEXT) && (WasChanged(Event)==false))
+        if (((changed & CHANGED_DESCRIPTION)==CHANGED_DESCRIPTION) && (WasChanged(Event)==false))
         {
             if (Event->Description()) description=strdup(Event->Description());
             if (description)

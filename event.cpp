@@ -631,7 +631,6 @@ void cXMLTVEvent::Clear()
     episodeoverall=0;
     parentalRating=0;
     weakid=false;
-    memset(&contents,0,sizeof(contents));
 }
 
 cXMLTVEvent::cXMLTVEvent()
