@@ -1485,28 +1485,35 @@ cXMLTVEvent *cImport::SearchXMLTVEvent(sqlite3 **Db,const char *ChannelID, const
     xevent=PrepareAndReturn(Db,sql);
     if (xevent) return xevent;
 
+    bool bUseRawTitle=false;
     if (g->SoundEx())
     {
         char wstr[128];
         if (SoundEx((char *) &wstr,(char *) Event->Title(),0,1)==0)
         {
-            esyslog("soundex of '%s' failed",Event->Title());
-            return NULL;
+            bUseRawTitle=true;
         }
-
-        if (asprintf(&sql,"select channelid,eventid,starttime,duration,title,origtitle,shorttext,description," \
-                     "country,year,credits,category,review,rating,starrating,video,audio,season,episode," \
-                     "episodeoverall,pics,src,eiteventid,eitdescription,alttitle,abs(starttime-%li) as diff from epg where " \
-                     " (starttime>=%li and starttime<=%li) and soundex(title)='%s' and channelid='%s' " \
-                     " order by diff,srcidx asc limit 1;",Event->StartTime(),Event->StartTime()-eventTimeDiff,
-                     Event->StartTime()+eventTimeDiff,wstr,ChannelID)==-1)
+        else
         {
-            esyslog("out of memory");
-            return NULL;
-        }
 
+            if (asprintf(&sql,"select channelid,eventid,starttime,duration,title,origtitle,shorttext,description," \
+                         "country,year,credits,category,review,rating,starrating,video,audio,season,episode," \
+                         "episodeoverall,pics,src,eiteventid,eitdescription,alttitle,abs(starttime-%li) as diff from epg where " \
+                         " (starttime>=%li and starttime<=%li) and soundex(title)='%s' and channelid='%s' " \
+                         " order by diff,srcidx asc limit 1;",Event->StartTime(),Event->StartTime()-eventTimeDiff,
+                         Event->StartTime()+eventTimeDiff,wstr,ChannelID)==-1)
+            {
+                esyslog("out of memory");
+                return NULL;
+            }
+        }
     }
     else
+    {
+        bUseRawTitle=true;
+    }
+    
+    if (bUseRawTitle)
     {
         char *sqltitle=strdup(Event->Title());
         if (!sqltitle)
