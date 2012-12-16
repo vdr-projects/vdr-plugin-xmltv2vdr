@@ -122,6 +122,11 @@ int cExtPipe::Close(int &status)
                     LOG_ERROR;
                     break;
                 }
+                else if (errno == ECHILD)
+                {
+                    ret = pid;
+                    break;
+                }
             }
             else if (ret == pid)
                 break;
