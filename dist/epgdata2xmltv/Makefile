@@ -7,7 +7,7 @@
 CXX      ?= g++
 CXXFLAGS ?= -g -rdynamic -O2 -Wall -Wextra -Woverloaded-virtual -Wno-parentheses
 PKG-CONFIG ?= pkg-config
-STRIP ?= strip
+STRIP ?= -s
 
 ### Includes and Defines (add further entries here):
 
@@ -29,7 +29,7 @@ TMPDIR = /tmp
 
 ### install directory ###
 
-INSTALL = /usr/bin
+INSTALL = $(DESTDIR)/usr/bin
 
 ### The object files (add further files here):
 
@@ -64,9 +64,9 @@ epgdata2xmltv: epgdata2xmltv_xsl $(OBJS)
 	$(CXX) $(CXXFLAGS) $(OBJS) $(LIBS) -o $@
 
 install: epgdata2xmltv
-	@cp epgdata2xmltv $(INSTALL)
-	$(STRIP) $(INSTALL)/epgdata2xmltv
-	@mkdir -p /var/lib/epgsources
+	@mkdir -p $(INSTALL)
+	@install $(STRIP) epgdata2xmltv $(INSTALL)	
+	@mkdir -p $(DESTDIR)/var/lib/epgsources
 	@mkdir -p /var/lib/epgsources/epgdata2xmltv-img
 	@cp epgdata2xmltv.dist /var/lib/epgsources/epgdata2xmltv
 	@chown -R vdr.vdr /var/lib/epgsources
