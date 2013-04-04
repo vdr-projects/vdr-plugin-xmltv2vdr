@@ -190,11 +190,11 @@ public:
     char *GetDefaultOrder();
     void AllocateEPGTimerThread()
     {
-        epgtimer=new cEPGTimer(this);
+        if (!epgtimer) epgtimer=new cEPGTimer(this);
     }
     void AllocateEPGSeasonThread()
     {
-        epgseasonepisode=new cEPGSeasonEpisode(this);
+        if (!epgseasonepisode) epgseasonepisode=new cEPGSeasonEpisode(this);
     }
     cEPGSeasonEpisode *EPGSeasonEpisode()
     {
