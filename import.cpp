@@ -1212,8 +1212,15 @@ cXMLTVEvent *cImport::PrepareAndReturn(sqlite3 **db, char *sql)
             }
             else
             {
-                esyslog("sqlite3: %i %s (par)",ret,errmsg);
-                tsyslog("sqlite3: %s",sql);
+                if ((ret==SQLITE_BUSY) || (ret==SQLITE_LOCKED))
+                {
+                    tsyslog("sqlite3: %i %s (par)",ret,errmsg);
+                }
+                else
+                {
+                    esyslog("sqlite3: %i %s (par)",ret,errmsg);
+                    tsyslog("sqlite3: %s",sql);
+                }
             }
         }
         free(sql);
@@ -1344,11 +1351,13 @@ cXMLTVEvent *cImport::AddXMLTVEvent(cEPGSource *Source,sqlite3 *Db, const char *
                 return NULL;
             }
         }
+        /*
         if (ret==SQLITE_OK)
         {
             tsyslogs(Source,"{%5i} adding '%s'/'%s' to db",xevent->EventID(),
                      xevent->Title(),xevent->ShortText());
         }
+        */
     }
     return xevent;
 }
@@ -1512,7 +1521,7 @@ cXMLTVEvent *cImport::SearchXMLTVEvent(sqlite3 **Db,const char *ChannelID, const
     {
         bUseRawTitle=true;
     }
-    
+
     if (bUseRawTitle)
     {
         char *sqltitle=strdup(Event->Title());
@@ -1631,7 +1640,7 @@ int cImport::Process(cEPGSource *Source, cEPGExecutor &myExecutor)
 
     dsyslogs(Source,"importing from db");
     sqlite3 *db=NULL;
-    if (sqlite3_open(g->EPGFile(),&db)!=SQLITE_OK)
+    if (sqlite3_open_v2(g->EPGFile(),&db,SQLITE_OPEN_READWRITE,NULL)!=SQLITE_OK)
     {
         esyslogs(Source,"failed to open %s",g->EPGFile());
         delete schedulesLock;
@@ -1771,6 +1780,7 @@ int cImport::Process(cEPGSource *Source, cEPGExecutor &myExecutor)
         {
             break;
         }
+        usleep(300000);
     }
 
     if (Commit(Source,db))

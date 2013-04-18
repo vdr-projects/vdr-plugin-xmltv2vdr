@@ -117,7 +117,7 @@ private:
     int epall;
     sqlite3 *db;
     time_t now;
-    bool check4proc(cEvent *event, bool &spth, cEPGMapping **map);
+    bool check4proc(cEvent *event, cTimer **timer, cEPGMapping **map);
 public:
     cEPGHandler(cGlobals *Global);
     void SetEPAll(int Value)

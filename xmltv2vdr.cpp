@@ -398,6 +398,10 @@ cEPGHandler::cEPGHandler(cGlobals* Global): import(Global)
     sources=Global->EPGSources();
     db=NULL;
     now=0;
+    if (ioprio_set(1,getpid(),7 | 3 << 13)==-1)
+    {
+        tsyslog("failed to set ioprio to 3,7");
+    }
 }
 
 bool cEPGHandler::IgnoreChannel(const cChannel* Channel)
@@ -408,10 +412,10 @@ bool cEPGHandler::IgnoreChannel(const cChannel* Channel)
     return maps->IgnoreChannel(Channel);
 }
 
-bool cEPGHandler::check4proc(cEvent *event, bool &spth, cEPGMapping **map)
+bool cEPGHandler::check4proc(cEvent *event, cTimer **timer, cEPGMapping **map)
 {
     if (map) *map=NULL;
-    spth=false;
+    if (timer) *timer=NULL;
     if (!event) return false;
     if (now>(event->StartTime()+event->Duration())) return false; // event in the past?
     if (!maps) return false;
@@ -421,9 +425,16 @@ bool cEPGHandler::check4proc(cEvent *event, bool &spth, cEPGMapping **map)
     if (!t_map)
     {
         if (!epall) return false;
-        if (!event->HasTimer()) return false;
         if (!event->ShortText()) return false;
-        spth=true;
+        if (!timer) return false;
+        eTimerMatch TimerMatch = tmNone;
+        *timer=Timers.GetMatch(event,&TimerMatch);
+        if (!*timer) return false;
+        if (TimerMatch!=tmFull)
+        {
+            *timer=NULL;
+            return false;
+        }
     }
     if (map) *map=t_map;
     return true;
@@ -450,8 +461,8 @@ bool cEPGHandler::SetShortText(cEvent* Event, const char* ShortText)
 
 bool cEPGHandler::SetDescription(cEvent* Event, const char* Description)
 {
-    bool seth;
-    if (!check4proc(Event,seth,NULL)) return false;
+    cTimer *timer;
+    if (!check4proc(Event,&timer,NULL)) return false;
 
     if (import.WasChanged(Event))
     {
@@ -462,17 +473,17 @@ bool cEPGHandler::SetDescription(cEvent* Event, const char* Description)
         if (!strcasestr(Event->Description(),Description))
         {
             // eit description changed -> set it
-            tsyslog("{%5i} %schanging descr of '%s'",Event->EventID(),seth ? "*" : "",
+            tsyslog("{%5i} %schanging descr of '%s'",Event->EventID(),timer ? "*" : "",
                     Event->Title());
             return false;
         }
 #ifdef VDRDEBUG
-        tsyslog("{%5i} %salready seen descr '%s'",Event->EventID(),seth ? "*" : "",
+        tsyslog("{%5i} %salready seen descr '%s'",Event->EventID(),timer ? "*" : "",
                 Event->Title());
 #endif
         return true;
     }
-    tsyslog("{%5i} %ssetting descr of '%s'",Event->EventID(),seth ? "*" : "",
+    tsyslog("{%5i} %ssetting descr of '%s'",Event->EventID(),timer ? "*" : "",
             Event->Title());
     return false;
 }
@@ -480,15 +491,15 @@ bool cEPGHandler::SetDescription(cEvent* Event, const char* Description)
 
 bool cEPGHandler::HandleEvent(cEvent* Event)
 {
-    bool special_epall_timer_handling;
+    cTimer *timer;
     cEPGMapping *map;
-    if (!check4proc(Event,special_epall_timer_handling,&map)) return false;
+    if (!check4proc(Event,&timer,&map)) return false;
 
     int Flags=0;
     const char *ChannelID=strdup(*Event->ChannelID().ToString());
     if (!ChannelID) return false;
 
-    if (special_epall_timer_handling)
+    if (timer)
     {
         Flags=USE_SEASON;
     }
@@ -496,11 +507,6 @@ bool cEPGHandler::HandleEvent(cEvent* Event)
     {
         // map is always set if seth==false
         Flags=map->Flags();
-    }
-
-    if (ioprio_set(1,getpid(),7 | 3 << 13)==-1)
-    {
-        tsyslog("failed to set ioprio to 3,7");
     }
 
     cEPGSource *source=NULL;
@@ -512,15 +518,31 @@ bool cEPGHandler::HandleEvent(cEvent* Event)
             free((void*)ChannelID);
             return false;
         }
+        if (!timer)
+        {
+            free((void*)ChannelID);
+            return false;
+        }
+        if (db && sqlite3_errcode(db)!=SQLITE_OK)
+        {
+            free((void*)ChannelID);
+            return false;
+        }
+
         source=sources->GetSource(EITSOURCE);
         if (!source) tsyslog("no source for %s",EITSOURCE);
         bool useeptext=((epall & EPLIST_USE_STEXTITLE)==EPLIST_USE_STEXTITLE);
         if (useeptext) Flags|=(USE_SHORTTEXT|OPT_SEASON_STEXTITLE);
+
         xevent=import.AddXMLTVEvent(source,db,ChannelID,Event,Event->Description(),useeptext);
         if (!xevent)
         {
             free((void*)ChannelID);
             return false;
+        }
+        else
+        {
+            tsyslog("{%5i} *adding '%s'/'%s' (%s)",Event->EventID(),xevent->Title(),xevent->ShortText(),*timer->ToDescr());
         }
     }
     else
@@ -559,16 +581,16 @@ cEPGTimer::cEPGTimer(cGlobals *Global) :
     sources=Global->EPGSources();
     maps=Global->EPGMappings();
     epall=0;
-}
-
-void cEPGTimer::Action()
-{
-    if (!import.DBExists()) return; // no database? -> exit immediately
     SetPriority(19);
     if (ioprio_set(1,getpid(),7 | 3 << 13)==-1)
     {
         dsyslog("failed to set ioprio to 3,7");
     }
+}
+
+void cEPGTimer::Action()
+{
+    if (!import.DBExists()) return; // no database? -> exit immediately
 
     cSchedulesLock schedulesLock(true,10); // wait 10ms for lock!
     const cSchedules *schedules = cSchedules::Schedules(schedulesLock);
@@ -595,7 +617,7 @@ void cEPGTimer::Action()
                 if ((strlen(event->ShortText())+strlen(event->Description()))==0) continue; // no text -> no episode
             }
         }
-        if (maps->ProcessChannel(event->ChannelID()) && event->ShortText()) continue; // already processed by xmltv2vdr
+        if (maps->ProcessChannel(event->ChannelID())) continue; // already processed by xmltv2vdr
 
         const char *ChannelID=strdup(*event->ChannelID().ToString());
         cXMLTVEvent *xevent=import.SearchXMLTVEvent(&db,ChannelID,event);
@@ -606,6 +628,10 @@ void cEPGTimer::Action()
             {
                 free((void*)ChannelID);
                 continue;
+            }
+            else
+            {
+                tsyslog("{%5i} +adding '%s'/'%s' (%s)",event->EventID(),xevent->Title(),xevent->ShortText(),*Timer->ToDescr());
             }
         }
         else
@@ -948,6 +974,7 @@ bool cPluginXmltv2vdr::Start(void)
     isyslog("using sqlite v%s",sqlite3_libversion());
     GetSqliteCompileOptions();
     if (sqlite3_threadsafe()==0) esyslog("sqlite3 not threadsafe!");
+    sqlite3_enable_shared_cache(0);
     cParse::InitLibXML();
     return true;
 }
