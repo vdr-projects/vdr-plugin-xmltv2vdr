@@ -1780,7 +1780,6 @@ int cImport::Process(cEPGSource *Source, cEPGExecutor &myExecutor)
         {
             break;
         }
-        usleep(300000);
     }
 
     if (Commit(Source,db))

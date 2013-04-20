@@ -427,7 +427,11 @@ bool cEPGHandler::check4proc(cEvent *event, cTimer **timer, cEPGMapping **map)
         if (!epall) return false;
         if (!event->ShortText()) return false;
         if (!timer) return false;
+#if VDRVERSNUM <= 10732
+        int TimerMatch = tmNone;
+#else
         eTimerMatch TimerMatch = tmNone;
+#endif
         *timer=Timers.GetMatch(event,&TimerMatch);
         if (!*timer) return false;
         if (TimerMatch!=tmFull)
