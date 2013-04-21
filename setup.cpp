@@ -1089,7 +1089,7 @@ void cMenuSetupXmltv2vdrChannelMap::output(void)
     Add(new cMyMenuEditBitItem(tr("country and date"),&flags,USE_COUNTRYDATE),true);
     Add(new cMyMenuEditBitItem(tr("original title"),&flags,USE_ORIGTITLE),true);
     Add(new cMyMenuEditBitItem(tr("category"),&flags,USE_CATEGORIES),true);
-#if VDRVERSNUM >= 10712 || EPGHANDLER    
+#if VDRVERSNUM >= 10712 || EPGHANDLER
     Add(new cMyMenuEditBitItem(tr("dvb content id"),&flags,USE_CONTENT),true);
 #endif
     Add(new cMyMenuEditBitItem(tr("credits"),&flags,USE_CREDITS),true);
@@ -1176,13 +1176,13 @@ eOSState cMenuSetupXmltv2vdrChannelMap::ProcessKey(eKeys Key)
             break;
         case kDown:
         case kDown|k_Repeat:
-            if (Current()>=cm)
-                SetHelp(tr("Button$Unmap"),tr("Button$Map"));
-            break;
         case kUp:
         case kUp|k_Repeat:
+            if (Current()>=cm)
+                SetHelp(tr("Button$Unmap"),tr("Button$Map"));
             if (Current()<cm)
                 SetHelp(NULL,NULL,tr("Button$Reset"),tr("Button$Copy"));
+            break;
         default:
             break;
         }
