@@ -167,6 +167,8 @@ class cGlobals
 private:
     char *confdir;
     char *epgfile;
+    char *epgfile_store;
+    char *epgfiledir;
     char *epdir;
     char *epcodeset;
     char *imgdir;
@@ -225,14 +227,16 @@ public:
     {
         return confdir;
     }
-    void SetEPGFile(const char *EPGFile)
-    {
-        free(epgfile);
-        epgfile=strdup(EPGFile);
-    }
+    void CopyEPGFile(bool Init);
+    bool CheckEPGDir(const char *EPGFileDir);
+    void SetEPGFile(const char *EPGFile);
     const char *EPGFile()
     {
         return epgfile;
+    }
+    const char *EPGFileStore()
+    {
+        return epgfile_store;
     }
     void SetEPDir(const char *EPDir);
     const char *EPDir()

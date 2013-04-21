@@ -17,6 +17,8 @@
 #include <sys/types.h>
 #include <pwd.h>
 #include <netdb.h>
+#include <libgen.h>
+#include <sys/vfs.h>
 
 #include "setup.h"
 #include "xmltv2vdr.h"
@@ -255,6 +257,8 @@ bool cEPGSearch_Client::DisableSearchTimer()
 cGlobals::cGlobals()
 {
     confdir=NULL;
+    epgfile_store=NULL;
+    epgfiledir=NULL;
     epgfile=NULL;
     epdir=NULL;
     epcodeset=NULL;
@@ -270,7 +274,30 @@ cGlobals::cGlobals()
     imgdelafter=30;
     soundex=false;
 
-    if (asprintf(&epgfile,"%s/epg.db",VideoDirectory)==-1) {};
+    if (asprintf(&epgfile_store,"%s/epg.db",VideoDirectory)==-1) {};
+
+    if (!CheckEPGDir("/var/run/vdr"))
+    {
+        if (!CheckEPGDir("/tmp"))
+        {
+            epgfiledir=NULL;
+            epgfile=strdup(epgfile_store);
+        }
+        else
+        {
+            epgfiledir=strdup("/tmp");
+        }
+    }
+    else
+    {
+        epgfiledir=strdup("/var/run/vdr");
+    }
+
+    if (epgfiledir)
+    {
+        if (asprintf(&epgfile,"%s/epg.db",epgfiledir)==-1) {};
+    }
+
     if (asprintf(&imgdir,"%s","/var/cache/vdr/epgimages")==-1) {};
     if (access(imgdir,R_OK|W_OK)==-1)
     {
@@ -319,6 +346,8 @@ cGlobals::~cGlobals()
 {
     free(confdir);
     free(epgfile);
+    free(epgfile_store);
+    free(epgfiledir);
     free(epdir);
     free(imgdir);
     free(codeset);
@@ -338,6 +367,147 @@ cGlobals::~cGlobals()
     epgmappings.Remove();
     textmappings.Remove();
 }
+
+bool cGlobals::CheckEPGDir(const char* EPGFileDir)
+{
+    struct statfs statfsbuf;
+    if (statfs(EPGFileDir,&statfsbuf)==-1) return false;
+    if ((statfsbuf.f_type!=0x01021994) && (statfsbuf.f_type!=0x28cd3d45)) return false;
+    if (access(EPGFileDir,R_OK|W_OK)==-1) return false;
+    return true;
+}
+
+void cGlobals::SetEPGFile(const char *EPGFile)
+{
+    free(epgfile_store);
+    free(epgfile);
+    epgfile_store=strdup(EPGFile);
+    if (!epgfile_store)
+    {
+        epgfile=NULL;
+        return;
+    }
+
+    char *tm2=strdup(epgfile_store);
+    if (!tm2)
+    {
+        free(epgfile_store);
+        epgfile_store=NULL;
+        epgfile=NULL;
+        return;
+    }
+    char *dn=dirname(tm2);
+    bool usestore=CheckEPGDir(dn);
+    free(tm2);
+
+    if ((usestore) || (!epgfiledir))
+    {
+        epgfile=strdup(epgfile_store);
+    }
+    else
+    {
+        char *tmp=strdup(epgfile_store);
+        if (!tmp)
+        {
+            free(epgfile_store);
+            epgfile_store=NULL;
+            epgfile=NULL;
+            return;
+        }
+        char *bn=basename(tmp);
+        if (asprintf(&epgfile,"%s/%s",epgfiledir,bn)==-1)
+        {
+            free(epgfile_store);
+            free(tmp);
+            epgfile_store=NULL;
+            epgfile=NULL;
+            return;
+        }
+        free(tmp);
+    }
+}
+
+
+void cGlobals::CopyEPGFile(bool Init)
+{
+    if ((!epgfile) || (!epgfile_store)) return;
+    if (!strcmp(epgfile,epgfile_store)) return; // same dir
+
+    struct stat statbuf;
+    char *tmpdstfile=NULL;
+    int fd=-1;
+
+    if (Init)
+    {
+        if (stat(epgfile_store,&statbuf)==-1) return; // no file?
+        fd=open(epgfile_store,O_RDONLY);
+    }
+    else
+    {
+        if (stat(epgfile,&statbuf)==-1) return;
+        fd=open(epgfile,O_RDONLY);
+    }
+
+    if (fd==-1) return; // no file??
+    char *buf=(char *) malloc(statbuf.st_size+1);
+    if (!buf)
+    {
+        close(fd);
+        return;
+    }
+    if (read(fd,buf,statbuf.st_size)!=statbuf.st_size)
+    {
+        free(buf);
+        close(fd);
+        return;
+    }
+    close(fd);
+    if (Init)
+    {
+        fd=creat(epgfile,0644);
+    }
+    else
+    {
+        if (asprintf(&tmpdstfile,"%s_",epgfile_store)==-1)
+        {
+            free(buf);
+            return;
+        }
+        fd=creat(tmpdstfile,0644);
+    }
+    if (fd==-1)
+    {
+        if (!Init) free(tmpdstfile);
+        free(buf);
+        return;
+    }
+    if (write(fd,buf,statbuf.st_size)!=statbuf.st_size)
+    {
+        close(fd);
+        if (Init)
+        {
+            unlink(epgfile);
+        }
+        else
+        {
+            unlink(tmpdstfile);
+            free(tmpdstfile);
+        }
+        free(buf);
+        return;
+    }
+    close(fd);
+    free(buf);
+    if (!Init)
+    {
+        if (rename(tmpdstfile,epgfile_store)!=-1)
+        {
+            unlink(epgfile);
+        }
+        free(tmpdstfile);
+    }
+}
+
 
 char *cGlobals::GetDefaultOrder()
 {
@@ -960,7 +1130,9 @@ bool cPluginXmltv2vdr::Start(void)
     g.SetConfDir(ConfigDirectory(PLUGIN_NAME_I18N));
 
     isyslog("using codeset '%s'",g.Codeset());
-    isyslog("using file '%s' for epg database",g.EPGFile());
+    isyslog("using file '%s' for epg database (storage)",g.EPGFileStore());
+    isyslog("using file '%s' for epg database (runtime)",g.EPGFile());
+    g.CopyEPGFile(true);
     if (g.EPDir())
     {
         isyslog("using dir '%s' (%s) for episodes",g.EPDir(),g.EPCodeset());
@@ -994,6 +1166,7 @@ void cPluginXmltv2vdr::Stop(void)
         free(logfile);
         logfile=NULL;
     }
+    g.CopyEPGFile(false);
 }
 
 void cPluginXmltv2vdr::Housekeeping(void)
