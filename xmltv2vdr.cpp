@@ -280,8 +280,15 @@ cGlobals::cGlobals()
     {
         if (!CheckEPGDir("/tmp"))
         {
-            epgfiledir=NULL;
-            epgfile=strdup(epgfile_store);
+            if (!CheckEPGDir("/dev/shm"))
+            {
+                epgfiledir=NULL;
+                epgfile=strdup(epgfile_store);
+            }
+            else
+            {
+                epgfiledir=strdup("/dev/shm");
+            }
         }
         else
         {
@@ -312,9 +319,12 @@ cGlobals::cGlobals()
         char *LangEnv=getenv("LANG");
         if (LangEnv)
         {
-            codeset=strdup(strchr(LangEnv,'.'));
-            if (codeset)
-                codeset++; // skip dot
+            char *codeset_p=strchr(LangEnv,'.');
+            if (codeset_p)
+            {
+                codeset_p++; // skip dot
+                codeset=strdup(codeset_p);
+            }
         }
     }
     if (!codeset)
