@@ -320,11 +320,10 @@ cGlobals::cGlobals()
         if (LangEnv)
         {
             char *codeset_p=strchr(LangEnv,'.');
-            if (codeset_p)
-            {
+            if (codeset_p) {
                 codeset_p++; // skip dot
                 codeset=strdup(codeset_p);
-            }
+	    }
         }
     }
     if (!codeset)
