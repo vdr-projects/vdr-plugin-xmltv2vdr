@@ -594,20 +594,22 @@ char *cImport::Add2Description(char *description, cXMLTVEvent *xEvent, int Flags
             cTEXTMapping *text=g->TEXTMappings()->GetMap("audio");
             if (text)
             {
-                description=Add2Description(description,text->Value());
-                description=Add2Description(description,": ");
 
                 if ((!strcasecmp(xEvent->Audio(),"mono")) || (!strcasecmp(xEvent->Audio(),"stereo")))
                 {
+                    description=Add2Description(description,text->Value());
+                    description=Add2Description(description,": ");
                     description=Add2Description(description,xEvent->Audio());
                     description=Add2Description(description,"\n");
                 }
                 else
                 {
-                    cTEXTMapping *text=g->TEXTMappings()->GetMap(xEvent->Audio());
-                    if (text)
+                    cTEXTMapping *atext=g->TEXTMappings()->GetMap(xEvent->Audio());
+                    if (atext)
                     {
                         description=Add2Description(description,text->Value());
+                        description=Add2Description(description,": ");
+                        description=Add2Description(description,atext->Value());
                         description=Add2Description(description,"\n");
                     }
                 }
