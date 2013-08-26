@@ -18,7 +18,7 @@
 		</xsl:variable>
 
 		<xsl:variable name="PICS">
-			<xsl:for-each select="*/Bild [@Kategorie='ImportBild']">
+			<xsl:for-each select="Bild [@Kategorie='ImportBild']|*/Bild [@Kategorie='ImportBild']">
   			   <xsl:element name="icon">
 			      <xsl:attribute name="src">file:///var/lib/epgsources/tvm2xmltv-img/<xsl:value-of select="BildDatei/BildURL"/></xsl:attribute>
                            </xsl:element>
