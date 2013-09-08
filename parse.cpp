@@ -294,6 +294,8 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
     char *line=NULL;
     size_t length;
     found=false;
+    if (EPShortText) *EPShortText=NULL;
+    size_t charlen=0;
     while (getline(&line,&length,f)!=-1)
     {
         if (line[0]=='#') continue;
@@ -303,6 +305,8 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
             char depshorttext[1024]="";
             char *lf=strchr(epshorttext,'\n');
             if (lf) *lf=0;
+            char *tab=strchr(epshorttext,'\t');
+            if (tab) *tab=0;
             slen=strlen(epshorttext);
             dlen=sizeof(depshorttext);
             FromPtr=(char *) epshorttext;
@@ -314,11 +318,32 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
                 {
                     strcpy(depshorttext,epshorttext); // ok lets try with the original text
                 }
-                if (!strncasecmp(dshorttext,depshorttext,strlen(depshorttext)))
+                if (!strcasecmp(dshorttext,depshorttext))
                 {
+                    // exact match
+                    if (EPShortText)
+                    {
+                        if (*EPShortText) free(*EPShortText);
+                        *EPShortText=strdup(epshorttext);
+                    }
                     found=true;
-                    if (EPShortText) *EPShortText=strdup(epshorttext);
                     break;
+                }
+
+                dlen=strlen(depshorttext);
+                if (!strncasecmp(dshorttext,depshorttext,dlen))
+                {
+                    // not exact match -> maybe better match available?
+                    if (dlen>charlen)
+                    {
+                        if (EPShortText)
+                        {
+                            if (*EPShortText) free(*EPShortText);
+                            *EPShortText=strdup(epshorttext);
+                        }
+                        charlen=dlen;
+                        found=true;
+                    }
                 }
             }
             else
