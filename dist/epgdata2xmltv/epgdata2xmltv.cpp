@@ -75,7 +75,7 @@ void cepgdata2xmltv::LoadXSLT()
     xmlSetExternalEntityLoader(xmlMyExternalEntityLoader);
     exsltRegisterAll();
 
-    if ((sxmlDoc = xmlReadMemory (xsl, sizeof(xsl), NULL,NULL,0)) != NULL)
+    if ((sxmlDoc = xmlReadMemory (xsl, sizeof(xsl), NULL,NULL,XML_PARSE_HUGE)) != NULL)
     {
         pxsltStylesheet=xsltParseStylesheetDoc(sxmlDoc);
         if (!pxsltStylesheet)
