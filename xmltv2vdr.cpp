@@ -320,10 +320,11 @@ cGlobals::cGlobals()
         if (LangEnv)
         {
             char *codeset_p=strchr(LangEnv,'.');
-            if (codeset_p) {
+            if (codeset_p)
+            {
                 codeset_p++; // skip dot
                 codeset=strdup(codeset_p);
-	    }
+            }
         }
     }
     if (!codeset)
@@ -738,6 +739,39 @@ bool cEPGHandler::HandleEvent(cEvent* Event)
         tsyslog("no source for %s",xevent->Source());
         delete xevent;
         return false;
+    }
+
+    if (xevent->Title() && Event->Title())
+    {
+        bool tChanged=false;
+        if (strcasecmp(xevent->Title(),Event->Title()))
+        {
+            // Title maybe changed, check AltTitle if exists
+            if (xevent->AltTitle())
+            {
+                if (strcasecmp(xevent->AltTitle(),Event->Title()))
+                {
+                    tChanged=true;
+                }
+            }
+            else
+            {
+                tChanged=true;
+            }
+
+            if (tChanged)
+            {
+                tsyslog("{%5i} title changed from '%s'->'%s'",Event->EventID(),
+                        xevent->Title(),Event->Title());
+                xevent->SetEITEventID(0);
+                tEventID oldID=Event->EventID();
+                Event->SetEventID(0);
+                import.UpdateXMLTVEvent(source,db,Event,xevent,NULL);
+                Event->SetEventID(oldID);
+                delete xevent;
+                return false;
+            }
+        }
     }
 
     import.PutEvent(source,db,NULL,Event,xevent,Flags);

@@ -109,6 +109,12 @@ void cParse::RemoveNonAlphaNumeric(char *String)
         memmove(p,p+6,len-6);
     }
 
+    len=strlen(String);
+    p=String;
+    // cut off " Folge XX"
+    p=strstr(String," Folge ");
+    if (p) *p=0;
+
     // remove non alphanumeric characters
     len=strlen(String);
     p=String;

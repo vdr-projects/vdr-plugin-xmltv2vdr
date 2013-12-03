@@ -92,6 +92,10 @@ cEvent *cImport::SearchVDREventByTitle(cEPGSource *source, cSchedule* schedule, 
         {
             return f;
         }
+        else
+        {
+            f=NULL;
+        }
     }
     // 3rd with StartTime +/- TimeDiff
     int maxdiff=INT_MAX;
@@ -897,6 +901,7 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
             const char *dp=conv->Convert(xEvent->Title());
             if (!Event->Title() || strcmp(Event->Title(),dp))
             {
+                tsyslogs(Source,"{%5i} changing title from '%s' to '%s'",Event->EventID(),Event->Title(),dp);
                 Event->SetTitle(dp);
                 changed|=CHANGED_TITLE; // title really changed
             }
@@ -910,6 +915,7 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
             const char *dp=conv->Convert(xEvent->AltTitle());
             if (!Event->Title() || strcmp(Event->Title(),dp))
             {
+                tsyslogs(Source,"{%5i} changing title from '%s' to '%s'",Event->EventID(),Event->Title(),dp);
                 Event->SetTitle(dp);
                 changed|=CHANGED_TITLE; // title really changed
             }
@@ -922,7 +928,7 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
         {
             if (!strcasecmp(xEvent->ShortText(),Event->Title()))
             {
-                tsyslogs(Source,"title and subtitle equal, clearing subtitle");
+                tsyslogs(Source,"{%5i} title and subtitle equal, clearing subtitle",Event->EventID());
                 Event->SetShortText(NULL);
             }
             else
@@ -1093,7 +1099,7 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
             int len=strlen(buf);
             if (len>0) buf[len-1]=0;
 
-            tsyslogs(Source,"{%5i} changing %s of '%s'/'%s'@%s-%s",Event->EventID(),
+            tsyslogs(Source,"{%5i} changed %s of '%s'/'%s'@%s-%s",Event->EventID(),
                      buf,Event->Title(),Event->ShortText() ? Event->ShortText() : "",
                      from,till);
         }
@@ -1373,7 +1379,7 @@ bool cImport::UpdateXMLTVEvent(cEPGSource *Source, sqlite3 *Db, const cEvent *Ev
     if (!xEvent) return false;
 
     // prevent unnecessary updates
-    if (!Description && (xEvent->EITEventID()==Event->EventID())) return false;
+    if (!Description && Event->EventID() && (xEvent->EITEventID()==Event->EventID())) return false;
 
     if (Description)
     {
@@ -1442,8 +1448,11 @@ bool cImport::UpdateXMLTVEvent(cEPGSource *Source, sqlite3 *Db, const cEvent *Ev
             strcat(buf,"eiteventid");
         }
 
-        tsyslogs(Source,"{%5i} updating %s of '%s' in db",Event->EventID(),buf,
-                 Event->Title());
+        if (Event->EventID())
+        {
+            tsyslogs(Source,"{%5i} updating %s of '%s' in db",Event->EventID(),buf,
+                     Event->Title());
+        }
     }
 
     char *errmsg;
