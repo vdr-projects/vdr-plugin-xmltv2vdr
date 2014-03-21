@@ -834,7 +834,10 @@ void cEPGTimer::Action()
                 if ((strlen(event->ShortText())+strlen(event->Description()))==0) continue; // no text -> no episode
             }
         }
-        if (maps->ProcessChannel(event->ChannelID())) continue; // already processed by xmltv2vdr
+        if (maps->ProcessChannel(event->ChannelID()))
+        {
+            if (event->ShortText()) continue; // already processed by xmltv2vdr
+        }
 
         const char *ChannelID=strdup(*event->ChannelID().ToString());
         cXMLTVEvent *xevent=import.SearchXMLTVEvent(&db,ChannelID,event);
@@ -855,7 +858,10 @@ void cEPGTimer::Action()
         {
             if (!event->ShortText() && event->Description())
             {
-                import.AddShortTextFromEITDescription(xevent,event->Description());
+                if (import.AddShortTextFromEITDescription(xevent,event->Description()))
+                {
+                    import.UpdateXMLTVEvent(source,db,xevent);
+                }
             }
         }
         free((void*)ChannelID);
@@ -1011,7 +1017,8 @@ cPluginXmltv2vdr::cPluginXmltv2vdr(void) : housekeeping(&g),epgexecutor(g.EPGSou
     // VDR OBJECTS TO EXIST OR PRODUCE ANY OUTPUT!
     logfile=NULL;
     last_maintime_t=0;
-    last_timer_t=last_epcheck_t=last_housetime_t=time(NULL); // start this threads later!
+    last_epcheck_t=last_housetime_t=time(NULL); // start this threads later!
+    last_timer_t=last_epcheck_t-(time_t) 540; // check timers in 60 seconds
     g.SetEPAll(0);
     g.TEXTMappings()->Add(new cTEXTMapping("country",tr("country")));
     g.TEXTMappings()->Add(new cTEXTMapping("year",tr("year")));

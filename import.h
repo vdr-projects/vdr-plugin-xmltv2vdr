@@ -69,12 +69,13 @@ public:
     bool DBExists();
     bool PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule, cEvent *Event,
                   cXMLTVEvent *xEvent, int Flags);
+    bool UpdateXMLTVEvent(cEPGSource *Source, sqlite3 *Db, cXMLTVEvent *xEvent);
     bool UpdateXMLTVEvent(cEPGSource *Source, sqlite3 *Db, const cEvent *Event, cXMLTVEvent *xEvent,
                           const char *Description);
     cXMLTVEvent *SearchXMLTVEvent(sqlite3 **Db, const char *ChannelID, const cEvent *Event);
     cXMLTVEvent *AddXMLTVEvent(cEPGSource *Source, sqlite3 *Db, const char *ChannelID,
                                const cEvent *Event, const char *EITDescription, bool UseEPText);
-    void AddShortTextFromEITDescription(cXMLTVEvent *xEvent, const char *EITDescription);
+    bool AddShortTextFromEITDescription(cXMLTVEvent *xEvent, const char *EITDescription);
     bool WasChanged(cEvent *Event);
 };
 

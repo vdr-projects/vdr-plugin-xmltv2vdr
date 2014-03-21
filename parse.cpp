@@ -97,7 +97,7 @@ time_t cParse::ConvertXMLTVTime2UnixTime(char *xmltvtime)
     return ret;
 }
 
-void cParse::RemoveNonAlphaNumeric(char *String)
+void cParse::RemoveNonAlphaNumeric(char *String, bool InDescription)
 {
     if (!String) return;
 
@@ -114,6 +114,27 @@ void cParse::RemoveNonAlphaNumeric(char *String)
     // cut off " Folge XX"
     p=strstr(String," Folge ");
     if (p) *p=0;
+
+    if (InDescription)
+    {
+        // remove leading numbers (inkl. roman numerals)
+        len=strlen(String);
+        p=String;
+        while (*p)
+        {
+            // 0x30 - 0x39
+            if (((*p>=0x30) && (*p<=0x39)) || (*p=='I') || (*p=='V') || (*p=='X') || (*p=='/'))
+            {
+                memmove(p,p+1,len);
+                len--;
+                continue;
+            }
+            else
+            {
+                break;
+            }
+        }
+    }
 
     // remove non alphanumeric characters
     len=strlen(String);
@@ -139,24 +160,6 @@ void cParse::RemoveNonAlphaNumeric(char *String)
         }
         p++;
         pos++;
-    }
-
-    // remove leading numbers (inkl. roman numerals)
-    len=strlen(String);
-    p=String;
-    while (*p)
-    {
-        // 0x30 - 0x39
-        if (((*p>=0x30) && (*p<=0x39)) || *p=='I' || *p=='V')
-        {
-            memmove(p,p+1,len);
-            len--;
-            continue;
-        }
-        else
-        {
-            break;
-        }
     }
 
     return;
@@ -254,10 +257,26 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
         free(epfile);
         return false;
     }
+    int f_season=0,f_episode=0;
     size_t slen;
     if (ShortText)
     {
         slen=strlen(ShortText);
+        if ((slen==6) && (ShortText[0]=='S') && (isdigit(ShortText[1])!=0) &&
+                (isdigit(ShortText[2])!=0) && (ShortText[3]=='E') && (isdigit(ShortText[4])!=0) &&
+                (isdigit(ShortText[5])!=0))
+        {
+            // special SxxExx-Format
+            char buf[5];
+            buf[0]=ShortText[1];
+            buf[1]=ShortText[2];
+            buf[2]=0;
+            f_season=atoi(buf);
+            buf[0]=ShortText[4];
+            buf[1]=ShortText[5];
+            buf[2]=0;
+            f_episode=atoi(buf);
+        }
     }
     else
     {
@@ -291,10 +310,14 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
         return false;
     }
 
-    RemoveNonAlphaNumeric(dshorttext);
+    RemoveNonAlphaNumeric(dshorttext,!ShortText);
     if (!strlen(dshorttext))
     {
         strn0cpy(dshorttext,ShortText ? ShortText : Description,slen); // ok lets try with the original text
+    }
+    if (!ShortText)
+    {
+        tsyslog("trying to find shorttext for '%s', with '%s'",Title,dshorttext);
     }
 
     char *line=NULL;
@@ -351,6 +374,18 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
                         found=true;
                     }
                 }
+
+                if ((f_season==Season) && (f_episode==Episode))
+                {
+                    if (EPShortText)
+                    {
+                        if (*EPShortText) free(*EPShortText);
+                        *EPShortText=strdup(epshorttext);
+                    }
+                    found=true;
+                    break;
+                }
+
             }
             else
             {
@@ -366,6 +401,10 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
     if ((!found) && (ShortText))
     {
         isyslog("failed to find '%s' for '%s' in eplists",ShortText,Title);
+    }
+    if ((found) && (!ShortText))
+    {
+        tsyslog("found shorttext '%s' from description of '%s'",*EPShortText,Title);
     }
     if (line) free(line);
     fclose(f);

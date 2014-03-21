@@ -1246,15 +1246,15 @@ cXMLTVEvent *cImport::PrepareAndReturn(sqlite3 **db, char *sql)
     return xevent;
 }
 
-void cImport::AddShortTextFromEITDescription(cXMLTVEvent *xEvent, const char *EITDescription)
+bool cImport::AddShortTextFromEITDescription(cXMLTVEvent *xEvent, const char *EITDescription)
 {
-    if (!g->EPDir()) return;
+    if (!g->EPDir()) return false;
     int season,episode,episodeoverall;
     char *epshorttext=NULL;
     if (!cParse::FetchSeasonEpisode(cep2ascii,cutf2ascii,g->EPDir(),xEvent->Title(),
                                     NULL,EITDescription,
                                     season,episode,episodeoverall,&epshorttext,
-                                    NULL)) return;
+                                    NULL)) return false;
 
     if (epshorttext)
     {
@@ -1264,6 +1264,7 @@ void cImport::AddShortTextFromEITDescription(cXMLTVEvent *xEvent, const char *EI
     xEvent->SetSeason(season);
     xEvent->SetEpisode(episode);
     xEvent->SetEpisodeOverall(episodeoverall);
+    return true;
 }
 
 cXMLTVEvent *cImport::AddXMLTVEvent(cEPGSource *Source,sqlite3 *Db, const char *ChannelID, const cEvent *Event,
@@ -1368,6 +1369,101 @@ cXMLTVEvent *cImport::AddXMLTVEvent(cEPGSource *Source,sqlite3 *Db, const char *
         */
     }
     return xevent;
+}
+
+bool cImport::UpdateXMLTVEvent(cEPGSource *Source, sqlite3 *Db, cXMLTVEvent *xEvent)
+{
+    if (!Source) return false;
+    if (!Db) return false;
+    if (!xEvent) return false;
+
+    if (!Begin(Source,Db)) return false;
+
+    char *sql=NULL;
+
+    if (xEvent->ShortText())
+    {
+        char *shortdesc=strdup(xEvent->ShortText());
+        if (!shortdesc)
+        {
+            esyslogs(Source,"out of memory");
+            return false;
+        }
+
+        string ed=shortdesc;
+
+        int reps;
+        reps=pcrecpp::RE("'").GlobalReplace("''",&ed);
+        if (reps)
+        {
+            shortdesc=(char *) realloc(shortdesc,ed.size()+1);
+            strcpy(shortdesc,ed.c_str());
+        }
+
+        if (asprintf(&sql,"update epg set season=%li, episode=%li, episodeoverall=%li, shorttext='%s' "
+                     " where eventid=%li and src='%s' and channelid='%s'", (long int) xEvent->Season(),
+                     (long int) xEvent->Episode(), (long int) xEvent->EpisodeOverall()   ,shortdesc,
+                     (long int) xEvent->EventID(),Source->Name(),xEvent->ChannelID())==-1)
+        {
+            free(shortdesc);
+            esyslogs(Source,"out of memory");
+            return false;
+        }
+        free(shortdesc);
+    }
+    else
+    {
+        if (asprintf(&sql,"update epg set season=%li, episode=%li, episodeoverall=%li "
+                     " where eventid=%li and src='%s' and channelid='%s'", (long int) xEvent->Season(),
+                     (long int) xEvent->Episode(), (long int) xEvent->EpisodeOverall(),
+                     (long int) xEvent->EventID(),Source->Name(),xEvent->ChannelID())==-1)
+        {
+            esyslogs(Source,"out of memory");
+            return false;
+        }
+    }
+
+    if (Source->Trace())
+    {
+        char buf[80]="";
+        if (xEvent->ShortText())
+        {
+            strcat(buf,"shorttext");
+            if (xEvent->Season() || xEvent->Episode() || xEvent->EpisodeOverall()) strcat(buf,"/");
+        }
+        if (xEvent->Season())
+        {
+            strcat(buf,"season");
+            if (xEvent->Episode() || xEvent->EpisodeOverall()) strcat(buf,"/");
+        }
+        if (xEvent->Episode())
+        {
+            strcat(buf,"episode");
+            if (xEvent->EpisodeOverall()) strcat(buf,"/");
+        }
+        if (xEvent->EpisodeOverall())
+        {
+            strcat(buf,"episodeoverall");
+        }
+
+        if (xEvent->EITEventID())
+        {
+            tsyslogs(Source,"{%5i} updating %s of '%s' in db",xEvent->EITEventID(),buf,
+                     xEvent->Title());
+        }
+    }
+
+    char *errmsg;
+    if (sqlite3_exec(Db,sql,NULL,NULL,&errmsg)!=SQLITE_OK)
+    {
+        esyslogs(Source,"%s -> %s",sql,errmsg);
+        free(sql);
+        sqlite3_free(errmsg);
+        return false;
+    }
+
+    free(sql);
+    return true;
 }
 
 bool cImport::UpdateXMLTVEvent(cEPGSource *Source, sqlite3 *Db, const cEvent *Event, cXMLTVEvent *xEvent,

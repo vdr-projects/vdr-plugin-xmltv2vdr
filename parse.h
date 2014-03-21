@@ -45,7 +45,7 @@ public:
     cParse(cEPGSource *Source, cGlobals *Global);
     ~cParse();
     int Process(cEPGExecutor &myExecutor, char *buffer, int bufsize);
-    static void RemoveNonAlphaNumeric(char *String);
+    static void RemoveNonAlphaNumeric(char *String, bool InDescription=false);
     static bool FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const char *EPDir,
                                    const char *Title, const char *ShortText, const char *Description,
                                    int &Season, int &Episode, int &EpisodeOverall, char **EPShortText,
