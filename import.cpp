@@ -933,11 +933,22 @@ bool cImport::PutEvent(cEPGSource *Source, sqlite3 *Db, cSchedule* Schedule,
             }
             else
             {
-                const char *dp=conv->Convert(xEvent->ShortText());
-                if (!Event->ShortText() || strcmp(Event->ShortText(),dp))
+                if (!strcmp(xEvent->ShortText(),"@"))
                 {
-                    Event->SetShortText(dp);
-                    changed|=CHANGED_SHORTTEXT; // shorttext really changed
+                    if (!Event->ShortText() || strcmp(Event->ShortText(),""))
+                    {
+                        Event->SetShortText("");
+                        changed|=CHANGED_SHORTTEXT; // shorttext really changed
+                    }
+                }
+                else
+                {
+                    const char *dp=conv->Convert(xEvent->ShortText());
+                    if (!Event->ShortText() || strcmp(Event->ShortText(),dp))
+                    {
+                        Event->SetShortText(dp);
+                        changed|=CHANGED_SHORTTEXT; // shorttext really changed
+                    }
                 }
             }
         }
@@ -1258,14 +1269,7 @@ bool cImport::AddShortTextFromEITDescription(cXMLTVEvent *xEvent, const char *EI
 
     if (epshorttext)
     {
-        if (strlen(epshorttext)>1)
-        {
-            xEvent->SetShortText(epshorttext);
-        }
-        else
-        {
-            xEvent->SetShortText("");
-        }
+        xEvent->SetShortText(epshorttext);
         free(epshorttext);
     }
     xEvent->SetSeason(season);
@@ -1318,17 +1322,7 @@ cXMLTVEvent *cImport::AddXMLTVEvent(cEPGSource *Source,sqlite3 *Db, const char *
     if (UseEPText)
     {
         if (eptitle) xevent->SetAltTitle(eptitle);
-        if (epshorttext)
-        {
-            if (strlen(epshorttext)>1)
-            {
-                xevent->SetShortText(epshorttext);
-            }
-            else
-            {
-                xevent->SetShortText("");
-            }
-        }
+        if (epshorttext) xevent->SetShortText(epshorttext);
     }
     else
     {

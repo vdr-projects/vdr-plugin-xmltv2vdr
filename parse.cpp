@@ -209,7 +209,52 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
         }
     }
     closedir(dir);
-    if (!found) return false;
+
+    int f_season=0,f_episode=0;
+    size_t slen;
+    if (ShortText)
+    {
+        slen=strlen(ShortText);
+        if ((slen<=7) && (ShortText[0]=='S') && (isdigit(ShortText[1])!=0) &&
+                (isdigit(ShortText[2])!=0) && (ShortText[3]=='E') && (isdigit(ShortText[4])!=0) &&
+                (isdigit(ShortText[5])!=0))
+        {
+            // special SxxExx-Format
+            char buf[5];
+            buf[0]=ShortText[1];
+            buf[1]=ShortText[2];
+            buf[2]=0;
+            f_season=atoi(buf);
+            buf[0]=ShortText[4];
+            buf[1]=ShortText[5];
+            if (slen==7)
+            {
+                buf[2]=ShortText[6];
+                buf[3]=0;
+            }
+            else
+            {
+                buf[2]=0;
+            }
+            f_episode=atoi(buf);
+        }
+    }
+
+    if (!found)
+    {
+        if ((f_season>0) && (f_episode>0))
+        {
+            if (EPShortText)
+            {
+                if (*EPShortText) free(*EPShortText);
+                *EPShortText=strdup("@");
+            }
+            Season=f_season;
+            Episode=f_episode;
+            return true;
+        }
+        return false;
+    }
 
     char *epfile=NULL;
     if (asprintf(&epfile,"%s/%s.episodes",EPDir,dirent->d_name)==-1) return false;
@@ -255,28 +300,7 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
         free(epfile);
         return false;
     }
-    int f_season=0,f_episode=0;
-    size_t slen;
-    if (ShortText)
-    {
-        slen=strlen(ShortText);
-        if ((slen==6) && (ShortText[0]=='S') && (isdigit(ShortText[1])!=0) &&
-                (isdigit(ShortText[2])!=0) && (ShortText[3]=='E') && (isdigit(ShortText[4])!=0) &&
-                (isdigit(ShortText[5])!=0))
-        {
-            // special SxxExx-Format
-            char buf[5];
-            buf[0]=ShortText[1];
-            buf[1]=ShortText[2];
-            buf[2]=0;
-            f_season=atoi(buf);
-            buf[0]=ShortText[4];
-            buf[1]=ShortText[5];
-            buf[2]=0;
-            f_episode=atoi(buf);
-        }
-    }
-    else
+    if (!ShortText)
     {
         slen=strlen(Description);
         if (slen>40) slen=40;
@@ -382,8 +406,9 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
                         if (EPShortText)
                         {
                             if (*EPShortText) free(*EPShortText);
-                            *EPShortText=strdup(" ");
+                            *EPShortText=strdup("@");
                         }
+                        isyslog("failed to find '%s' for '%s' in eplists",ShortText,Title);
                     }
                     else
                     {
@@ -396,7 +421,6 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
                     found=true;
                     break;
                 }
-
             }
             else
             {
@@ -412,6 +436,15 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
     if ((!found) && (ShortText))
     {
         isyslog("failed to find '%s' for '%s' in eplists",ShortText,Title);
+        if ((f_season>0) && (f_episode>0))
+        {
+            if (EPShortText)
+            {
+                if (*EPShortText) free(*EPShortText);
+                *EPShortText=strdup("@");
+            }
+            found=true;
+        }
     }
     if ((found) && (!ShortText))
     {
@@ -806,17 +839,7 @@ bool cParse::FetchEvent(xmlNodePtr enode, bool useeptext)
         xevent.SetEpisodeOverall(episodeoverall);
         if (epshorttext)
         {
-            if (useeptext)
-            {
-                if (strlen(epshorttext)>1)
-                {
-                    xevent.SetShortText(epshorttext);
-                }
-                else
-                {
-                    xevent.SetShortText("");
-                }
-            }
+            if (useeptext) xevent.SetShortText(epshorttext);
             free(epshorttext);
         }
     }
