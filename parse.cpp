@@ -170,8 +170,6 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
                                 int &Season, int &Episode, int &EpisodeOverall, char **EPShortText,
                                 char **EPTitle)
 {
-    Season=0;
-    Episode=0;
     EpisodeOverall=0;
 
     // Title and ShortText are always UTF8 !
@@ -282,6 +280,8 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
     {
         slen=strlen(Description);
         if (slen>40) slen=40;
+        if (Season>0) f_season=Season;
+        if (Episode>0) f_episode=Episode;
     }
     if (!slen)
     {
@@ -377,10 +377,21 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
 
                 if ((f_season==Season) && (f_episode==Episode))
                 {
-                    if (EPShortText)
+                    if (!strcasecmp(epshorttext,"n.n."))
                     {
-                        if (*EPShortText) free(*EPShortText);
-                        *EPShortText=strdup(epshorttext);
+                        if (EPShortText)
+                        {
+                            if (*EPShortText) free(*EPShortText);
+                            *EPShortText=strdup(" ");
+                        }
+                    }
+                    else
+                    {
+                        if (EPShortText)
+                        {
+                            if (*EPShortText) free(*EPShortText);
+                            *EPShortText=strdup(epshorttext);
+                        }
                     }
                     found=true;
                     break;
@@ -782,7 +793,7 @@ bool cParse::FetchEvent(xmlNodePtr enode, bool useeptext)
         node=node->next;
     }
 
-    int season,episode,episodeoverall;
+    int season=xevent.Season(),episode=xevent.Episode(),episodeoverall;
     char *epshorttext=NULL;
     char *eptitle=NULL;
 
@@ -795,7 +806,17 @@ bool cParse::FetchEvent(xmlNodePtr enode, bool useeptext)
         xevent.SetEpisodeOverall(episodeoverall);
         if (epshorttext)
         {
-            if (useeptext) xevent.SetShortText(epshorttext);
+            if (useeptext)
+            {
+                if (strlen(epshorttext)>1)
+                {
+                    xevent.SetShortText(epshorttext);
+                }
+                else
+                {
+                    xevent.SetShortText("");
+                }
+            }
             free(epshorttext);
         }
     }

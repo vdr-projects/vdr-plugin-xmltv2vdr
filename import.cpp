@@ -1258,7 +1258,14 @@ bool cImport::AddShortTextFromEITDescription(cXMLTVEvent *xEvent, const char *EI
 
     if (epshorttext)
     {
-        xEvent->SetShortText(epshorttext);
+        if (strlen(epshorttext)>1)
+        {
+            xEvent->SetShortText(epshorttext);
+        }
+        else
+        {
+            xEvent->SetShortText("");
+        }
         free(epshorttext);
     }
     xEvent->SetSeason(season);
@@ -1311,7 +1318,17 @@ cXMLTVEvent *cImport::AddXMLTVEvent(cEPGSource *Source,sqlite3 *Db, const char *
     if (UseEPText)
     {
         if (eptitle) xevent->SetAltTitle(eptitle);
-        if (epshorttext) xevent->SetShortText(epshorttext);
+        if (epshorttext)
+        {
+            if (strlen(epshorttext)>1)
+            {
+                xevent->SetShortText(epshorttext);
+            }
+            else
+            {
+                xevent->SetShortText("");
+            }
+        }
     }
     else
     {
