@@ -274,7 +274,11 @@ cGlobals::cGlobals()
     imgdelafter=30;
     soundex=false;
 
+#if APIVERSNUM > 20101
+    if (asprintf(&epgfile_store,"%s/epg.db",cVideoDirectory::Name())==-1) {};
+#else
     if (asprintf(&epgfile_store,"%s/epg.db",VideoDirectory)==-1) {};
+#endif
 
     if (!CheckEPGDir("/var/run/vdr"))
     {
