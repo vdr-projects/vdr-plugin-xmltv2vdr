@@ -181,7 +181,7 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
     DIR *dir=opendir(EPDir);
     if (!dir) return false;
     struct dirent dirent_buf,*dirent;
-    bool found=false;
+    char *fTitle=NULL;
     for (;;)
     {
         if (readdir_r(dir,&dirent_buf,&dirent)!=0) break;
@@ -197,12 +197,14 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
             {
                 if (Title[dlen]==32)
                 {
-                    found=true;
+                    if (fTitle) free(fTitle);
+                    fTitle=strdup(dirent->d_name);
                 }
             }
             else
             {
-                found=true;
+                if (fTitle) free(fTitle);
+                fTitle=strdup(dirent->d_name);
                 break;
             }
         }
@@ -239,7 +241,7 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
         }
     }
 
-    if (!found)
+    if (!fTitle)
     {
         if ((f_season>0) && (f_episode>0))
         {
@@ -256,12 +258,17 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
     }
 
     char *epfile=NULL;
-    if (asprintf(&epfile,"%s/%s.episodes",EPDir,dirent->d_name)==-1) return false;
+    if (asprintf(&epfile,"%s/%s.episodes",EPDir,fTitle)==-1)
+    {
+        free(fTitle);
+        return false;
+    }
 
     FILE *f=fopen(epfile,"r");
     if (!f)
     {
         free(epfile);
+        free(fTitle);
         return false;
     }
 
@@ -289,7 +296,8 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
         dname[0]=0;
     }
 
-    if (dname[0]==0) strn0cpy(dname,dirent->d_name,sizeof(dname)-1);
+    if (dname[0]==0) strn0cpy(dname,fTitle,sizeof(dname)-1);
+    free(fTitle);
 
     if (EPTitle && strcasecmp(Title,dname)) *EPTitle=strdup(dname);
 
@@ -345,7 +353,7 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
 
     char *line=NULL;
     size_t length;
-    found=false;
+    bool found=false;
     if (EPShortText) *EPShortText=NULL;
     size_t charlen=0;
     while (getline(&line,&length,f)!=-1)
