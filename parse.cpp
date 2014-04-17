@@ -198,7 +198,6 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
                 if (Title[dlen]==32)
                 {
                     found=true;
-                    break;
                 }
             }
             else
