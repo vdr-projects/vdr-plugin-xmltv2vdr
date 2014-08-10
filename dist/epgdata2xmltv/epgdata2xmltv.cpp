@@ -118,7 +118,7 @@ int cepgdata2xmltv::DownloadData(const char *url)
     curl_easy_setopt(curl_handle, CURLOPT_MAXFILESIZE, 85971520);  // Set maximum file size to get (bytes)
     curl_easy_setopt(curl_handle, CURLOPT_NOPROGRESS, 1);  // No progress meter
     curl_easy_setopt(curl_handle, CURLOPT_NOSIGNAL, 1);  // No signaling
-    curl_easy_setopt(curl_handle, CURLOPT_TIMEOUT, 240);  // Set timeout to 240 seconds
+    curl_easy_setopt(curl_handle, CURLOPT_TIMEOUT, 300);  // Set timeout to 300 seconds
     curl_easy_setopt(curl_handle, CURLOPT_USERAGENT, EPGDATA2XMLTV_USERAGENT);  // Some servers don't like requests that are made without a user-agent field
 
     ret=curl_easy_perform(curl_handle);
