@@ -1260,7 +1260,7 @@ cXMLTVEvent *cImport::PrepareAndReturn(sqlite3 **db, char *sql)
 bool cImport::AddShortTextFromEITDescription(cXMLTVEvent *xEvent, const char *EITDescription)
 {
     if (!g->EPDir()) return false;
-    int season,episode,episodeoverall;
+    int season=0,episode=0,episodeoverall=0;
     char *epshorttext=NULL;
     if (!cParse::FetchSeasonEpisode(cep2ascii,cutf2ascii,g->EPDir(),xEvent->Title(),
                                     NULL,EITDescription,
@@ -1287,7 +1287,7 @@ cXMLTVEvent *cImport::AddXMLTVEvent(cEPGSource *Source,sqlite3 *Db, const char *
     if (!Event) return NULL;
     if (!g->EPDir()) return NULL;
 
-    int season,episode,episodeoverall;
+    int season=0,episode=0,episodeoverall=0;
     char *epshorttext=NULL,*eptitle=NULL;
     if (!cParse::FetchSeasonEpisode(cep2ascii,cutf2ascii,g->EPDir(),Event->Title(),
                                     Event->ShortText(),Event->Description(),

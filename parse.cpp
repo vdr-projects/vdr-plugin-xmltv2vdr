@@ -111,11 +111,21 @@ void cParse::RemoveNonAlphaNumeric(char *String, bool InDescription)
 
     len=strlen(String);
     p=String;
-    // cut off " Folge XX"
+    // cut off " Folge XX" at end
     p=strstr(String," Folge ");
     if (p) *p=0;
 
-    if (InDescription)
+    bool bCutNumbers=false;
+    len=strlen(String);
+    p=String;
+    // cut off "Folge XX" at start
+    if (!strncmp(String,"Folge ",6))
+    {
+        memmove(p,p+6,len-6);
+        bCutNumbers=true;
+    }
+
+    if (InDescription || bCutNumbers)
     {
         // remove leading numbers (inkl. roman numerals)
         len=strlen(String);
@@ -211,7 +221,7 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
     }
     closedir(dir);
 
-    int f_season=0,f_episode=0;
+    int f_season=Season,f_episode=Episode;
     size_t slen;
     if (ShortText)
     {
@@ -342,20 +352,24 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
     }
 
     RemoveNonAlphaNumeric(dshorttext,!ShortText);
+
     if (!strlen(dshorttext))
     {
         strn0cpy(dshorttext,ShortText ? ShortText : Description,slen); // ok lets try with the original text
+        tsyslog("Warning: removed all characters, now using '%s'",dshorttext);
     }
     if (!ShortText)
     {
         tsyslog("trying to find shorttext for '%s', with '%s'",Title,dshorttext);
     }
 
+
     char *line=NULL;
     size_t length;
     bool found=false;
     if (EPShortText) *EPShortText=NULL;
     size_t charlen=0;
+    int tmpSeason=-1,tmpEpisode=-1,tmpEpisodeOverall=-1;
     while (getline(&line,&length,f)!=-1)
     {
         if (line[0]=='#') continue;
@@ -378,6 +392,7 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
                 {
                     strcpy(depshorttext,epshorttext); // ok lets try with the original text
                 }
+
                 if (!strcasecmp(dshorttext,depshorttext))
                 {
                     // exact match
@@ -400,6 +415,9 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
                         {
                             if (*EPShortText) free(*EPShortText);
                             *EPShortText=strdup(epshorttext);
+                            tmpSeason=Season;
+                            tmpEpisode=Episode;
+                            tmpEpisodeOverall=EpisodeOverall;
                         }
                         charlen=dlen;
                         found=true;
@@ -439,23 +457,37 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
             tsyslog("failed to parse '%s' in '%s'",line,dirent->d_name);
         }
     }
-
-    if ((!found) && (ShortText))
+    if (tmpEpisode!=-1)
     {
-        isyslog("failed to find '%s' for '%s' in eplists",ShortText,Title);
-        if ((f_season>0) && (f_episode>0))
+        Season=tmpSeason;
+        Episode=tmpEpisode;
+        EpisodeOverall=tmpEpisodeOverall;
+    }
+
+    if (!found)
+    {
+        Season=0;
+        Episode=0;
+        if (ShortText)
         {
-            if (EPShortText)
+            isyslog("failed to find '%s' for '%s' in eplists",ShortText,Title);
+            if ((f_season>0) && (f_episode>0))
             {
-                if (*EPShortText) free(*EPShortText);
-                *EPShortText=strdup("@");
+                if (EPShortText)
+                {
+                    if (*EPShortText) free(*EPShortText);
+                    *EPShortText=strdup("@");
+                }
+                found=true;
             }
-            found=true;
         }
     }
-    if ((found) && (!ShortText))
+    if (found)
     {
-        tsyslog("found shorttext '%s' from description of '%s'",*EPShortText,Title);
+        if (!ShortText)
+        {
+            tsyslog("found shorttext '%s' with description of '%s'",*EPShortText,Title);
+        }
     }
     if (line) free(line);
     fclose(f);
@@ -833,7 +865,7 @@ bool cParse::FetchEvent(xmlNodePtr enode, bool useeptext)
         node=node->next;
     }
 
-    int season=xevent.Season(),episode=xevent.Episode(),episodeoverall;
+    int season=xevent.Season(),episode=xevent.Episode(),episodeoverall=0;
     char *epshorttext=NULL;
     char *eptitle=NULL;
 

@@ -747,9 +747,9 @@ bool cEPGHandler::HandleEvent(cEvent* Event)
 
     if (xevent->Title() && Event->Title())
     {
-        bool tChanged=false;
         if (strcasecmp(xevent->Title(),Event->Title()))
         {
+            bool tChanged=false;
             // Title maybe changed, check AltTitle if exists
             if (xevent->AltTitle())
             {
