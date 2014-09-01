@@ -122,6 +122,7 @@ void cParse::RemoveNonAlphaNumeric(char *String, bool InDescription)
     if (!strncmp(String,"Folge ",6))
     {
         memmove(p,p+6,len-6);
+        String[len-6]=0;
         bCutNumbers=true;
     }
 
@@ -289,7 +290,7 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
         if (ls)
         {
             ls++;
-            memmove(dname,ls,strlen(ls));
+            memmove(dname,ls,strlen(ls)+1);
         }
         char *pt=strrchr(dname,'.');
         if (pt)
@@ -320,7 +321,7 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
     if (!ShortText)
     {
         slen=strlen(Description);
-        if (slen>40) slen=40;
+        if (slen>60) slen=60;
         if (Season>0) f_season=Season;
         if (Episode>0) f_episode=Episode;
     }
