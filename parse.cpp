@@ -104,6 +104,7 @@ void cParse::RemoveNonAlphaNumeric(char *String, bool InDescription)
     // remove " Teil " (special for .episodes files)
     int len=strlen(String);
     char *p=strstr(String," Teil ");
+    if (!p) p=strstr(String,"(Teil ");
     if (p)
     {
         memmove(p,p+6,len-6);
@@ -364,6 +365,11 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
         tsyslog("trying to find shorttext for '%s', with '%s'",Title,dshorttext);
     }
 
+#undef DEBCMP
+
+#ifdef DEBCMP
+    tsyslog("dshorttext=%s",dshorttext);
+#endif
 
     char *line=NULL;
     size_t length;
@@ -393,7 +399,9 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
                 {
                     strcpy(depshorttext,epshorttext); // ok lets try with the original text
                 }
-
+#ifdef DEBCMP
+                tsyslog("depshorttext=%s",depshorttext);
+#endif
                 if (!strcasecmp(dshorttext,depshorttext))
                 {
                     // exact match
@@ -485,6 +493,9 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
     }
     if (found)
     {
+#ifdef DEBCMP
+        tsyslog("found shorttext '%s'",*EPShortText);
+#endif
         if (!ShortText)
         {
             tsyslog("found shorttext '%s' with description of '%s'",*EPShortText,Title);
