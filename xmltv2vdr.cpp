@@ -952,11 +952,10 @@ void cHouseKeeping::checkdir(const char* imgdir, int age, int &cnt, int &lcnt)
     if (!dir) return;
     time_t tmin=time(NULL);
     tmin-=(age*86400);
-    struct dirent dirent_buf,*dirent;
+    struct dirent *dirent;
 
-    while (readdir_r(dir,&dirent_buf,&dirent)==0)
+    while (dirent=readdir(dir))
     {
-        if (!dirent) break;
         if (dirent->d_name[0]=='.') continue;
         if ((dirent->d_type==DT_LNK) || (dirent->d_type==DT_REG))
         {

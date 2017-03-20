@@ -628,7 +628,7 @@ eOSState cMenuSetupXmltv2vdrOrder::ProcessKey(eKeys Key)
 
     if (state==osContinue)
     {
-        switch (Key)
+        switch ((int) Key)
         {
         case kDown:
         case kUp:
@@ -1194,7 +1194,7 @@ eOSState cMenuSetupXmltv2vdrChannelMap::ProcessKey(eKeys Key)
     if (HasSubMenu()) return osContinue;
     if (state==osContinue)
     {
-        switch (Key)
+        switch ((int) Key)
         {
         case kLeft:
         case kLeft|k_Repeat:
