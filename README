@@ -2,9 +2,9 @@ This is a "plugin" for the Video Disk Recorder (VDR).
 
 Written by:                  Jochen Dolze <vdr@dolze.de>
 
-Project's homepage:          http://projects.vdr-developer.org/projects/plg-xmltv2vdr
+Project's homepage:          https://github.com/vdr-projects/vdr-plugin-xmltv2vdr
 
-Latest version available at: http://projects.vdr-developer.org/projects/plg-xmltv2vdr/files
+Latest version available at: https://github.com/vdr-projects/vdr-plugin-xmltv2vdr/tags
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -22,10 +22,10 @@ Interface for sources:
 
 All sources must provide a control file with a name similar to the
 name of the source/source.xmltv (e.g. epgdata.xmltv -> epgdata).
-In the first line you can decide if your source provides data by file 
+In the first line you can decide if your source provides data by file
 (file must be placed in /var/lib/epgsources with extension .xmltv) or
 pipe (binary with the same name is called by xmltv2vdr-plugin, and
-must be in the path). There can be additional fields in the first 
+must be in the path). There can be additional fields in the first
 line seperated with semicolons. The second option gives the time when
 the epg data will be updated from the origin, the third option informs
 the plugin, if a pin is needed for this source (0/1), the fourth option
