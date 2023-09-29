@@ -261,7 +261,7 @@ char *cImport::Add2Description(char *description, const char *Name, int Value)
 
 char *cImport::AddEOT2Description(char *description, bool checkutf8)
 {
-    const char nbspUTF8[]{"\u00A0"};
+    const char nbspUTF8[]={"\u00A0"};
 
     if (checkutf8)
     {
@@ -277,7 +277,7 @@ char *cImport::AddEOT2Description(char *description, bool checkutf8)
             }
             else
             {
-                const char nbsp[]{"\xA0"};
+                const char nbsp[]={"\xA0"};
                 description=strcatrealloc(description,nbsp);
             }
         }
