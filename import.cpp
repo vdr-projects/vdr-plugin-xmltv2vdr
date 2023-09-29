@@ -1401,7 +1401,7 @@ bool cImport::UpdateXMLTVEvent(cEPGSource *Source, sqlite3 *Db, cXMLTVEvent *xEv
             return false;
         }
 
-        string ed=shortdesc;
+        std::string ed=shortdesc;
 
         int reps;
         reps=pcrecpp::RE("'").GlobalReplace("''",&ed);
@@ -1511,7 +1511,7 @@ bool cImport::UpdateXMLTVEvent(cEPGSource *Source, sqlite3 *Db, const cEvent *Ev
             return false;
         }
 
-        string ed=eitdescription;
+        std::string ed=eitdescription;
 
         int reps;
         reps=pcrecpp::RE("'").GlobalReplace("''",&ed);
@@ -1649,7 +1649,7 @@ cXMLTVEvent *cImport::SearchXMLTVEvent(sqlite3 **Db,const char *ChannelID, const
             return NULL;
         }
 
-        string st=sqltitle;
+        std::string st=sqltitle;
 
         int reps;
         reps=pcrecpp::RE("'").GlobalReplace("''",&st);

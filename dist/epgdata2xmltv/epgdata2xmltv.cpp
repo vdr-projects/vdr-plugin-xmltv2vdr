@@ -561,7 +561,7 @@ int cepgdata2xmltv::Process(int argc, char *argv[])
                 enca_analyser_free(analyser);
             }
 
-            string s = xmlmem;
+            std::string s = xmlmem;
             int reps=pcrecpp::RE("&(?![a-zA-Z]{1,8};)").GlobalReplace("%amp;",&s);
             if (reps) {
                 xmlmem = (char *)realloc(xmlmem, s.size()+1);
