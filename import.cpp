@@ -7,8 +7,8 @@
 
 #include <sqlite3.h>
 #include <ctype.h>
+#include <regex>
 #include <time.h>
-#include <pcrecpp.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <vdr/channels.h>
@@ -1403,9 +1403,9 @@ bool cImport::UpdateXMLTVEvent(cEPGSource *Source, sqlite3 *Db, cXMLTVEvent *xEv
 
         std::string ed=shortdesc;
 
-        int reps;
-        reps=pcrecpp::RE("'").GlobalReplace("''",&ed);
-        if (reps)
+        long unsigned int reps = ed.length();
+        std::regex_replace(ed, std::regex("'"), "''");
+        if (reps != ed.length())
         {
             shortdesc=(char *) realloc(shortdesc,ed.size()+1);
             strcpy(shortdesc,ed.c_str());
@@ -1513,9 +1513,9 @@ bool cImport::UpdateXMLTVEvent(cEPGSource *Source, sqlite3 *Db, const cEvent *Ev
 
         std::string ed=eitdescription;
 
-        int reps;
-        reps=pcrecpp::RE("'").GlobalReplace("''",&ed);
-        if (reps)
+        long unsigned int reps = ed.length();
+        std::regex_replace(ed, std::regex("'"), "''");
+        if (reps != ed.length())
         {
             eitdescription=(char *) realloc(eitdescription,ed.size()+1);
             strcpy(eitdescription,ed.c_str());
@@ -1651,9 +1651,9 @@ cXMLTVEvent *cImport::SearchXMLTVEvent(sqlite3 **Db,const char *ChannelID, const
 
         std::string st=sqltitle;
 
-        int reps;
-        reps=pcrecpp::RE("'").GlobalReplace("''",&st);
-        if (reps)
+        long unsigned int reps = st.length();
+        std::regex_replace(st, std::regex("'"), "''");
+        if (reps != st.length())
         {
             char *tmp_sqltitle=(char *) realloc(sqltitle,st.size()+1);
             if (tmp_sqltitle)
