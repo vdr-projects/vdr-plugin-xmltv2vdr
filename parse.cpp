@@ -1070,7 +1070,7 @@ int cParse::Process(cEPGExecutor &myExecutor,char *buffer, int bufsize)
             skipped++;
             continue;
         }
-        xmlErrorPtr xmlerr=xmlGetLastError();
+        const xmlError* xmlerr=xmlGetLastError();
         if (xmlerr && xmlerr->code)
         {
             esyslogs(source,"%s",xmlerr->message);
