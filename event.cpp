@@ -8,8 +8,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <vector>
+#include <regex>
 #include <vdr/tools.h>
-#include <pcrecpp.h>
 #include "event.h"
 
 extern char *strcatrealloc(char *, const char*);
@@ -529,11 +529,11 @@ void cXMLTVEvent::GetSQL(const char *Source, int SrcIdx, const char *ChannelID, 
     }
 
     std::string si=sql_insert;
-    int ireps;
-    ireps=pcrecpp::RE("'").GlobalReplace("''",&si);
-    ireps+=pcrecpp::RE("\\^").GlobalReplace("'",&si);
-    ireps+=pcrecpp::RE("'NULL'").GlobalReplace("NULL",&si);
-    if (ireps)
+    long unsigned int ilen = si.length();
+    si = std::regex_replace(si, std::regex("'"), "''");
+    si = std::regex_replace(si, std::regex("\\^"), "'");
+    si = std::regex_replace(si, std::regex("'NULL'"), "NULL");
+    if (ilen != si.length())
     {
         sql_insert=(char *) realloc(sql_insert,si.size()+1);
         strcpy(sql_insert,si.c_str());
@@ -541,11 +541,11 @@ void cXMLTVEvent::GetSQL(const char *Source, int SrcIdx, const char *ChannelID, 
     *Insert=sql_insert;
 
     std::string su=sql_update;
-    int ureps;
-    ureps=pcrecpp::RE("'").GlobalReplace("''",&su);
-    ureps+=pcrecpp::RE("\\^").GlobalReplace("'",&su);
-    ureps+=pcrecpp::RE("'NULL'").GlobalReplace("NULL",&su);
-    if (ureps)
+    long unsigned int ulen = su.length();
+    su = std::regex_replace(su, std::regex("'"), "''");
+    su = std::regex_replace(su, std::regex("\\^"), "'");
+    su = std::regex_replace(su, std::regex("'NULL'"), "NULL");
+    if (ulen != su.length())
     {
         sql_update=(char *) realloc(sql_update,su.size()+1);
         strcpy(sql_update,su.c_str());

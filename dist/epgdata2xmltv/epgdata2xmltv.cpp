@@ -6,15 +6,16 @@
 #include <sys/types.h>
 #include <dirent.h>
 #include <string.h>
+#include <fcntl.h>
 #include <locale.h>
 #include <zip.h>
-#include <pcrecpp.h>
 #include <enca.h>
 #include <libxml/parserInternals.h>
+
+#include <regex>
+
 #include "epgdata2xmltv.h"
 #include "epgdata2xmltv_xsl.h"
-
-#include <fcntl.h>
 
 int SysLogLevel=1;
 char *dtdmem=NULL;
@@ -562,9 +563,11 @@ int cepgdata2xmltv::Process(int argc, char *argv[])
             }
 
             std::string s = xmlmem;
-            int reps=pcrecpp::RE("&(?![a-zA-Z]{1,8};)").GlobalReplace("%amp;",&s);
-            if (reps) {
-                xmlmem = (char *)realloc(xmlmem, s.size()+1);
+            long unsigned int reps = s.length();
+            s = std::regex_replace(s, std::regex("&(?![a-zA-Z]{1,8};)"), ("%amp;"));
+            if (reps != s.length())
+            {
+    	        xmlmem = (char *)realloc(xmlmem, s.size()+1);
                 xmlsize = s.size();
                 strcpy(xmlmem,s.c_str());
             }
