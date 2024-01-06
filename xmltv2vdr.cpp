@@ -990,7 +990,7 @@ void cHouseKeeping::Action()
                 if (changes)
                 {
                     isyslog("removed %i old entries from db",changes);
-                    sqlite3_exec(db,"VACCUM;",NULL,NULL,NULL);
+                    sqlite3_exec(db,"VACUUM;",NULL,NULL,NULL);
                 }
             }
             free(sql);
