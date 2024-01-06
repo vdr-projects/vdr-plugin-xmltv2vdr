@@ -388,7 +388,7 @@ int cepgdata2xmltv::Process(int argc, char *argv[])
                 ok=true;
                 break;
             }
-            if (sizeof(sb.size>4)) sb.size &= 0x00FFFFFF; // just to be sure
+            sb.size &= 0x00FFFFFF; // just to be sure
             if (dtdmem) {
                 free(dtdmem);
                 dtdmem=NULL;
@@ -450,7 +450,7 @@ int cepgdata2xmltv::Process(int argc, char *argv[])
                             ok=true;
                             break;
                         }
-                        if (sizeof(sb.size>4)) sb.size &= 0x00FFFFFF; // just to be sure
+                        sb.size &= 0x00FFFFFF; // just to be sure
                         xmlmem=(char *) malloc(sb.size+1);
                         int size=zip_fread(zfile,xmlmem,sb.size);
                         if (size!=(int) sb.size)
@@ -488,7 +488,7 @@ int cepgdata2xmltv::Process(int argc, char *argv[])
                                     struct zip_stat sb;
                                     memset(&sb,0,sizeof(sb));
                                     if (zip_stat_index(zip,i,ZIP_FL_UNCHANGED,&sb)!=-1) {
-                                        if (sizeof(sb.size>4)) sb.size &= 0x00FFFFFF; // just to be sure
+                                        sb.size &= 0x00FFFFFF; // just to be sure
                                         char *jpg=(char *) malloc(sb.size+1);
                                         if (jpg) {
                                             int size=zip_fread(zfile,jpg,sb.size);
@@ -620,17 +620,19 @@ int cepgdata2xmltv::Process(int argc, char *argv[])
                 if (num>0)
                 {
                     char *channelnum=strdup(sc+1);
-                    char *lf=strchr(channelnum,10);
-                    if (lf) *lf=0;
-                    channel[0]='"';
-                    *sc++='"';
-                    *sc=0;
-                    const char *params[5] =
-                    {
-                        "channelid", channel, "channelnum",channelnum,NULL
-                    };
-                    Translate(pxmlDoc,params);
-                    if (channelnum) free(channelnum);
+                    if (channelnum) {
+		       char *lf=strchr(channelnum,10);
+                       if (lf) *lf=0;
+                       channel[0]='"';
+                       *sc++='"';
+                       *sc=0;
+                       const char *params[5] =
+                       {
+                           "channelid", channel, "channelnum",channelnum,NULL
+                       };
+                       Translate(pxmlDoc,params);
+		       free(channelnum);
+		    }
                 }
             }
         }

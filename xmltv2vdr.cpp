@@ -157,7 +157,10 @@ bool cSVDRPMsg::Send(const char *format, ...)
     char *msg;
     va_list ap;
     va_start(ap, format);
-    if (vasprintf(&msg,format,ap)==-1) return false;
+    if (vasprintf(&msg,format,ap)==-1) {
+       va_end(ap);
+       return false;
+    }
     va_end(ap);
 
     int port;
@@ -1160,6 +1163,7 @@ bool cPluginXmltv2vdr::ProcessArgs(int argc, char *argv[])
             break;
         case 'i':
             g.SetImgDir(optarg);
+            break;
         case 'l':
             if (logfile) free(logfile);
             logfile=strdup(optarg);
