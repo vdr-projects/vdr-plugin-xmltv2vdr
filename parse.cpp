@@ -192,11 +192,11 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
 
     DIR *dir=opendir(EPDir);
     if (!dir) return false;
-    struct dirent dirent_buf,*dirent;
+    struct dirent *dirent;
     char *fTitle=NULL;
     for (;;)
     {
-        if (readdir_r(dir,&dirent_buf,&dirent)!=0) break;
+        dirent = readdir(dir);
         if (!dirent) break;
         if (dirent->d_name[0]=='.') continue;
         char *pt=strrchr(dirent->d_name,'.');
