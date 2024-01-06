@@ -34,6 +34,8 @@ int ioprio_set(int which, int who, int ioprio)
 #define __NR_ioprio_set  251
 #elif defined(__ia64__)
 #define __NR_ioprio_set  1274
+#elif defined(__arch64__)
+#define __NR_ioprio_set  30
 #else
 #define __NR_ioprio_set  0
 #endif
