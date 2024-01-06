@@ -5,7 +5,7 @@
 ### The C++ compiler and options:
 
 CXX      ?= g++
-CXXFLAGS ?= -g -rdynamic -O2 -Wall -Wextra -Woverloaded-virtual -Wno-parentheses
+CXXFLAGS ?= -g -rdynamic -O2 -Wall -Wextra -Woverloaded-virtual -Wno-parentheses -Wno-stringop-truncation
 PKG-CONFIG ?= pkg-config
 STRIP ?= -s
 
