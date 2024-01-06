@@ -6,15 +6,16 @@
 #include <sys/types.h>
 #include <dirent.h>
 #include <string.h>
+#include <fcntl.h>
 #include <locale.h>
 #include <zip.h>
-#include <pcrecpp.h>
 #include <enca.h>
 #include <libxml/parserInternals.h>
+
+#include <regex>
+
 #include "epgdata2xmltv.h"
 #include "epgdata2xmltv_xsl.h"
-
-#include <fcntl.h>
 
 int SysLogLevel=1;
 char *dtdmem=NULL;
@@ -289,7 +290,7 @@ int cepgdata2xmltv::Process(int argc, char *argv[])
         time_t td=t+(day*86400);
         struct tm *tm;
         tm=localtime(&td);
-        char vgl[10];
+        char vgl[80];
         sprintf(vgl,"%04i%02i%02i",tm->tm_year+1900,tm->tm_mon+1,tm->tm_mday);
 
         char *dest=NULL;
@@ -394,7 +395,7 @@ int cepgdata2xmltv::Process(int argc, char *argv[])
             }
             dtdmem=(char *) malloc(sb.size+1);
             int size=zip_fread(zfile,dtdmem,sb.size);
-            if (size!=sb.size)
+            if (size!=(int) sb.size)
             {
                 zip_fclose(zfile);
                 esyslog("failed to read qy.dtd from %s",dest);
@@ -452,7 +453,7 @@ int cepgdata2xmltv::Process(int argc, char *argv[])
                         if (sizeof(sb.size>4)) sb.size &= 0x00FFFFFF; // just to be sure
                         xmlmem=(char *) malloc(sb.size+1);
                         int size=zip_fread(zfile,xmlmem,sb.size);
-                        if (size!=sb.size)
+                        if (size!=(int) sb.size)
                         {
                             zip_fclose(zfile);
                             free(xmlmem);
@@ -491,7 +492,7 @@ int cepgdata2xmltv::Process(int argc, char *argv[])
                                         char *jpg=(char *) malloc(sb.size+1);
                                         if (jpg) {
                                             int size=zip_fread(zfile,jpg,sb.size);
-                                            if (size==sb.size) {
+                                            if (size==(int) sb.size) {
                                                 FILE *j=fopen(destjpg,"w+");
                                                 if (j) {
                                                     fwrite(jpg,size,1,j);
@@ -562,9 +563,11 @@ int cepgdata2xmltv::Process(int argc, char *argv[])
             }
 
             std::string s = xmlmem;
-            int reps=pcrecpp::RE("&(?![a-zA-Z]{1,8};)").GlobalReplace("%amp;",&s);
-            if (reps) {
-                xmlmem = (char *)realloc(xmlmem, s.size()+1);
+            long unsigned int reps = s.length();
+            s = std::regex_replace(s, std::regex("&(?![a-zA-Z]{1,8};)"), ("%amp;"));
+            if (reps != s.length())
+            {
+    	        xmlmem = (char *)realloc(xmlmem, s.size()+1);
                 xmlsize = s.size();
                 strcpy(xmlmem,s.c_str());
             }

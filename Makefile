@@ -50,8 +50,8 @@ SOFILE = libvdr-$(PLUGIN).so
 
 ### Includes and Defines (add further entries here):
 
-PKG-LIBS += libxml-2.0 libpcrecpp sqlite3
-PKG-INCLUDES += libxml-2.0 libpcrecpp sqlite3
+PKG-LIBS += libxml-2.0 sqlite3
+PKG-INCLUDES += libxml-2.0 sqlite3
 
 DEFINES += -D_GNU_SOURCE -D_XOPEN_SOURCE -DPLUGIN_NAME_I18N='"$(PLUGIN)"'
 

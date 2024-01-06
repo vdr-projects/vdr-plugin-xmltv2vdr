@@ -34,6 +34,8 @@ int ioprio_set(int which, int who, int ioprio)
 #define __NR_ioprio_set  251
 #elif defined(__ia64__)
 #define __NR_ioprio_set  1274
+#elif defined(__arch64__)
+#define __NR_ioprio_set  30
 #else
 #define __NR_ioprio_set  0
 #endif
@@ -596,10 +598,9 @@ bool cEPGHandler::IgnoreChannel(const cChannel* Channel)
     return maps->IgnoreChannel(Channel);
 }
 
-bool cEPGHandler::check4proc(cEvent *event, char **timerdescr, cEPGMapping **map)
+bool cEPGHandler::check4proc(cEvent *event, cEPGMapping **map)
 {
     if (map) *map=NULL;
-    if (timerdescr) *timerdescr=NULL;
     if (!event) return false;
     if (now>(event->StartTime()+event->Duration())) return false; // event in the past?
     if (!maps) return false;
@@ -610,29 +611,6 @@ bool cEPGHandler::check4proc(cEvent *event, char **timerdescr, cEPGMapping **map
     {
         if (!epall) return false;
         if (!event->ShortText()) return false;
-        if (!timerdescr) return false;
-#if VDRVERSNUM <= 10732
-        int TimerMatch = tmNone;
-#else
-        eTimerMatch TimerMatch = tmNone;
-#endif
-
-#if VDRVERSNUM>=20301
-        cStateKey StateKey;
-        if (const cTimers *Timers=cTimers::GetTimersRead(StateKey))
-        {
-            const cTimer *Timer=Timers->GetMatch(event,&TimerMatch);
-            if ((Timer) && (TimerMatch==tmFull))
-            {
-                *timerdescr=strdup(Timer->ToDescr());
-            }
-            StateKey.Remove();
-        }
-#else
-        cTimer *timer=Timers.GetMatch(event,&TimerMatch);
-        if ((!timer) || (TimerMatch!=tmFull)) return false;
-        *timerdescr=strdup(timer->ToDescr());
-#endif
     }
     if (map) *map=t_map;
     return true;
@@ -659,76 +637,49 @@ bool cEPGHandler::SetShortText(cEvent* Event, const char* ShortText)
 
 bool cEPGHandler::SetDescription(cEvent* Event, const char* Description)
 {
-    //cTimer *timer;
-    char *timerdescr;
-    if (!check4proc(Event,&timerdescr,NULL))
-    {
-        if (timerdescr) free(timerdescr);
-        return false;
-    }
+    if (!check4proc(Event,NULL)) return false;
 
     if (import.WasChanged(Event))
     {
         // ok we already changed this event!
-        if (!Description)
-        {
-            if (timerdescr) free(timerdescr);
-            return true; // prevent setting nothing to description
-        }
-        int len=strlen(Description);
-        if (!len)
-        {
-            if (timerdescr) free(timerdescr);
-            return true; // prevent setting nothing to description
-        }
-        if (!strcasestr(Event->Description(),Description))
+        if (!Description) return true; // prevent setting nothing to desciption
+        if (strlen(Description)==0) return true; // prevent setting nothing to description
+
+	if (!strcasestr(Event->Description(),Description))
         {
             // eit description changed -> set it
-            tsyslog("{%5i} %schanging descr of '%s'",Event->EventID(),timerdescr ? "*" : "",
+            tsyslog("{%5i} %schanging descr of '%s'",Event->EventID(),Event->HasTimer() ? "*" : "",
                     Event->Title());
-            if (timerdescr) free(timerdescr);
             return false;
         }
 #ifdef VDRDEBUG
-        tsyslog("{%5i} %salready seen descr '%s'",Event->EventID(),timerdescr ? "*" : "",
+        tsyslog("{%5i} %salready seen descr '%s'",Event->EventID(),Event->HasTimer() ? "*" : "",
                 Event->Title());
 #endif
-        if (timerdescr) free(timerdescr);
         return true;
     }
-    tsyslog("{%5i} %ssetting descr of '%s'",Event->EventID(),timerdescr ? "*" : "",
+    tsyslog("{%5i} %ssetting descr of '%s'",Event->EventID(),Event->HasTimer() ? "*" : "",
             Event->Title());
-    if (timerdescr) free(timerdescr);
     return false;
 }
 
 
 bool cEPGHandler::HandleEvent(cEvent* Event)
 {
-    //cTimer *timer;
-    char *timerdescr;
     cEPGMapping *map;
-    if (!check4proc(Event,&timerdescr,&map))
-    {
-        if (timerdescr) free(timerdescr);
-        return false;
-    }
+    if (!check4proc(Event,&map)) return false;
 
     int Flags=0;
     const char *ChannelID=strdup(*Event->ChannelID().ToString());
-    if (!ChannelID)
-    {
-        if (timerdescr) free(timerdescr);
-        return false;
-    }
+    if (!ChannelID) return false;
 
-    if (timerdescr)
+    if (Event->HasTimer())
     {
         Flags=USE_SEASON;
     }
     else
     {
-        // map is always set if seth==false
+	if (!map) return false;
         Flags=map->Flags();
     }
 
@@ -739,19 +690,11 @@ bool cEPGHandler::HandleEvent(cEvent* Event)
         if (!epall)
         {
             free((void*)ChannelID);
-            if (timerdescr) free(timerdescr);
-            return false;
-        }
-        if (!timerdescr)
-        {
-            free((void*)ChannelID);
-            if (timerdescr) free(timerdescr);
             return false;
         }
         if (db && sqlite3_errcode(db)!=SQLITE_OK)
         {
             free((void*)ChannelID);
-            if (timerdescr) free(timerdescr);
             return false;
         }
 
@@ -764,12 +707,11 @@ bool cEPGHandler::HandleEvent(cEvent* Event)
         if (!xevent)
         {
             free((void*)ChannelID);
-            if (timerdescr) free(timerdescr);
             return false;
         }
         else
         {
-            tsyslog("{%5i} *adding '%s'/'%s' (%s)",Event->EventID(),xevent->Title(),xevent->ShortText(),timerdescr);
+            tsyslog("{%5i} *adding '%s'/'%s' (%s)",Event->EventID(),xevent->Title(),xevent->ShortText(),Event->Description());
         }
     }
     else
@@ -777,7 +719,6 @@ bool cEPGHandler::HandleEvent(cEvent* Event)
         source=sources->GetSource(xevent->Source());
     }
     free((void*)ChannelID);
-    if (timerdescr) free(timerdescr);
     if (!source)
     {
         tsyslog("no source for %s",xevent->Source());
@@ -1049,7 +990,7 @@ void cHouseKeeping::Action()
                 if (changes)
                 {
                     isyslog("removed %i old entries from db",changes);
-                    sqlite3_exec(db,"VACCUM;",NULL,NULL,NULL);
+                    sqlite3_exec(db,"VACUUM;",NULL,NULL,NULL);
                 }
             }
             free(sql);
