@@ -712,7 +712,7 @@ void cMenuSetupXmltv2vdrLog::output(void)
     int cur=Current();
     Clear();
     Add(NewTitle(tr("overview")));
-    time_t nextrun=src->NextRunTime();
+    time_t nextrun=src ? src->NextRunTime() : 0;
     if (nextrun)
     {
         struct tm tm;
@@ -720,15 +720,18 @@ void cMenuSetupXmltv2vdrLog::output(void)
         strftime(nextrun_str,sizeof(nextrun_str)-1,"%d %b %H:%M:%S",&tm);
     }
     cString last;
-    if (src->Active())
+    if (src) 
     {
-        last=cString::sprintf("%s:\t%s",tr("next execution"),
+       if (src->Active())
+       {
+           last=cString::sprintf("%s:\t%s",tr("next execution"),
                               tr("active"));
-    }
-    else
-    {
-        last=cString::sprintf("%s:\t%s",tr("next execution"),
+       }
+       else
+       {
+           last=cString::sprintf("%s:\t%s",tr("next execution"),
                               nextrun ?  nextrun_str : "-");
+       }
     }
     Add(new cOsdItem(last,osUnknown,true));
 

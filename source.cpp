@@ -519,35 +519,38 @@ int cEPGSource::Execute(cEPGExecutor &myExecutor)
     if (pcmd)
     {
         char *pa=strchr(pcmd,'\'');
-        char *pe=strchr(pa+1,'\'');
-        if (pa && pe)
-        {
-            pa++;
-            for (char *c=pa; c<pe; c++)
+	if (pa) 
+	{
+	    char *pe=strchr(pa+1,'\'');
+            if (pe)
             {
-                if (c==pa)
+                pa++;
+                for (char *c=pa; c<pe; c++)
                 {
-                    *c='X';
+                    if (c==pa)
+                    { 
+                        *c='X';
+                    }
+                    else
+                    {
+                        *c='@';
+                    }
                 }
-                else
+                pe=pcmd;
+                while (*pe)
                 {
-                    *c='@';
+                    if (*pe=='@')
+                    {
+                        memmove(pe,pe+1,strlen(pe));
+                    }
+                    else
+                    {
+                        pe++;
+                    }
                 }
+                isyslogs(this,"%s",pcmd);
             }
-            pe=pcmd;
-            while (*pe)
-            {
-                if (*pe=='@')
-                {
-                    memmove(pe,pe+1,strlen(pe));
-                }
-                else
-                {
-                    pe++;
-                }
-            }
-            isyslogs(this,"%s",pcmd);
-        }
+	}
         free(pcmd);
     }
     cExtPipe p;

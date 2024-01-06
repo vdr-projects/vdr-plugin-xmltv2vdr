@@ -50,7 +50,7 @@ char* cXMLTVEvent::removechar(char* s, char what)
     char *p=strchr(s,what);
     while (p)
     {
-        if (p) *p=' ';
+        *p=' ';
         p=strchr(s,what);
 
     }
@@ -529,27 +529,19 @@ void cXMLTVEvent::GetSQL(const char *Source, int SrcIdx, const char *ChannelID, 
     }
 
     std::string si=sql_insert;
-    long unsigned int ilen = si.length();
     si = std::regex_replace(si, std::regex("'"), "''");
     si = std::regex_replace(si, std::regex("\\^"), "'");
     si = std::regex_replace(si, std::regex("'NULL'"), "NULL");
-    if (ilen != si.length())
-    {
-        sql_insert=(char *) realloc(sql_insert,si.size()+1);
-        strcpy(sql_insert,si.c_str());
-    }
+    sql_insert=(char *) realloc(sql_insert,si.size()+1);
+    strcpy(sql_insert,si.c_str());
     *Insert=sql_insert;
 
     std::string su=sql_update;
-    long unsigned int ulen = su.length();
     su = std::regex_replace(su, std::regex("'"), "''");
     su = std::regex_replace(su, std::regex("\\^"), "'");
     su = std::regex_replace(su, std::regex("'NULL'"), "NULL");
-    if (ulen != su.length())
-    {
-        sql_update=(char *) realloc(sql_update,su.size()+1);
-        strcpy(sql_update,su.c_str());
-    }
+    sql_update=(char *) realloc(sql_update,su.size()+1);
+    strcpy(sql_update,su.c_str());
     *Update=sql_update;
 }
 

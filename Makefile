@@ -55,7 +55,7 @@ PKG-INCLUDES += libxml-2.0 sqlite3
 
 DEFINES += -D_GNU_SOURCE -D_XOPEN_SOURCE -DPLUGIN_NAME_I18N='"$(PLUGIN)"'
 
-CXXFLAGS += $(shell $(PKG_CONFIG) --cflags $(PKG-INCLUDES))
+CXXFLAGS += $(shell $(PKG_CONFIG) --cflags $(PKG-INCLUDES)) -Wextra
 LIBS    += $(shell $(PKG_CONFIG) --libs $(PKG-LIBS))
 
 ### The object files (add further files here):

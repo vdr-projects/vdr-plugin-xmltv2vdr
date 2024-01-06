@@ -157,7 +157,7 @@ cEPGMapping::~cEPGMapping()
     if (channelids) free(channelids);
 }
 
-cEPGMapping::cEPGMapping(cEPGMapping&copy)
+cEPGMapping::cEPGMapping(cEPGMapping&copy):cListObject()
 {
     channelname=strdup(copy.channelname);
     channelids=NULL;
