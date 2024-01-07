@@ -1757,13 +1757,36 @@ int cImport::Process(cEPGSource *Source, cEPGExecutor &myExecutor)
         l++;
     }
 #else
+    const cChannels *Channels = NULL;
+    cStateKey StateKeyChan;
+    while (l<300)
+    {
+	Channels=cChannels::GetChannelsRead(StateKeyChan, 200);
+	if (!myExecutor.StillRunning())
+	{
+	    if (Channels) StateKeyChan.Remove();
+	    isyslogs(Source,"request to stop from vdr");
+	    return 0;
+	}
+	if (Channels) break;
+	l++;
+    }
+
+    if (!Channels)
+    {
+	esyslogs(Source,"failed to get channels lock");
+	return 141;
+    }
+
     cStateKey StateKey;
+    l=0;
     while (l<300)
     {
         schedules=cSchedules::GetSchedulesWrite(StateKey,200);
         if (!myExecutor.StillRunning())
         {
             if (schedules) StateKey.Remove();
+	    StateKeyChan.Remove();
             isyslogs(Source,"request to stop from vdr");
             return 0;
         }
@@ -1774,6 +1797,7 @@ int cImport::Process(cEPGSource *Source, cEPGExecutor &myExecutor)
 
     if (!schedules)
     {
+	StateKeyChan.Remove();
         esyslogs(Source,"failed to get schedules lock");
         return 141;
     }
@@ -1788,6 +1812,7 @@ int cImport::Process(cEPGSource *Source, cEPGExecutor &myExecutor)
         Timers.DecBeingEdited();
 #else
         StateKey.Remove();
+	StateKeyChan.Remove();
 #endif
         return 141;
     }
@@ -1806,6 +1831,7 @@ int cImport::Process(cEPGSource *Source, cEPGExecutor &myExecutor)
         Timers.DecBeingEdited();
 #else
         StateKey.Remove();
+	StateKeyChan.Remove();
 #endif
         return 134;
     }
@@ -1822,6 +1848,7 @@ int cImport::Process(cEPGSource *Source, cEPGExecutor &myExecutor)
         Timers.DecBeingEdited();
 #else
         StateKey.Remove();
+	StateKeyChan.Remove();
 #endif
         return 141;
     }
@@ -1861,56 +1888,41 @@ int cImport::Process(cEPGSource *Source, cEPGExecutor &myExecutor)
                     if ((flags & OPT_APPEND)==OPT_APPEND) addevents=true;
 
 #if VDRVERSNUM>=20301
-                    cStateKey StateKeyChan;
-                    const cChannels *Channels=cChannels::GetChannelsRead(StateKeyChan);
-                    if (Channels)
-                    {
-                        const cChannel *channel=Channels->GetByChannelID(tChannelID::FromString(xevent.ChannelID()));
+                    const cChannel *channel=Channels->GetByChannelID(tChannelID::FromString(xevent.ChannelID()));
 #else
-
                     cChannel *channel=Channels.GetByChannelID(tChannelID::FromString(xevent.ChannelID()));
 #endif
-                        if (!channel)
+                    if (!channel)
+                    {
+                        if (lerr!=IMPORT_NOCHANNEL)
+                            esyslogs(Source,"channel %s not found in channels.conf",
+                                     xevent.ChannelID());
+                        lerr=IMPORT_NOCHANNEL;
+                        if (lastChannelID)
                         {
-                            if (lerr!=IMPORT_NOCHANNEL)
-                                esyslogs(Source,"channel %s not found in channels.conf",
-                                         xevent.ChannelID());
-                            lerr=IMPORT_NOCHANNEL;
-                            if (lastChannelID)
-                            {
-                                free(lastChannelID);
-                                lastChannelID=NULL;
-                            }
-#if VDRVERSNUM>=20301
-                            StateKeyChan.Remove();
-#endif
-                            continue;
+                            free(lastChannelID);
+                            lastChannelID=NULL;
                         }
-
-                        schedule = (cSchedule *) schedules->GetSchedule(channel,addevents);
-                        if (!schedule)
-                        {
-                            if (lerr!=IMPORT_NOSCHEDULE)
-                                esyslogs(Source,"cannot get schedule for channel %s%s",
-                                         channel->Name(),addevents ? "" : " - try add option");
-                            lerr=IMPORT_NOSCHEDULE;
-                            if (lastChannelID)
-                            {
-                                free(lastChannelID);
-                                lastChannelID=NULL;
-                            }
-#if VDRVERSNUM>=20301
-                            StateKeyChan.Remove();
-#endif
-                            continue;
-                        }
-                        if (lastChannelID) free(lastChannelID);
-                        lastChannelID=strdup(xevent.ChannelID());
-                        hint=0;
-#if VDRVERSNUM>=20301
-                        StateKeyChan.Remove();
+                        continue;
                     }
-#endif
+
+                    schedule = (cSchedule *) schedules->GetSchedule(channel,addevents);
+                    if (!schedule)
+                    {
+                        if (lerr!=IMPORT_NOSCHEDULE)
+                            esyslogs(Source,"cannot get schedule for channel %s%s",
+                                     channel->Name(),addevents ? "" : " - try add option");
+                        lerr=IMPORT_NOSCHEDULE;
+                        if (lastChannelID)
+                        {
+                            free(lastChannelID);
+                            lastChannelID=NULL;
+                        }
+                        continue;
+                    }
+                    if (lastChannelID) free(lastChannelID);
+                    lastChannelID=strdup(xevent.ChannelID());
+                    hint=0;
                 }
 
                 cEvent *event=SearchVDREvent(Source, schedule, &xevent, addevents, hint);
@@ -1991,6 +2003,7 @@ int cImport::Process(cEPGSource *Source, cEPGExecutor &myExecutor)
     Timers.DecBeingEdited();
 #else
     StateKey.Remove();
+    StateKeyChan.Remove();
 #endif
     return 0;
 }
