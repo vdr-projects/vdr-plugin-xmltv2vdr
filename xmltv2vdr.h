@@ -21,7 +21,7 @@
 #define UNUSED(x) x
 #endif
 
-static const char *VERSION        = "0.2.2";
+static const char *VERSION        = "0.2.3";
 static const char *DESCRIPTION    = trNOOP("Imports xmltv epg into vdr");
 
 int ioprio_set(int which, int who, int ioprio);
