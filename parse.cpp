@@ -372,13 +372,18 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
 #endif
 
     char *line=NULL;
-    size_t length;
+    size_t length = 0;
     bool found=false;
     if (EPShortText) *EPShortText=NULL;
     size_t charlen=0;
     int tmpSeason=-1,tmpEpisode=-1,tmpEpisodeOverall=-1;
     while (getline(&line,&length,f)!=-1)
     {
+        if (line==NULL) 
+	{
+	    length = 0;
+	    continue;
+	}
         if (line[0]=='#') continue;
         char epshorttext[256]="";
         if (sscanf(line,"%3d\t%3d\t%5d\t%255c",&Season,&Episode,&EpisodeOverall,epshorttext)==4)
@@ -463,7 +468,7 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
         }
         else
         {
-            tsyslog("failed to parse '%s' in '%s'",line,dirent->d_name);
+            tsyslog("failed to parse '%s' in '%s'",line,epfile);
         }
     }
     if (tmpEpisode!=-1)
