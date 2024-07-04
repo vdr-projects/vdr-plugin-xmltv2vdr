@@ -874,6 +874,10 @@ bool cParse::FetchEvent(xmlNodePtr enode, bool useeptext)
             {
                 // info if it's old ;) -> just ignore (till now)
             }
+            else if ((!xmlStrcasecmp(node->name, (const xmlChar *) "live")))
+            {
+                // live -> just ignore (till now)
+            }
             else
             {
                 esyslogs(source,"unknown element %s, please report!",node->name);
