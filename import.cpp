@@ -86,7 +86,11 @@ cEvent *cImport::SearchVDREventByTitle(cEPGSource *source, cSchedule* schedule, 
     const char *cxTitle=conv->Convert(Title);
 
     // 2nd with StartTime
+#if VDRVERSNUM >= 20701
+    cEvent *f=(cEvent *) schedule->GetEventByTime(StartTime+hint);
+#else
     cEvent *f=(cEvent *) schedule->GetEvent((tEventID) 0,StartTime+hint);
+#endif
     if (f)
     {
         if (!strcasecmp(f->Title(),cxTitle))
@@ -188,10 +192,18 @@ cEvent *cImport::SearchVDREvent(cEPGSource *source, cSchedule* schedule, cXMLTVE
 
     // try to find an event,
     // 1st with our own EventID
+#if VDRVERSNUM >= 20701
+    if (xevent->EITEventID()) f=(cEvent *) schedule->GetEventById(xevent->EITEventID());
+#else
     if (xevent->EITEventID()) f=(cEvent *) schedule->GetEvent(xevent->EITEventID());
+#endif
     if (f) return f;
 
+#if VDRVERSNUM >= 20701
+    if (xevent->EventID() && append) f=(cEvent *) schedule->GetEventById(xevent->EITEventID());
+#else
     if (xevent->EventID() && append) f=(cEvent *) schedule->GetEvent(xevent->EventID());
+#endif
     if (f) return f;
 
     f=SearchVDREventByTitle(source, schedule, xevent->Title(), xevent->StartTime(),
