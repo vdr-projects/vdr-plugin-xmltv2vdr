@@ -200,7 +200,7 @@ cEvent *cImport::SearchVDREvent(cEPGSource *source, cSchedule* schedule, cXMLTVE
     if (f) return f;
 
 #if VDRVERSNUM >= 20701
-    if (xevent->EventID() && append) f=(cEvent *) schedule->GetEventById(xevent->EITEventID());
+    if (xevent->EventID() && append) f=(cEvent *) schedule->GetEventById(xevent->EventID());
 #else
     if (xevent->EventID() && append) f=(cEvent *) schedule->GetEvent(xevent->EventID());
 #endif
