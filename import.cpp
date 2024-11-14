@@ -205,6 +205,7 @@ cEvent *cImport::SearchVDREvent(cEPGSource *source, cSchedule* schedule, cXMLTVE
     if (xevent->EventID() && append) f=(cEvent *) schedule->GetEvent(xevent->EventID());
 #endif
     if (f) return f;
+    if (!append) return NULL;  // Return here with "create" processing otherwise short TV programs will be omitted	
 
     f=SearchVDREventByTitle(source, schedule, xevent->Title(), xevent->StartTime(),
                             xevent->Duration(), hint);
