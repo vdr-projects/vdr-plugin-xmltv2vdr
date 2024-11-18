@@ -102,6 +102,8 @@ cEvent *cImport::SearchVDREventByTitle(cEPGSource *source, cSchedule* schedule, 
             f=NULL;
         }
     }
+    if (!hint) return NULL; // Return here with addevents ("create" processing) otherwise short TV programs will be omitted	
+
     // 3rd with StartTime +/- TimeDiff
     int maxdiff=INT_MAX;
     int eventTimeDiff=720;
@@ -205,7 +207,6 @@ cEvent *cImport::SearchVDREvent(cEPGSource *source, cSchedule* schedule, cXMLTVE
     if (xevent->EventID() && append) f=(cEvent *) schedule->GetEvent(xevent->EventID());
 #endif
     if (f) return f;
-    if (!append) return NULL;  // Return here with "create" processing otherwise short TV programs will be omitted	
 
     f=SearchVDREventByTitle(source, schedule, xevent->Title(), xevent->StartTime(),
                             xevent->Duration(), hint);
@@ -1897,7 +1898,7 @@ int cImport::Process(cEPGSource *Source, cEPGExecutor &myExecutor)
                     }
                     flags=map->Flags();
 
-                    bool addevents=false;
+                    addevents=false;
                     if ((flags & OPT_APPEND)==OPT_APPEND) addevents=true;
 
 #if VDRVERSNUM>=20301
