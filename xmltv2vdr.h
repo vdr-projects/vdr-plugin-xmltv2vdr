@@ -21,7 +21,7 @@
 #define UNUSED(x) x
 #endif
 
-static const char *VERSION        = "0.2.3";
+static const char *VERSION        = "0.2.4";
 static const char *DESCRIPTION    = trNOOP("Imports xmltv epg into vdr");
 
 int ioprio_set(int which, int who, int ioprio);
@@ -62,6 +62,7 @@ private:
     cEPGMappings *maps;
     cImport import;
     int epall;
+    time_t last_timer_t;
 public:
     cEPGTimer(cGlobals *Global);
     void Stop()
@@ -73,6 +74,10 @@ public:
         epall=Value;
     }
     virtual void Action();
+    time_t Last()
+    {
+	return last_timer_t;
+    }
 };
 
 #if VDRVERSNUM < 10726 && !EPGHANDLER
@@ -139,9 +144,28 @@ class cHouseKeeping : public cThread
 {
 private:
     cGlobals *global;
+    time_t last_housetime_t;
     void checkdir(const char *imgdir, int age, int &cnt, int &lcnt);
 public:
     cHouseKeeping(cGlobals *Global);
+    void Stop()
+    {
+        Cancel(3);
+    }
+    time_t Last()
+    {
+        return last_housetime_t;
+    }
+    virtual void Action();
+};
+
+class cMainThread : public cThread
+{
+private:
+    cGlobals *global;
+    time_t last_maintime_t;
+public:
+    cMainThread(cGlobals *Global);
     void Stop()
     {
         Cancel(3);
@@ -188,6 +212,8 @@ public:
     cGlobals();
     ~cGlobals();
     cEPGHandler *epghandler;
+    cEPGExecutor epgexecutor;
+    cHouseKeeping housekeeping;
     bool DBExists();
     char *GetDefaultOrder();
     void AllocateEPGTimerThread()
@@ -321,11 +347,7 @@ class cPluginXmltv2vdr : public cPlugin
 {
 private:
     cGlobals g;
-    cHouseKeeping housekeeping;
-    cEPGExecutor epgexecutor;
-    time_t last_housetime_t;
-    time_t last_maintime_t;
-    time_t last_timer_t;
+    cMainThread mainthread;
     time_t last_epcheck_t;
     void GetSqliteCompileOptions();
     int GetLastImportSource();
@@ -345,12 +367,8 @@ public:
     virtual bool Initialize(void);
     virtual bool Start(void);
     virtual void Stop(void);
-    virtual void Housekeeping(void);
-    virtual void MainThreadHook(void);
     virtual cString Active(void);
     virtual time_t WakeupTime(void);
-    virtual const char *MainMenuEntry(void);
-    virtual cOsdObject *MainMenuAction(void);
     virtual cMenuSetupPage *SetupMenu(void);
     virtual bool SetupParse(const char *Name, const char *Value);
     virtual bool Service(const char *Id, void *Data = NULL);

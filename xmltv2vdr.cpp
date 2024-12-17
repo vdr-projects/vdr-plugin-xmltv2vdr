@@ -259,7 +259,7 @@ bool cEPGSearch_Client::DisableSearchTimer()
 
 // -------------------------------------------------------------
 
-cGlobals::cGlobals()
+cGlobals::cGlobals() : epgexecutor(EPGSources()),housekeeping(this)
 {
     confdir=NULL;
     epgfile_store=NULL;
@@ -363,6 +363,8 @@ cGlobals::cGlobals()
 
 cGlobals::~cGlobals()
 {
+    epgexecutor.Stop();
+    housekeeping.Stop();
     free(confdir);
     free(epgfile);
     free(epgfile_store);
@@ -786,6 +788,7 @@ cEPGTimer::cEPGTimer(cGlobals *Global) :
     sources=Global->EPGSources();
     maps=Global->EPGMappings();
     epall=0;
+    last_timer_t=time(NULL)-(time_t) 540;
     SetPriority(19);
     if (ioprio_set(1,getpid(),7 | 3 << 13)==-1)
     {
@@ -795,6 +798,7 @@ cEPGTimer::cEPGTimer(cGlobals *Global) :
 
 void cEPGTimer::Action()
 {
+    last_timer_t=(time(NULL)/600)*600;
     if (!import.DBExists()) return; // no database? -> exit immediately
 
 #if VDRVERSNUM<20301
@@ -884,9 +888,53 @@ Timers.DecBeingEdited();
 
 // -------------------------------------------------------------
 
+cMainThread::cMainThread(cGlobals *Global): cThread("xmltv2vdr mainthread")
+{
+    global=Global;
+    last_maintime_t = 0;
+}
+
+void cMainThread::Action(void)
+{
+    while (Running())
+    {
+         time_t now=time(NULL);
+         if (now>=(last_maintime_t+60))
+         {
+             if (!global->epgexecutor.Active())
+             {
+                 if (global->EPGSources()->RunItNow()) global->epgexecutor.Start();
+             }
+             last_maintime_t=(now/60)*60;
+         }
+         if (global->EPDir() && global->EPGTimer())
+         {
+             if (global->EPAll())
+             {
+                 if (now>=(global->EPGTimer()->Last()+600))
+                 {
+                     global->EPGTimer()->Start();
+                 }
+             }
+         }
+
+         if (now>(global->housekeeping.Last()+3600))
+         {
+             if (!global->housekeeping.Active())
+             {
+                 global->housekeeping.Start();
+             }
+         }
+         usleep(500000);
+    }
+}
+
+// -------------------------------------------------------------
+
 cHouseKeeping::cHouseKeeping(cGlobals *Global): cThread("xmltv2vdr housekeeping")
 {
     global=Global;
+    last_housetime_t = time(NULL);
 }
 
 void cHouseKeeping::checkdir(const char* imgdir, int age, int &cnt, int &lcnt)
@@ -938,6 +986,7 @@ int sd_select(const dirent* dirent)
 
 void cHouseKeeping::Action()
 {
+    last_housetime_t=(time(NULL) / 3600)*3600;
     if (global->ImgDelAfter() && global->ImgDir())
     {
         int cnt=0,lcnt=0;
@@ -1016,15 +1065,13 @@ void cEPGSeasonEpisode::Action()
 
 // -------------------------------------------------------------
 
-cPluginXmltv2vdr::cPluginXmltv2vdr(void) : housekeeping(&g),epgexecutor(g.EPGSources())
+cPluginXmltv2vdr::cPluginXmltv2vdr(void) : mainthread(&g)
 {
     // Initialize any member variables here.
     // DON'T DO ANYTHING ELSE THAT MAY HAVE SIDE EFFECTS, REQUIRE GLOBAL
     // VDR OBJECTS TO EXIST OR PRODUCE ANY OUTPUT!
     logfile=NULL;
-    last_maintime_t=0;
-    last_epcheck_t=last_housetime_t=time(NULL); // start this threads later!
-    last_timer_t=last_epcheck_t-(time_t) 540; // check timers in 60 seconds
+    last_epcheck_t=time(NULL); // start this threads later!
     g.SetEPAll(0);
     g.TEXTMappings()->Add(new cTEXTMapping("country",tr("country")));
     g.TEXTMappings()->Add(new cTEXTMapping("year",tr("year")));
@@ -1209,14 +1256,14 @@ bool cPluginXmltv2vdr::Start(void)
     if (sqlite3_threadsafe()==0) esyslog("sqlite3 not threadsafe!");
     sqlite3_enable_shared_cache(0);
     cParse::InitLibXML();
+    mainthread.Start();
     return true;
 }
 
 void cPluginXmltv2vdr::Stop(void)
 {
     // Stop any background activities the plugin is performing.
-    epgexecutor.Stop();
-    housekeeping.Stop();
+    mainthread.Stop();
     cParse::CleanupLibXML();
     if (logfile)
     {
@@ -1226,57 +1273,10 @@ void cPluginXmltv2vdr::Stop(void)
     g.CopyEPGFile(false);
 }
 
-void cPluginXmltv2vdr::Housekeeping(void)
-{
-    // Perform any cleanup or other regular tasks.
-    time_t now=time(NULL);
-    if (now>(last_housetime_t+3600))
-    {
-        if (!housekeeping.Active())
-        {
-            housekeeping.Start();
-        }
-        last_housetime_t=(now / 3600)*3600;
-    }
-}
-
-void cPluginXmltv2vdr::MainThreadHook(void)
-{
-    // Perform actions in the context of the main program thread.
-    // WARNING: Use with great care - see PLUGINS.html!
-    time_t now=time(NULL);
-    if (now>=(last_maintime_t+60))
-    {
-        if (!epgexecutor.Active())
-        {
-            if (g.EPGSources()->RunItNow()) epgexecutor.Start();
-        }
-        last_maintime_t=(now/60)*60;
-    }
-    if (g.EPDir())
-    {
-        /*
-          if (now>=(last_epcheck_t+900))
-          {
-              if (g.EPGSeasonEpisode()) g.EPGSeasonEpisode()->Start();
-              last_epcheck_t=(now/900)*900;
-          }
-        */
-        if (g.EPAll())
-        {
-            if (now>=(last_timer_t+600))
-            {
-                if (g.EPGTimer()) g.EPGTimer()->Start();
-                last_timer_t=(now/600)*600;
-            }
-        }
-    }
-}
-
 cString cPluginXmltv2vdr::Active(void)
 {
     // Return a message string if shutdown should be postponed
-    if (epgexecutor.Active())
+    if (g.epgexecutor.Active())
     {
         return tr("xmltv2vdr plugin still working");
     }
@@ -1293,18 +1293,6 @@ time_t cPluginXmltv2vdr::WakeupTime(void)
     tsyslog("reporting wakeuptime %s",ctime(&nextruntime));
 #endif
     return nextruntime;
-}
-
-const char *cPluginXmltv2vdr::MainMenuEntry(void)
-{
-    // Return a main menu entry
-    return NULL;
-}
-
-cOsdObject *cPluginXmltv2vdr::MainMenuAction(void)
-{
-    // Perform the action when selected from the main VDR menu.
-    return NULL;
 }
 
 cMenuSetupPage *cPluginXmltv2vdr::SetupMenu(void)
@@ -1396,7 +1384,7 @@ cString cPluginXmltv2vdr::SVDRPCommand(const char *Command, const char *Option, 
         }
         else
         {
-            if (epgexecutor.Active())
+            if (g.epgexecutor.Active())
             {
                 ReplyCode=550;
                 output="update already running\n";
@@ -1405,13 +1393,13 @@ cString cPluginXmltv2vdr::SVDRPCommand(const char *Command, const char *Option, 
             {
                 if (Option && strstr(Option,"force"))
                 {
-                    epgexecutor.SetForceDownload();
+                    g.epgexecutor.SetForceDownload();
                 }
                 else
                 {
-                    epgexecutor.SetForceImport(GetLastImportSource());
+                    g.epgexecutor.SetForceImport(GetLastImportSource());
                 }
-                if (epgexecutor.Start())
+                if (g.epgexecutor.Start())
                 {
                     ReplyCode=250;
                     output="update started\n";
@@ -1447,10 +1435,9 @@ cString cPluginXmltv2vdr::SVDRPCommand(const char *Command, const char *Option, 
     }
     if (!strcasecmp(Command,"TIMR"))
     {
-        if (!epgexecutor.Active() && g.EPGTimer() && !g.EPGTimer()->Active())
+        if (!g.epgexecutor.Active() && g.EPGTimer() && !g.EPGTimer()->Active())
         {
             g.EPGTimer()->Start();
-            last_timer_t=(time(NULL)/600)*600;
             ReplyCode=250;
             output="timerthread started\n";
         }
@@ -1470,10 +1457,9 @@ cString cPluginXmltv2vdr::SVDRPCommand(const char *Command, const char *Option, 
     }
     if (!strcasecmp(Command,"HOUS"))
     {
-        if (!epgexecutor.Active() && !housekeeping.Active())
+        if (!g.epgexecutor.Active() && !g.housekeeping.Active())
         {
-            housekeeping.Start();
-            last_housetime_t=(time(NULL)/3600)*3600;
+            g.housekeeping.Start();
             ReplyCode=250;
             output="housekeeping started\n";
         }
