@@ -110,6 +110,18 @@ void cParse::RemoveNonAlphaNumeric(char *String, bool InDescription)
         memmove(p,p+6,len-6);
     }
 
+    // cut off " Dramedy,"
+    len=strlen(String);
+    p=String;
+    p=strstr(String," Dramedy,");
+    if (p) *p=0;
+
+    // cut off " Krimi,"
+    len=strlen(String);
+    p=String;
+    p=strstr(String," Krimi,");
+    if (p) *p=0;
+
     len=strlen(String);
     p=String;
     // cut off " Folge XX" at end
@@ -362,14 +374,12 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
     }
     if (!ShortText)
     {
-        tsyslog("trying to find shorttext for '%s', with '%s'",Title,dshorttext);
+        tsyslog("trying to find shorttext for '%s' with '%s'",Title,dshorttext);
     }
 
-#undef DEBCMP
+    tsyslog("trying to find season/episode for '%s' with '%s'",Title,dshorttext);
 
-#ifdef DEBCMP
-    tsyslog("dshorttext=%s",dshorttext);
-#endif
+//#define DEBCMP 1
 
     char *line=NULL;
     size_t length = 0;
@@ -447,7 +457,7 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
                             if (*EPShortText) free(*EPShortText);
                             *EPShortText=strdup("@");
                         }
-                        isyslog("failed to find '%s' for '%s' in eplists",ShortText,Title);
+                        isyslog("failed to find '%s' for '%s' in eplists*",ShortText,Title);
                     }
                     else
                     {

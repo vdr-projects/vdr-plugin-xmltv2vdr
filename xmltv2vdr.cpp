@@ -653,8 +653,10 @@ bool cEPGHandler::SetDescription(cEvent* Event, const char* Description)
 	if (!strcasestr(Event->Description(),Description))
         {
             // eit description changed -> set it
+#ifdef VDRDEBUG
             tsyslog("{%5i} %schanging descr of '%s'",Event->EventID(),Event->HasTimer() ? "*" : "",
                     Event->Title());
+#endif
             return false;
         }
 #ifdef VDRDEBUG
@@ -663,8 +665,10 @@ bool cEPGHandler::SetDescription(cEvent* Event, const char* Description)
 #endif
         return true;
     }
+#ifdef VDRDEBUG
     tsyslog("{%5i} %ssetting descr of '%s'",Event->EventID(),Event->HasTimer() ? "*" : "",
             Event->Title());
+#endif
     return false;
 }
 
