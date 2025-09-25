@@ -128,6 +128,12 @@ void cParse::RemoveNonAlphaNumeric(char *String, bool InDescription)
     p=strstr(String," Familie,");
     if (p) *p=0;
 
+    // cut off " Western,"
+    len=strlen(String);
+    p=String;
+    p=strstr(String," Western,");
+    if (p) *p=0;
+
     len=strlen(String);
     p=String;
     // cut off " Folge XX" at end
