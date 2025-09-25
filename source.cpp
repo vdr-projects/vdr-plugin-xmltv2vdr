@@ -141,7 +141,7 @@ cEPGSource::cEPGSource(const char *Name, cGlobals *Global)
     running=false;
     haspics=usepics=false;
     daysinadvance=1;
-    exec_time=10;
+    exec_time=15;
     exec_weekday=127; // Mon->Sun
     lastretcode=255;
     disabled=false;

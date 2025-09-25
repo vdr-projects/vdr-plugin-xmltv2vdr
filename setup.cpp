@@ -913,7 +913,7 @@ cMenuSetupXmltv2vdrChannelSource::cMenuSetupXmltv2vdrChannelSource(cGlobals *Glo
 
     day=0;
     weekday=127;
-    start=10;
+    start=15;
 
     days=1;
     pin[0]=0;

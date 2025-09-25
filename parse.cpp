@@ -122,6 +122,12 @@ void cParse::RemoveNonAlphaNumeric(char *String, bool InDescription)
     p=strstr(String," Krimi,");
     if (p) *p=0;
 
+    // cut off " Familie,"
+    len=strlen(String);
+    p=String;
+    p=strstr(String," Familie,");
+    if (p) *p=0;
+
     len=strlen(String);
     p=String;
     // cut off " Folge XX" at end
@@ -377,9 +383,12 @@ bool cParse::FetchSeasonEpisode(iconv_t cEP2ASCII, iconv_t cUTF2ASCII, const cha
         tsyslog("trying to find shorttext for '%s' with '%s'",Title,dshorttext);
     }
 
-    tsyslog("trying to find season/episode for '%s' with '%s'",Title,dshorttext);
-
 //#define DEBCMP 1
+
+#ifdef DEBCMP
+    tsyslog("dshorttext=%s",dshorttext);
+#endif
+    tsyslog("trying to find season/episode for '%s' with '%s'",Title,dshorttext);
 
     char *line=NULL;
     size_t length = 0;

@@ -876,6 +876,7 @@ void cEPGTimer::Action()
         delete xevent;
     }
 #if VDRVERSNUM>=20301
+    if (!Timers) tsyslog("failed to get timers for read");
     StateKey.Remove();
 }
 #endif
